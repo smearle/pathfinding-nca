@@ -1,3 +1,4 @@
+from pdb import set_trace as TT
 import numpy as np
 import torch
 
@@ -7,6 +8,12 @@ wall_chan = 1
 src_chan = 2
 trg_chan = 3
 path_chan = 4
+
+
+class Mazes():
+  def __init__(self, cfg, height=16, width=16):
+    self.mazes_discrete, self.mazes_onehot, self.target_paths = gen_rand_mazes(data_n=cfg.data_n)
+    self.maze_ims = torch.Tensor([render_discrete(maze_discrete[None,])[0] for maze_discrete in self.mazes_discrete])
 
 
 def generate_random_maze(render=True):
@@ -38,15 +45,14 @@ def generate_random_maze(render=True):
 
     return rand_maze_onehot
 
-empty_color = torch.Tensor([1.0, 1.0, 1.0])
-wall_color = torch.Tensor([0.0, 0.0, 0.0])
-src_color = torch.Tensor([1.0, 1.0, 0.0])
-trg_color = torch.Tensor([0.0, 1.0, 0.0])
-path_color = torch.Tensor([1.0, 0.0, 0.0])
-colors = {empty_chan: empty_color, wall_chan: wall_color, path_chan: path_color, src_chan: src_color, trg_chan: trg_color, }
 
-
-def render_discrete(arr, colors=colors):
+def render_discrete(arr):
+    empty_color = torch.Tensor([1.0, 1.0, 1.0])
+    wall_color = torch.Tensor([0.0, 0.0, 0.0])
+    src_color = torch.Tensor([1.0, 1.0, 0.0])
+    trg_color = torch.Tensor([0.0, 1.0, 0.0])
+    path_color = torch.Tensor([1.0, 0.0, 0.0])
+    colors = {empty_chan: empty_color, wall_chan: wall_color, path_chan: path_color, src_chan: src_color, trg_chan: trg_color, }
     batch_size, height, width = arr.shape
     im = torch.zeros((batch_size, height, width, 3), dtype=torch.float32)
 
@@ -57,6 +63,7 @@ def render_discrete(arr, colors=colors):
     im = im.cpu().numpy()
 
     return im
+
 
 # rand_maze_onehot = generate_random_maze()
 # rand_maze_im = render_discrete(rand_maze_onehot.argmax(dim=1))

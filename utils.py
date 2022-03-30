@@ -1,6 +1,7 @@
 
 import base64
 import io
+import pickle
 import requests
 
 from moviepy.video.io.ffmpeg_writer import FFMPEG_VideoWriter
@@ -9,6 +10,37 @@ from moviepy.video.io.ffmpeg_writer import FFMPEG_VideoWriter
 import numpy as np
 import PIL
 import torch
+
+
+class Logger():
+  def __init__(self):
+    self.loss_log = []
+
+  def log(self, loss):
+    self.loss_log.append(loss)
+
+ca_state_fname = 'ca_state_dict.pt'
+opt_state_fname = 'opt_state_dict.pt'
+logger_fname = 'logger.pk'
+maze_data_fname = 'maze_data.pk'
+
+def save(ca, opt, maze_data, logger, cfg):
+  torch.save(ca.state_dict(), f'{cfg.log_dir}/{ca_state_fname}')
+  torch.save(opt.state_dict(), f'{cfg.log_dir}/{opt_state_fname}')
+  with open(f'{cfg.log_dir}/{logger_fname}', 'wb') as f:
+    pickle.dump(logger, f)
+  with open(f'{cfg.log_dir}/{maze_data_fname}', 'wb') as f:
+    pickle.dump(maze_data, f)
+
+
+def load(ca, opt, cfg):
+  ca.load_state_dict(torch.load(f'{cfg.log_dir}/{ca_state_fname}'))
+  opt.load_state_dict(torch.load(f'{cfg.log_dir}/{opt_state_fname}'))
+  maze_data = pickle.load(open(f'{cfg.log_dir}/{maze_data_fname}', 'rb'))
+  logger = pickle.load(open(f'{cfg.log_dir}/{logger_fname}', 'rb'))
+  print(f'Loaded CA and optimizer state dict, and maze archive from {cfg.log_dir}.')
+
+  return ca, opt, maze_data, logger
 
 
 def to_path(x):
@@ -55,6 +87,7 @@ def np2pil(a):
     a = np.uint8(np.clip(a, 0, 1)*255)
   return PIL.Image.fromarray(a)
 
+
 def imwrite(f, a, fmt=None):
   a = np.asarray(a)
   if isinstance(f, str):
@@ -64,6 +97,7 @@ def imwrite(f, a, fmt=None):
     f = open(f, 'wb')
   np2pil(a).save(f, fmt, quality=95)
 
+
 def imencode(a, fmt='jpeg'):
   a = np.asarray(a)
   if len(a.shape) == 3 and a.shape[-1] == 4:
@@ -72,13 +106,16 @@ def imencode(a, fmt='jpeg'):
   imwrite(f, a, fmt)
   return f.getvalue()
 
+
 def im2url(a, fmt='jpeg'):
   encoded = imencode(a, fmt)
   base64_byte_string = base64.b64encode(encoded).decode('ascii')
   return 'data:image/' + fmt.upper() + ';base64,' + base64_byte_string
 
+
 # def imshow(a, fmt='jpeg'):
 #   display(Image(data=imencode(a, fmt)))
+
 
 def tile2d(a, w=None):
   a = np.asarray(a)

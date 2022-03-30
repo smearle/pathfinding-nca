@@ -4,7 +4,9 @@
 import argparse
 import os
 from pdb import set_trace as TT
+import pickle
 import sys
+from matplotlib import animation
 
 import numpy as np
 import matplotlib.pyplot as pl
@@ -14,10 +16,10 @@ import torch
 from tqdm import tqdm_notebook, tnrange
 
 from config import Config
-from mazes import gen_rand_mazes, render_discrete
+from mazes import gen_rand_mazes, render_discrete, Mazes
 from model import CA
 from training import train
-from utils import VideoWriter, gen_pool, get_mse_loss, to_path
+from utils import Logger, VideoWriter, gen_pool, get_mse_loss, to_path, load
 
 
 os.system('nvidia-smi -L')
@@ -36,26 +38,9 @@ def main():
   args.add_argument('--load', action='store_true')
   args.add_argument('--render', action='store_true')
   args = args.parse_args()
-
-  solvable_mazes_discrete, solvable_mazes_onehot, target_paths = gen_rand_mazes(data_n=cfg.data_n)
-  rand_maze_ims = [render_discrete(rand_maze_discrete[None,])[0] for rand_maze_discrete in solvable_mazes_discrete]
-  fig, ax = pl.subplots(figsize=(20, 5))
-  pl.imshow(np.hstack(rand_maze_ims[:cfg.render_minibatch_size]))
-
-  path_chan = 4
-  assert path_chan == solvable_mazes_discrete.max() + 1
-  solved_mazes = solvable_mazes_discrete.clone()
-  solved_mazes[torch.where(target_paths == 1)] = path_chan
-  solved_maze_ims = render_discrete(solved_mazes)
-  fig, ax = pl.subplots(figsize=(20, 5))
-  pl.imshow(np.hstack(solved_maze_ims[:cfg.render_minibatch_size]))
-
-  fig, ax = pl.subplots(figsize=(20, 5))
-  pl.imshow(np.hstack(target_paths[:cfg.render_minibatch_size].cpu()))
-  pl.tight_layout()
+  args.load = True if args.render else args.load
 
   n_in_chan = 4  # The number of channels in the one-hot encodings of the training mazes.
-  assert n_in_chan == solvable_mazes_onehot.shape[1]
 
   # setup training
   ca = CA(n_in_chan, cfg.n_aux_chan, cfg.n_hidden_chan) 
@@ -63,33 +48,41 @@ def main():
   print('CA param count:', param_n)
   opt = torch.optim.Adam(ca.parameters(), 1e-4)
 
-
   if args.load:
-    ca.load_state_dict(torch.load(f'{cfg.log_dir}/ca_state_dict.pt'))
-    opt.load_state_dict(torch.load(f'{cfg.log_dir}/opt_state_dict.pt'))
-    print(f'Loaded CA state dict and optimizer state dict from {cfg.log_dir}.')
+    ca, opt, maze_data, logger = load(ca, opt, cfg)
 
-  # with torch.no_grad():
-  #   pool = ca.seed(256)
+  else:
+    maze_data = Mazes(cfg)
+    logger = Logger()
 
-  #@title training loop {vertical-output: true}
+  mazes_onehot, mazes_discrete, maze_ims, target_paths = \
+    (maze_data.mazes_onehot, maze_data.mazes_discrete, maze_data.maze_ims, maze_data.target_paths)
+
+# fig, ax = pl.subplots(figsize=(20, 5))
+# pl.imshow(np.hstack(maze_ims[:cfg.render_minibatch_size]))
+
+  path_chan = 4
+  assert path_chan == mazes_discrete.max() + 1
+# solved_mazes = mazes_discrete.clone()
+# solved_mazes[torch.where(target_paths == 1)] = path_chan
+# fig, ax = pl.subplots(figsize=(20, 5))
+# pl.imshow(np.hstack(solved_maze_ims[:cfg.render_minibatch_size]))
+
+# fig, ax = pl.subplots(figsize=(20, 5))
+# pl.imshow(np.hstack(target_paths[:cfg.render_minibatch_size].cpu()))
+# pl.tight_layout()
+
+  assert n_in_chan == mazes_onehot.shape[1]
 
   # The set of initial mazes (padded with 0s, channel-wise, to act as the initial state of the CA).
-  training_mazes_onehot, training_mazes_discrete = solvable_mazes_onehot, solvable_mazes_discrete
-  # training_maze_xs = torch.zeros(training_mazes.shape[0], n_aux_chan, training_mazes.shape[2], training_mazes.shape[3])
-  # training_maze_xs[:, :n_in_chan, :, :] = training_mazes
-  # pl.imshow(np.hstack(training_maze_xs[...,2:3,:,:].permute([0,2,3,1]).cpu()))
-  # sys.exit()
-  # Images of solved mazes, for reference.
-  solved_maze_ims = torch.Tensor(solved_maze_ims)
 
   if args.render:
-    render_trained(ca, training_mazes_onehot, training_mazes_discrete, cfg)
+    render_trained(ca, mazes_onehot, mazes_discrete, cfg)
   else:
-    train(ca, opt, training_mazes_onehot, solved_maze_ims, target_paths, cfg)
+    train(ca, opt, maze_data, target_paths, logger, cfg)
 
 
-def render_trained(ca, mazes_onehot, mazes_discrete, cfg):
+def render_trained(ca, mazes_onehot, mazes_discrete, cfg, pyplot_animation=True):
   #@title NCA video {vertical-output: true}
 
   pool = gen_pool(mazes_onehot.shape[0], ca.n_out_chan, mazes_onehot.shape[2], mazes_onehot.shape[3])
@@ -99,34 +92,74 @@ def render_trained(ca, mazes_onehot, mazes_discrete, cfg):
   x0 = mazes_onehot[batch_idx]
   ca.reset(x0)
 
-  with VideoWriter() as vid, torch.no_grad():
+  if pyplot_animation:
+    fig, ax = pl.subplots(figsize=(10,10))
 
-    def write(x, x0):
+
+    def get_imgs(x, x0):
       img = to_path(x[:cfg.render_minibatch_size])[...,None].cpu()
       img = (img - img.min()) / (img.max() - img.min())
-      img = np.hstack(img)
+      img = np.hstack(img.detach())
       # solved_maze_ims = [render_discrete(x0i.argmax(0)[None,...]) for x0i in x0]
       # solved_mazes_im = np.hstack(np.vstack(solved_maze_ims))
       solved_mazes_im = np.hstack(render_discrete(mazes_discrete[render_batch_idx]))
       imgs = np.vstack([solved_mazes_im, np.tile(img, (1, 1, 3))])
-      vid.add(imgs)
-  #   fig, ax = pl.subplots(figsize=(10,10))
-  #   pl.imshow(imgs)
-  #   pl.show()
 
-    write(x, x0)
-    # for k in tnrange(300, leave=False):
-    # for k in range(m):
-      # step_n = min(2**(k//30), 16)
-    for i in range(cfg.expected_net_steps):
-      x = ca(x)
-      # pl.imshow(x)
+      return imgs
+
+
+    imgs = get_imgs(x, x0)
+    pl_im = pl.imshow(imgs, interpolation='none')
+
+    def init():
+      pl_im.set_data(imgs)
+
+      return pl_im,
+
+    xs = []
+
+    with torch.no_grad():
+      for i in range(cfg.expected_net_steps):
+        x = ca(x)
+        xs.append(x)
+
+    def animate(i):
+      xi = xs[i]
+      imgs = get_imgs(xi, x0)
+      pl_im.set_data(imgs)
+      # line.set_ydata(np.sin(x + i / 50))  # update the data.
       # pl.show()
-      write(x, x0)
-  #     if i < expected_net_steps - 1:
-  #       clear_output(True)
-      
-      # Test trained model on newly-generated solvable mazes to test inference.
+
+      return pl_im,
+
+
+    anim = animation.FuncAnimation(
+      fig, animate, init_func=init, interval=1, frames=cfg.expected_net_steps, blit=True, save_count=50)
+    anim.save(f'{cfg.log_dir}/path_nca_anim.mp4', fps=30, extra_args=['-vcodec', 'libx264'])
+    pl.show()
+
+  else:
+
+    with VideoWriter(filename=f'{cfg.log_dir}/path_nca.mp4') as vid, torch.no_grad():
+    #   pl.imshow(imgs)
+    #   pl.show()
+
+      vid.add(imgs)
+      # for k in tnrange(300, leave=False):
+      # for k in range(m):
+        # step_n = min(2**(k//30), 16)
+      with torch.no_grad():
+        for i in range(cfg.expected_net_steps):
+          x = ca(x)
+          # pl.imshow(x)
+          # pl.show()
+          imgs = get_imgs(x, x0)
+          vid.add(imgs)
+      #     if i < expected_net_steps - 1:
+      #       clear_output(True)
+          
+          # Test trained model on newly-generated solvable mazes to test inference.
+
 
 def evaluate(ca, cfg):
   n_test_minibatches = 10
@@ -154,7 +187,9 @@ def evaluate(ca, cfg):
                   # clear_output(True)
                   fig, ax = pl.subplots(figsize=(10, 10))
                   solved_maze_ims = np.hstack(render_discrete(x0_discrete[:cfg.render_minibatch_size]))
-                  target_path_ims = np.tile(np.hstack(target_paths_mini_batch[:cfg.render_minibatch_size].cpu())[...,None], (1, 1, 3))
+                  target_path_ims = np.tile(np.hstack(
+                    target_paths_mini_batch[:cfg.render_minibatch_size].cpu())[...,None], (1, 1, 3)
+                    )
                   predicted_path_ims = to_path(x[:cfg.render_minibatch_size])[...,None].cpu()
                   # img = (img - img.min()) / (img.max() - img.min())
                   predicted_path_ims = np.hstack(predicted_path_ims)

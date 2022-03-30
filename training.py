@@ -1,19 +1,24 @@
+from logging import Logger
+from pdb import set_trace as TT
+import pickle
 from matplotlib import pyplot as pl
 import numpy as np
+from timeit import default_timer as timer
 import torch
 import torchvision.models as models
 
-from utils import gen_pool, get_mse_loss, to_path
+from utils import gen_pool, get_mse_loss, to_path, save
 
 
-def train(ca, opt, mazes_onehot, maze_ims, target_paths, cfg):
+def train(ca, opt, maze_data, target_paths, logger, cfg):
+  mazes_onehot, maze_ims = maze_data.mazes_onehot, maze_data.maze_ims
   # Upper bound of net steps = step_n * m. Expected net steps = (minibatch_size / data_n) * m * step_n. (Since we select from pool
   # randomly before each mini-episode.)
   minibatch_size = min(cfg.minibatch_size, cfg.data_n)
   m = int(cfg.expected_net_steps / cfg.step_n * cfg.data_n / minibatch_size)
   # m = expected_net_steps
   lr_sched = torch.optim.lr_scheduler.MultiStepLR(opt, [2000], 0.01)
-  loss_log = []
+  last_time = timer()
 
   for i in range(cfg.n_updates):
     with torch.no_grad():
@@ -58,14 +63,14 @@ def train(ca, opt, mazes_onehot, maze_ims, target_paths, cfg):
       # lr_sched.step()
       pool[batch_idx] = x                # update pool
       
-      loss_log.append(loss.item())
+      logger.log(loss=loss.item())
 
       if i % cfg.log_interval == 0:
         fig, ax = pl.subplots(2, 4, figsize=(20, 10))
         pl.subplot(411)
-        pl.plot(loss_log, '.', alpha=0.1)
+        pl.plot(logger.loss_log, '.', alpha=0.1)
         pl.yscale('log')
-        pl.ylim(np.min(loss_log), loss_log[0])
+        pl.ylim(np.min(logger.loss_log), logger.loss_log[0])
         # imgs = to_rgb(x).permute([0, 2, 3, 1]).cpu()
         render_paths = to_path(x[:cfg.render_minibatch_size]).cpu()
         # imshow(np.hstack(imgs))
@@ -81,12 +86,16 @@ def train(ca, opt, mazes_onehot, maze_ims, target_paths, cfg):
         pl.savefig(f'{cfg.log_dir}/training_progress.png')
           
       if i % cfg.save_interval == 0:
-        torch.save(ca.state_dict(), f'{cfg.log_dir}/ca_state_dict.pt')
-        torch.save(opt.state_dict(), f'{cfg.log_dir}/opt_state_dict.pt')
-        print(f'Saved CA and optimizer state dicts to {cfg.log_dir}')
+        save(ca, opt, maze_data, logger, cfg)
 
-      if i % 10 == 0:
-        print('\rstep_n:', len(loss_log),
-          ' loss:', loss.item(), 
+        # print(f'Saved CA and optimizer state dicts and maze archive to {cfg.log_dir}')
+
+      new_time = timer()
+
+      if i % cfg.log_interval == 0:
+        print('\rstep_n:', len(logger.loss_log),
+          ' loss: {:.6e}'.format(loss.item()),
+          'fps: {:.2f}'.format(cfg.step_n * cfg.minibatch_size / (timer() - last_time)), 
           # ' lr:', lr_sched.get_lr()[0], end=''
           )
+        last_time = timer()
