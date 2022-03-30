@@ -10,7 +10,8 @@ import sys
 import zipfile
 
 import numpy as np
-import matplotlib.pylab as pl
+# import matplotlib.pylab as pl
+import matplotlib.pyplot as pl
 import PIL.Image, PIL.ImageDraw
 import base64
 # from IPython.display import Image, HTML, clear_output
@@ -139,6 +140,7 @@ src_chan = 2
 trg_chan = 3
 path_chan = 4
 
+
 def generate_random_maze(render=True):
     batch_size = 1
     width = 16
@@ -188,10 +190,8 @@ def render_discrete(arr, colors=colors):
 
     return im
 
-
 rand_maze_onehot = generate_random_maze()
 rand_maze_im = render_discrete(rand_maze_onehot.argmax(dim=1))
-TT()
 fig, ax = pl.subplots()
 ax.imshow(np.hstack(rand_maze_im), )
 pl.tight_layout()
@@ -203,73 +203,6 @@ adj_coords_2d = np.array([
     [0, -1]
 ])
 
-def bfs(arr, passable=0, impassable=1, src=2, trg=3):
-    width = arr.shape[0]
-    assert width == arr.shape[1]
-    srcs = np.argwhere(arr == src)
-    assert srcs.shape[0] == 1
-    src = tuple(srcs[0])
-    frontier = [src]
-    back_paths = {}
-    visited = set({})
-    while frontier:
-        curr = frontier.pop(0)
-        if arr[curr[0], curr[1]] == trg:
-            path = []
-            path.append(curr)
-            while curr in back_paths:
-                curr = back_paths[curr]
-                path.append(curr)
-            return path[::-1]
-        visited.add(curr)
-        adjs = [tuple((np.array(curr) + move) % width) for move in adj_coords_2d]
-        for adj in adjs:
-            if adj in visited or arr[adj[0], adj[1]] == impassable:
-                continue
-            frontier.append(adj)
-            back_paths.update({adj: curr})
-    return []
-
-data_n = 256
-render_minibatch_size = 8  # how many mazes to render at once
-
-
-def gen_rand_mazes(data_n=data_n):
-    # Generate new random mazes until we get enough solvable ones.
-    solvable_mazes_onehot = []
-    solvable_mazes_discrete = []
-    target_paths = []
-    i = 0
-    while len(solvable_mazes_onehot) < data_n:
-        rand_maze_onehot = generate_random_maze()
-        rand_maze_discrete = rand_maze_onehot.argmax(axis=1)
-        sol = bfs(rand_maze_discrete[0].cpu().numpy())
-        if sol:
-            solvable_mazes_onehot.append(rand_maze_onehot)
-            solvable_mazes_discrete.append(rand_maze_discrete)
-            target_path = torch.zeros_like(rand_maze_discrete)
-            for x, y in sol:
-                target_path[0, x, y] = 1
-            target_paths.append(target_path)
-        i += 1
-    # print(f'Solution length: {len(sol)}')
-    print(f'Generated {i} random mazes to produce {data_n} solvable mazes.')
-
-    return torch.vstack(solvable_mazes_discrete), torch.vstack(solvable_mazes_onehot), torch.vstack(target_paths)
-
-
-TT()
-solvable_mazes_discrete, solvable_mazes_onehot, target_paths = gen_rand_mazes(data_n=data_n)
-rand_maze_ims = [render_discrete(rand_maze_discrete[None,])[0] for rand_maze_discrete in solvable_mazes_discrete]
-fig, ax = pl.subplots(figsize=(20, 5))
-pl.imshow(np.hstack(rand_maze_ims[:render_minibatch_size]))
-
-adj_coords_2d = np.array([
-    [1, 0],
-    [0, 1],
-    [-1, 0],
-    [0, -1]
-])
 
 def bfs(arr, passable=0, impassable=1, src=2, trg=3):
     width = arr.shape[0]
@@ -467,7 +400,8 @@ expected_net_steps = 64 * 4
 m = int(expected_net_steps / step_n * data_n / minibatch_size)
 # m = expected_net_steps
 
-log_interval = 64
+log_interval = 128
+save_interval = 1024
 n_updates = 100000
 
 for i in range(n_updates):
@@ -516,8 +450,6 @@ for i in range(n_updates):
     loss_log.append(loss.item())
 
     if i % log_interval == 0:
-      clear_output(True)
-
       fig, ax = pl.subplots(2, 4, figsize=(20, 10))
       pl.subplot(411)
       pl.plot(loss_log, '.', alpha=0.1)
@@ -535,9 +467,12 @@ for i in range(n_updates):
       # pl.imshow(np.hstack(x[...,-2:-1,:,:].permute([0,2,3,1]).cpu()))
       # pl.imshow(np.hstack(ca.x0[...,0:1,:,:].permute([0,2,3,1]).cpu()))
       print(f'path activation min: {render_paths.min()}, max: {render_paths.max()}')
-      pl.show()
+      pl.savefig('training_progress.png')
+        
+    if i % save_interval == 0:
+        pass
 
-    if i%10 == 0:
+    if i % 10 == 0:
       print('\rstep_n:', len(loss_log),
         ' loss:', loss.item(), 
         ' lr:', lr_sched.get_lr()[0], end='')
@@ -580,8 +515,8 @@ with VideoWriter() as vid, torch.no_grad():
     # pl.imshow(x)
     # pl.show()
     write(x, x0)
-    if i < expected_net_steps - 1:
-      clear_output(True)
+#     if i < expected_net_steps - 1:
+#       clear_output(True)
     
     # Test trained model on newly-generated solvable mazes to test inference.
 
