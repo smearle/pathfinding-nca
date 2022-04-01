@@ -4,7 +4,9 @@ import torch
 
 
 class Config():
+  # How many mazes on which to train at a time
   data_n = 256
+
   render_minibatch_size = 8  # how many mazes to render at once
   log_dir = 'log'
 
@@ -33,4 +35,9 @@ class Config():
   minibatch_size = 32    
 
   # device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+  learning_rate = 1e-4
+
+  # Train on new random mazes 
+  gen_new_data_interval = None
 

@@ -33,12 +33,16 @@ np.set_printoptions(threshold=sys.maxsize)
 
 
 def main():
-  cfg = Config()
   args = argparse.ArgumentParser()
   args.add_argument('--load', action='store_true')
   args.add_argument('--render', action='store_true')
   args = args.parse_args()
   args.load = True if args.render else args.load
+
+  cfg = Config()
+
+  # Command-line arguments will overwrite config attributs.
+  [setattr(cfg, k, v) for k, v in vars(args).items()]
 
   n_in_chan = 4  # The number of channels in the one-hot encodings of the training mazes.
 
@@ -46,9 +50,9 @@ def main():
   ca = CA(n_in_chan, cfg.n_aux_chan, cfg.n_hidden_chan) 
   param_n = sum(p.numel() for p in CA().parameters())
   print('CA param count:', param_n)
-  opt = torch.optim.Adam(ca.parameters(), 1e-4)
+  opt = torch.optim.Adam(ca.parameters(), cfg.learning_rate)
 
-  if args.load:
+  if cfg.load:
     ca, opt, maze_data, logger = load(ca, opt, cfg)
 
   else:
@@ -76,15 +80,16 @@ def main():
 
   # The set of initial mazes (padded with 0s, channel-wise, to act as the initial state of the CA).
 
-  if args.render:
-    render_trained(ca, mazes_onehot, mazes_discrete, cfg)
+  if cfg.render:
+    render_trained(ca, maze_data, cfg)
   else:
     train(ca, opt, maze_data, target_paths, logger, cfg)
 
 
-def render_trained(ca, mazes_onehot, mazes_discrete, cfg, pyplot_animation=True):
-  #@title NCA video {vertical-output: true}
-
+def render_trained(ca, maze_data, cfg, pyplot_animation=True):
+  """Generate a video showing the behavior of the trained NCA on mazes from its training distribution.
+  """
+  mazes_onehot, mazes_discrete = maze_data.mazes_onehot, maze_data.mazes_discrete
   pool = gen_pool(mazes_onehot.shape[0], ca.n_out_chan, mazes_onehot.shape[2], mazes_onehot.shape[3])
   batch_idx = np.random.choice(pool.shape[0], cfg.render_minibatch_size, replace=False)
   render_batch_idx = batch_idx[:cfg.render_minibatch_size]
@@ -123,6 +128,7 @@ def render_trained(ca, mazes_onehot, mazes_discrete, cfg, pyplot_animation=True)
         x = ca(x)
         xs.append(x)
 
+
     def animate(i):
       xi = xs[i]
       imgs = get_imgs(xi, x0)
@@ -141,26 +147,17 @@ def render_trained(ca, mazes_onehot, mazes_discrete, cfg, pyplot_animation=True)
   else:
 
     with VideoWriter(filename=f'{cfg.log_dir}/path_nca.mp4') as vid, torch.no_grad():
-    #   pl.imshow(imgs)
-    #   pl.show()
-
       vid.add(imgs)
-      # for k in tnrange(300, leave=False):
-      # for k in range(m):
-        # step_n = min(2**(k//30), 16)
+
       with torch.no_grad():
+
         for i in range(cfg.expected_net_steps):
           x = ca(x)
-          # pl.imshow(x)
-          # pl.show()
           imgs = get_imgs(x, x0)
           vid.add(imgs)
-      #     if i < expected_net_steps - 1:
-      #       clear_output(True)
           
-          # Test trained model on newly-generated solvable mazes to test inference.
 
-
+# Test trained model on newly-generated solvable mazes to test inference.
 def evaluate(ca, cfg):
   n_test_minibatches = 10
   n_test_mazes = n_test_minibatches * cfg.minibatch_size

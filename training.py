@@ -6,6 +6,7 @@ import numpy as np
 from timeit import default_timer as timer
 import torch
 import torchvision.models as models
+from mazes import Mazes
 
 from utils import gen_pool, get_mse_loss, to_path, save
 
@@ -17,11 +18,15 @@ def train(ca, opt, maze_data, target_paths, logger, cfg):
   minibatch_size = min(cfg.minibatch_size, cfg.data_n)
   m = int(cfg.expected_net_steps / cfg.step_n * cfg.data_n / minibatch_size)
   # m = expected_net_steps
-  lr_sched = torch.optim.lr_scheduler.MultiStepLR(opt, [2000], 0.01)
+  # lr_sched = torch.optim.lr_scheduler.MultiStepLR(opt, [10000], 0.1)
   last_time = timer()
 
   for i in range(cfg.n_updates):
     with torch.no_grad():
+
+      if cfg.gen_new_data_interval and i % cfg.gen_new_data_interval == 0:
+        maze_data = Mazes(cfg)
+        mazes_onehot, maze_ims = maze_data.mazes_onehot, maze_data.maze_ims
 
       if i % m == 0:
         # pool = training_maze_xs.clone()
@@ -60,7 +65,7 @@ def train(ca, opt, maze_data, target_paths, logger, cfg):
         p.grad /= (p.grad.norm()+1e-8)   # normalize gradients 
       opt.step()
       opt.zero_grad()
-      # lr_sched.step()
+      lr_sched.step()
       pool[batch_idx] = x                # update pool
       
       logger.log(loss=loss.item())
@@ -84,18 +89,18 @@ def train(ca, opt, maze_data, target_paths, logger, cfg):
         # pl.imshow(np.hstack(ca.x0[...,0:1,:,:].permute([0,2,3,1]).cpu()))
         # print(f'path activation min: {render_paths.min()}, max: {render_paths.max()}')
         pl.savefig(f'{cfg.log_dir}/training_progress.png')
+        pl.close()
           
       if i % cfg.save_interval == 0:
         save(ca, opt, maze_data, logger, cfg)
 
         # print(f'Saved CA and optimizer state dicts and maze archive to {cfg.log_dir}')
 
-      new_time = timer()
-
       if i % cfg.log_interval == 0:
+        fps = cfg.step_n * cfg.minibatch_size / (timer() - last_time) if i > 0 else 0
         print('\rstep_n:', len(logger.loss_log),
           ' loss: {:.6e}'.format(loss.item()),
-          'fps: {:.2f}'.format(cfg.step_n * cfg.minibatch_size / (timer() - last_time)), 
-          # ' lr:', lr_sched.get_lr()[0], end=''
+          ' fps: {:.2f}'.format(fps), 
+          ' lr:', lr_sched.get_last_lr(), end=''
           )
         last_time = timer()
