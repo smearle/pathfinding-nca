@@ -15,36 +15,26 @@ import base64
 import torch
 from tqdm import tqdm_notebook, tnrange
 
-from config import Config
+from config import ClArgsConfig
 from mazes import gen_rand_mazes, render_discrete, Mazes
 from model import CA
 from training import train
 from utils import Logger, VideoWriter, gen_pool, get_mse_loss, to_path, load
 
 
-os.system('nvidia-smi -L')
-if torch.cuda.is_available():
-    print('Using GPU/CUDA.')
-    torch.set_default_tensor_type('torch.cuda.FloatTensor')
-else:
-    print('Not using GPU/CUDA, using CPU.')
-    
 np.set_printoptions(threshold=sys.maxsize)
 
 
 def main():
-  args = argparse.ArgumentParser()
-  args.add_argument('--load', action='store_true')
-  args.add_argument('--render', action='store_true')
-  args = args.parse_args()
-  args.load = True if args.render else args.load
-
-  cfg = Config()
-
-  # Command-line arguments will overwrite config attributs.
-  [setattr(cfg, k, v) for k, v in vars(args).items()]
-
+  os.system('nvidia-smi -L')
+  if torch.cuda.is_available():
+      print('Using GPU/CUDA.')
+      torch.set_default_tensor_type('torch.cuda.FloatTensor')
+  else:
+      print('Not using GPU/CUDA, using CPU.')
+    
   n_in_chan = 4  # The number of channels in the one-hot encodings of the training mazes.
+  cfg = ClArgsConfig()
 
   # setup training
   ca = CA(n_in_chan, cfg.n_aux_chan, cfg.n_hidden_chan) 
@@ -142,7 +132,7 @@ def render_trained(ca, maze_data, cfg, pyplot_animation=True):
     anim = animation.FuncAnimation(
       fig, animate, init_func=init, interval=1, frames=cfg.expected_net_steps, blit=True, save_count=50)
     anim.save(f'{cfg.log_dir}/path_nca_anim.mp4', fps=30, extra_args=['-vcodec', 'libx264'])
-    pl.show()
+    # pl.show()
 
   else:
 

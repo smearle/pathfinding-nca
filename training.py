@@ -18,7 +18,7 @@ def train(ca, opt, maze_data, target_paths, logger, cfg):
   minibatch_size = min(cfg.minibatch_size, cfg.data_n)
   m = int(cfg.expected_net_steps / cfg.step_n * cfg.data_n / minibatch_size)
   # m = expected_net_steps
-  # lr_sched = torch.optim.lr_scheduler.MultiStepLR(opt, [10000], 0.1)
+  lr_sched = torch.optim.lr_scheduler.MultiStepLR(opt, [10000], 0.1)
   last_time = timer()
 
   for i in range(cfg.n_updates):
@@ -65,7 +65,7 @@ def train(ca, opt, maze_data, target_paths, logger, cfg):
         p.grad /= (p.grad.norm()+1e-8)   # normalize gradients 
       opt.step()
       opt.zero_grad()
-      lr_sched.step()
+      # lr_sched.step()
       pool[batch_idx] = x                # update pool
       
       logger.log(loss=loss.item())
@@ -73,9 +73,11 @@ def train(ca, opt, maze_data, target_paths, logger, cfg):
       if i % cfg.log_interval == 0:
         fig, ax = pl.subplots(2, 4, figsize=(20, 10))
         pl.subplot(411)
-        pl.plot(logger.loss_log, '.', alpha=0.1)
+        # smooth_loss_log = smooth(logger.loss_log, 10)
+        smooth_loss_log = logger.loss_log
+        pl.plot(smooth_loss_log, '.', alpha=0.1)
         pl.yscale('log')
-        pl.ylim(np.min(logger.loss_log), logger.loss_log[0])
+        pl.ylim(np.min(smooth_loss_log), logger.loss_log[0])
         # imgs = to_rgb(x).permute([0, 2, 3, 1]).cpu()
         render_paths = to_path(x[:cfg.render_minibatch_size]).cpu()
         # imshow(np.hstack(imgs))
@@ -104,3 +106,9 @@ def train(ca, opt, maze_data, target_paths, logger, cfg):
           ' lr:', lr_sched.get_last_lr(), end=''
           )
         last_time = timer()
+
+
+def smooth(y, box_pts):
+    box = np.ones(box_pts)/box_pts
+    y_smooth = np.convolve(y, box, mode='same')
+    return y_smooth
