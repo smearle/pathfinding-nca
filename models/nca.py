@@ -4,25 +4,25 @@ import torch
 
 
 class NCA(torch.nn.Module):
-  def __init__(self, n_in_chan=4, n_hidden_chan=9, drop_diagonals=True):
+  def __init__(self, n_in_chan=4, n_hid_chan=9, drop_diagonals=True):
     """A Neural Cellular Automata model for pathfinding over grid-based mazes.
     
     Args:
       n_in_chan: Number of input channels in the onehot-encoded input.
-      n_hidden_chan: Number of channels in the hidden layers.
+      n_hid_chan: Number of channels in the hidden layers.
       drop_diagonals: Whether to drop diagonals in the 3x3 input patches to each conv layer.
       """
     super().__init__()
     # Number of hidden channels, also number of writable channels the the output. (None-maze channels at the input.)
-    self.n_hidden_chan = n_hidden_chan  
+    self.n_hidden_chan = n_hid_chan  
 
     conv2d = torch.nn.Conv2d
 
     # This layer applies a dense layer to each 3x3 block of the input.
-    self.l1 = conv2d(n_hidden_chan + n_in_chan, n_hidden_chan, kernel_size=3, padding=1)
+    self.l1 = conv2d(n_hid_chan + n_in_chan, n_hid_chan, kernel_size=3, padding=1)
 
     # Since the NCA receives the onehot maze as input at each step, we do not write to the channels reserved for this.
-    self.l2 = conv2d(n_hidden_chan, n_hidden_chan, kernel_size=1) 
+    self.l2 = conv2d(n_hid_chan, n_hid_chan, kernel_size=1) 
 
     # self.w2.weight.data.zero_()
 

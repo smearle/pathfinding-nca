@@ -19,7 +19,8 @@ from tqdm import tqdm_notebook, tnrange
 
 from config import ClArgsConfig
 from mazes import gen_rand_mazes, load_dataset, render_discrete, Mazes
-from model import NCA
+from models.gnn import GNN
+from models.nca import NCA
 from training import train
 from utils import Logger, VideoWriter, gen_pool, get_mse_loss, to_path, load
 
@@ -37,9 +38,10 @@ def main():
     
   n_in_chan = 4  # The number of channels in the one-hot encodings of the training mazes.
   cfg = ClArgsConfig()
+  model_cls = globals()[cfg.model]
   
   # setup training
-  ca = NCA(n_in_chan, cfg.n_hid_chan, cfg.n_hid_chan) 
+  ca = model_cls(n_in_chan, cfg.n_hid_chan, cfg.n_hid_chan) 
   param_n = sum(p.numel() for p in NCA().parameters())
   print('CA param count:', param_n)
   opt = torch.optim.Adam(ca.parameters(), cfg.learning_rate)
