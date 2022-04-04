@@ -43,8 +43,9 @@ def main():
   param_n = sum(p.numel() for p in NCA().parameters())
   print('CA param count:', param_n)
   opt = torch.optim.Adam(ca.parameters(), cfg.learning_rate)
-  maze_data, _ = load_dataset(cfg.n_data, cfg.device)
-  cfg.n_data = maze_data.mazes_onehot.shape[0]
+  maze_data_train, maze_data_val, _ = load_dataset(cfg.n_data, cfg.device)
+  maze_data_val.get_subset(cfg.n_val_data)
+  # cfg.n_data = maze_data_train.mazes_onehot.shape[0]
 
   if cfg.load:
     ca, opt, logger = load(ca, opt, cfg)
@@ -59,7 +60,7 @@ def main():
   json.dump(cfg.__dict__, open(f'{cfg.log_dir}/config.json', 'w'))
 
   mazes_onehot, mazes_discrete, maze_ims, target_paths = \
-    (maze_data.mazes_onehot, maze_data.mazes_discrete, maze_data.maze_ims, maze_data.target_paths)
+    (maze_data_train.mazes_onehot, maze_data_train.mazes_discrete, maze_data_train.maze_ims, maze_data_train.target_paths)
 
 # fig, ax = pl.subplots(figsize=(20, 5))
 # pl.imshow(np.hstack(maze_ims[:cfg.render_minibatch_size]))
@@ -81,9 +82,9 @@ def main():
 
   if cfg.render:
     # TT()
-    render_trained(ca, maze_data, cfg)
+    render_trained(ca, maze_data_train, cfg)
   else:
-    train(ca, opt, maze_data, target_paths, logger, cfg)
+    train(ca, opt, maze_data_train, maze_data_val, target_paths, logger, cfg)
 
 
 def render_trained(ca, maze_data, cfg, pyplot_animation=True):
@@ -167,7 +168,7 @@ def evaluate_test(ca, cfg):
   """Evaluate the trained model on a test set."""
   n_test_minibatches = 10
   n_test_mazes = n_test_minibatches * cfg.minibatch_size
-  _, maze_data_test = load_dataset(cfg.n_eval_data, cfg.device)
+  _, _, maze_data_test = load_dataset(cfg.n_eval_data, cfg.device)
   test_mazes_onehot, test_mazes_discrete, target_paths = maze_data_test.mazes_onehot, maze_data_test.mazes_discrete, \
     maze_data_test.target_paths
 

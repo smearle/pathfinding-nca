@@ -13,7 +13,8 @@ class Config():
   # How many mazes on which to train at a time
   n_data = 256
 
-  n_eval_data = 64
+  n_val_data = 64
+  val_batch_size = 64
 
   render_minibatch_size = 8  # how many mazes to render at once
 
@@ -33,7 +34,9 @@ class Config():
   log_interval = 512  
 
   # How often to save the model and optimizer to disk.
-  save_interval = log_interval * 1  
+  save_interval = log_interval * 5  
+
+  eval_interval = 100
 
   # How many updates to perform during training.
   n_updates = 50000    
@@ -76,6 +79,8 @@ class ClArgsConfig():
     # Command-line arguments will overwrite default config attributes.
     [setattr(self, k, v) for k, v in vars(args).items()]
 
+    assert self.expected_net_steps % self.step_n == 0, "Expected net steps must be a multiple of step_n."
+    assert self.n_val_data % self.val_batch_size == 0, "Validation dataset size must be a multiple of val_batch_size."
     self.load = True if self.render else self.load
     self.log_dir = get_exp_name(self)
 

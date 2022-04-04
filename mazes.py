@@ -12,14 +12,13 @@ trg_chan = 3
 path_chan = 4
 maze_data_fname = os.path.join("data", "maze_data")
 train_fname = f"{maze_data_fname}_train.pk"
+val_fname = f"{maze_data_fname}_val.pk"
 test_fname = f"{maze_data_fname}_test.pk"
 
-n_data = 1
 
-
-def main():
+def main(n_data):
     """Generate random mazes for training/testing."""
-    if os.path.exists(maze_data_fname):
+    if np.any([os.path.exists(fname) for fname in [train_fname, val_fname, test_fname]]):
         overwrite = input("File already exists. Overwrite? (y/n) ")
         if overwrite != 'y':
             return
@@ -29,6 +28,11 @@ def main():
     maze_data = Mazes(n_data=n_data)
     with open(train_fname, 'wb') as f:
         pickle.dump(maze_data, f)
+
+    maze_data = Mazes(n_data=n_data)
+    with open(val_fname, 'wb') as f:
+        pickle.dump(maze_data, f)
+
     maze_data = Mazes(n_data=n_data)
     with open(test_fname, 'wb') as f:
         pickle.dump(maze_data, f)
@@ -42,11 +46,14 @@ def load_dataset(n_data, device):
         maze_data_train = pickle.load(f)
     maze_data_train.get_subset(n_data)
 
+    with open(val_fname, 'rb') as f:
+        maze_data_val = pickle.load(f)
+
     with open(test_fname, 'rb') as f:
         maze_data_test = pickle.load(f)
     maze_data_test.get_subset(n_data)
 
-    return maze_data_train.to(device), maze_data_test.to(device)
+    return maze_data_train.to(device), maze_data_val.to(device), maze_data_test.to(device)
 
 
 class Mazes():
@@ -183,4 +190,4 @@ def gen_rand_mazes(n_data):
 
 
 if __name__ == "__main__":
-    main()
+    main(n_data=256)

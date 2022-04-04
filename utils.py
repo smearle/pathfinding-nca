@@ -15,11 +15,17 @@ import torch
 class Logger():
   def __init__(self):
     self.loss_log = []
+    self.val_loss_log = {}
     self.n_step = 0
 
   def log(self, loss):
+    """Log training loss (once per update step)."""
     self.loss_log.append(loss)
     self.n_step += 1
+
+  def log_val(self, val_loss):
+    """Log validation loss."""
+    self.val_loss_log[self.n_step] = val_loss
 
 ca_state_fname = 'ca_state_dict.pt'
 opt_state_fname = 'opt_state_dict.pt'
