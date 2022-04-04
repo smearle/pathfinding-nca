@@ -15,32 +15,31 @@ import torch
 class Logger():
   def __init__(self):
     self.loss_log = []
+    self.n_step = 0
 
   def log(self, loss):
     self.loss_log.append(loss)
+    self.n_step += 1
 
 ca_state_fname = 'ca_state_dict.pt'
 opt_state_fname = 'opt_state_dict.pt'
 logger_fname = 'logger.pk'
-maze_data_fname = 'maze_data.pk'
+
 
 def save(ca, opt, maze_data, logger, cfg):
   torch.save(ca.state_dict(), f'{cfg.log_dir}/{ca_state_fname}')
   torch.save(opt.state_dict(), f'{cfg.log_dir}/{opt_state_fname}')
   with open(f'{cfg.log_dir}/{logger_fname}', 'wb') as f:
     pickle.dump(logger, f)
-  with open(f'{cfg.log_dir}/{maze_data_fname}', 'wb') as f:
-    pickle.dump(maze_data, f)
 
 
 def load(ca, opt, cfg):
   ca.load_state_dict(torch.load(f'{cfg.log_dir}/{ca_state_fname}'))
   opt.load_state_dict(torch.load(f'{cfg.log_dir}/{opt_state_fname}'))
-  maze_data = pickle.load(open(f'{cfg.log_dir}/{maze_data_fname}', 'rb'))
   logger = pickle.load(open(f'{cfg.log_dir}/{logger_fname}', 'rb'))
   print(f'Loaded CA and optimizer state dict, and maze archive from {cfg.log_dir}.')
 
-  return ca, opt, maze_data, logger
+  return ca, opt, logger
 
 
 def to_path(x):

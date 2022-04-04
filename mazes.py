@@ -1,4 +1,6 @@
+import os
 from pdb import set_trace as TT
+import pickle
 import numpy as np
 import torch
 
@@ -8,12 +10,60 @@ wall_chan = 1
 src_chan = 2
 trg_chan = 3
 path_chan = 4
+maze_data_fname = os.path.join("data", "maze_data")
+train_fname = f"{maze_data_fname}_train.pk"
+test_fname = f"{maze_data_fname}_test.pk"
+
+n_data = 1
+
+
+def main():
+    """Generate random mazes for training/testing."""
+    if os.path.exists(maze_data_fname):
+        overwrite = input("File already exists. Overwrite? (y/n) ")
+        if overwrite != 'y':
+            return
+        
+        print('Overwriting existing dataset...')
+
+    maze_data = Mazes(n_data=n_data)
+    with open(train_fname, 'wb') as f:
+        pickle.dump(maze_data, f)
+    maze_data = Mazes(n_data=n_data)
+    with open(test_fname, 'wb') as f:
+        pickle.dump(maze_data, f)
+
+    # TODO: Render a big grid of all the data.
+
+
+def load_dataset(n_data, device):
+    """Load the dataset of random mazes"""
+    with open(train_fname, 'rb') as f:
+        maze_data_train = pickle.load(f)
+    maze_data_train.get_subset(n_data)
+
+    with open(test_fname, 'rb') as f:
+        maze_data_test = pickle.load(f)
+    maze_data_test.get_subset(n_data)
+
+    return maze_data_train.to(device), maze_data_test.to(device)
 
 
 class Mazes():
-  def __init__(self, cfg, height=16, width=16):
-    self.mazes_discrete, self.mazes_onehot, self.target_paths = gen_rand_mazes(data_n=cfg.data_n)
-    self.maze_ims = torch.Tensor([render_discrete(maze_discrete[None,])[0] for maze_discrete in self.mazes_discrete])
+    def __init__(self, n_data, height=16, width=16):
+        self.mazes_discrete, self.mazes_onehot, self.target_paths = gen_rand_mazes(n_data=n_data)
+        self.maze_ims = torch.Tensor(np.array(
+            [render_discrete(maze_discrete[None,])[0] for maze_discrete in self.mazes_discrete]
+        ))
+    
+    def to(self, device):
+        self.mazes_discrete, self.mazes_onehot, self.target_paths = self.mazes_discrete.to(device), \
+            self.mazes_onehot.to(device), self.target_paths.to(device)
+        return self
+
+    def get_subset(self, n_data):
+        self.mazes_discrete, self.mazes_onehot, self.target_paths = self.mazes_discrete[:n_data], \
+            self.mazes_onehot[:n_data], self.target_paths[:n_data]
 
 
 def generate_random_maze(render=True):
@@ -52,7 +102,8 @@ def render_discrete(arr):
     src_color = torch.Tensor([1.0, 1.0, 0.0])
     trg_color = torch.Tensor([0.0, 1.0, 0.0])
     path_color = torch.Tensor([1.0, 0.0, 0.0])
-    colors = {empty_chan: empty_color, wall_chan: wall_color, path_chan: path_color, src_chan: src_color, trg_chan: trg_color, }
+    colors = {empty_chan: empty_color, wall_chan: wall_color, path_chan: path_color, src_chan: src_color, 
+              trg_chan: trg_color, }
     batch_size, height, width = arr.shape
     im = torch.zeros((batch_size, height, width, 3), dtype=torch.float32)
 
@@ -107,13 +158,13 @@ def bfs(arr, passable=0, impassable=1, src=2, trg=3):
     return []
 
 
-def gen_rand_mazes(data_n):
+def gen_rand_mazes(n_data):
     # Generate new random mazes until we get enough solvable ones.
     solvable_mazes_onehot = []
     solvable_mazes_discrete = []
     target_paths = []
     i = 0
-    while len(solvable_mazes_onehot) < data_n:
+    while len(solvable_mazes_onehot) < n_data:
         rand_maze_onehot = generate_random_maze()
         rand_maze_discrete = rand_maze_onehot.argmax(axis=1)
         sol = bfs(rand_maze_discrete[0].cpu().numpy())
@@ -126,6 +177,10 @@ def gen_rand_mazes(data_n):
             target_paths.append(target_path)
         i += 1
     # print(f'Solution length: {len(sol)}')
-    print(f'Generated {i} random mazes to produce {data_n} solvable mazes.')
+    print(f'Generated {i} random mazes to produce {n_data} solvable mazes.')
 
     return torch.vstack(solvable_mazes_discrete), torch.vstack(solvable_mazes_onehot), torch.vstack(target_paths)
+
+
+if __name__ == "__main__":
+    main()

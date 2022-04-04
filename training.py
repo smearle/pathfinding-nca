@@ -15,13 +15,13 @@ def train(ca, opt, maze_data, target_paths, logger, cfg):
   mazes_onehot, maze_ims = maze_data.mazes_onehot, maze_data.maze_ims
   # Upper bound of net steps = step_n * m. Expected net steps = (minibatch_size / data_n) * m * step_n. (Since we select from pool
   # randomly before each mini-episode.)
-  minibatch_size = min(cfg.minibatch_size, cfg.data_n)
-  m = int(cfg.expected_net_steps / cfg.step_n * cfg.data_n / minibatch_size)
+  minibatch_size = min(cfg.minibatch_size, cfg.n_data)
+  m = int(cfg.expected_net_steps / cfg.step_n * cfg.n_data / minibatch_size)
   # m = expected_net_steps
   lr_sched = torch.optim.lr_scheduler.MultiStepLR(opt, [10000], 0.1)
   last_time = timer()
 
-  for i in range(cfg.n_updates):
+  for i in range(logger.n_step, cfg.n_updates):
     with torch.no_grad():
 
       if cfg.gen_new_data_interval and i % cfg.gen_new_data_interval == 0:
@@ -30,7 +30,7 @@ def train(ca, opt, maze_data, target_paths, logger, cfg):
 
       if i % m == 0:
         # pool = training_maze_xs.clone()
-        pool = gen_pool(mazes_onehot.shape[0], ca.n_out_chan, mazes_onehot.shape[2], mazes_onehot.shape[3])
+        pool = gen_pool(mazes_onehot.shape[0], ca.n_hidden_chan, mazes_onehot.shape[2], mazes_onehot.shape[3])
 
       # batch_idx = np.random.choice(len(pool), 4, replace=False)
 
