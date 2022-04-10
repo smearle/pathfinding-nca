@@ -13,6 +13,7 @@ class Config():
   # How many mazes on which to train at a time
   n_data = 256
 
+  # Size of validation dataset
   n_val_data = 64
   val_batch_size = 64
 
@@ -42,7 +43,7 @@ class Config():
   n_updates = 50000    
 
   # How many mazes on which to train at once
-  minibatch_size = 32    
+  minibatch_size = 32 
 
   # Size of minibatch for rendering images and animations.
   render_minibatch_size = 8
