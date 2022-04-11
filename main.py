@@ -41,12 +41,13 @@ def main():
   cfg = ClArgsConfig()
   model_cls = globals()[cfg.model]
   
-  # setup training
-  model = model_cls(n_in_chan, cfg.n_hid_chan) 
-  param_n = sum(p.numel() for p in model.parameters())
-  torchinfo.summary(model, input_size=(cfg.minibatch_size, n_in_chan, 16, 16))
-  print(model.summary())
-  print('model param count:', param_n)
+  # Setup training
+  model = model_cls(n_in_chan, cfg.n_hid_chan)
+  # Set a dummy initial maze state.
+  model.reset(torch.zeros(cfg.minibatch_size, n_in_chan, cfg.width, cfg.width))
+  torchinfo.summary(model, input_size=(cfg.minibatch_size, cfg.n_hid_chan, cfg.width, cfg.width))
+  # param_n = sum(p.numel() for p in model.parameters())
+  # print('model param count:', param_n)
   opt = torch.optim.Adam(model.parameters(), cfg.learning_rate)
   maze_data_train, maze_data_val, _ = load_dataset(cfg.n_data, cfg.device)
   maze_data_val.get_subset(cfg.n_val_data)

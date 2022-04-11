@@ -6,12 +6,14 @@ import numpy as np
 from timeit import default_timer as timer
 import torch
 import torchvision.models as models
+from config import ClArgsConfig
 from mazes import Mazes, render_discrete
+from models.nn import PathfindingNN
 
 from utils import gen_pool, get_mse_loss, to_path, save
 
 
-def train(ca, opt, maze_data, maze_data_val, target_paths, logger, cfg):
+def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, logger, cfg: ClArgsConfig):
   mazes_onehot, maze_ims = maze_data.mazes_onehot, maze_data.maze_ims
   # Upper bound of net steps = step_n * m. Expected net steps = (minibatch_size / data_n) * m * step_n. (Since we select from pool
   # randomly before each mini-episode.)
@@ -31,7 +33,7 @@ def train(ca, opt, maze_data, maze_data_val, target_paths, logger, cfg):
 
       if i % m == 0 or pool is None:
         # pool = training_maze_xs.clone()
-        pool = gen_pool(mazes_onehot.shape[0], ca.n_hidden_chan, mazes_onehot.shape[2], mazes_onehot.shape[3])
+        pool = gen_pool(mazes_onehot.shape[0], cfg.n_hid_chan, mazes_onehot.shape[2], mazes_onehot.shape[3])
 
       # batch_idx = np.random.choice(len(pool), 4, replace=False)
 
@@ -45,24 +47,24 @@ def train(ca, opt, maze_data, maze_data_val, target_paths, logger, cfg):
       x0 = mazes_onehot[batch_idx].clone()
       target_paths_mini_batch = target_paths[batch_idx]
 
-      ca.reset(x0)
+      model.reset(x0)
 
     # step_n = np.random.randint(32, 96)
 
     # The following line is equivalent to this code:
     # for k in range(step_n):
-      # x = ca(x)
+      # x = model(x)
     # It uses gradient checkpointing to save memory, which enables larger
     # batches and longer CA step sequences. Surprisingly, this version
     # is also ~2x faster than a simple loop, even though it performs
     # the forward pass twice!
-    x = torch.utils.checkpoint.checkpoint_sequential([ca]*cfg.step_n, 16, x)
+    x = torch.utils.checkpoint.checkpoint_sequential([model]*cfg.step_n, 16, x)
     
     loss = get_mse_loss(x, target_paths_mini_batch)
 
     with torch.no_grad():
       loss.backward()
-      for p in ca.parameters():
+      for p in model.parameters():
         p.grad /= (p.grad.norm()+1e-8)   # normalize gradients 
       opt.step()
       opt.zero_grad()
@@ -73,12 +75,12 @@ def train(ca, opt, maze_data, maze_data_val, target_paths, logger, cfg):
 
           
       if i % cfg.save_interval == 0:
-        save(ca, opt, maze_data, logger, cfg)
+        save(model, opt, maze_data, logger, cfg)
 
         # print(f'Saved CA and optimizer state dicts and maze archive to {cfg.log_dir}')
 
       if i % cfg.eval_interval == 0:
-        val_loss = evaluate(ca, maze_data_val, cfg.val_batch_size, cfg)
+        val_loss = evaluate(model, maze_data_val, cfg.val_batch_size, cfg)
         logger.log_val(val_loss=val_loss)
 
       if i % cfg.log_interval == 0:
@@ -131,7 +133,7 @@ def evaluate(ca, data, batch_size, cfg, render=False):
           batch_idx = np.arange(i*batch_size, (i+1)*batch_size, dtype=int)
           x0 = mazes_onehot[batch_idx]
           x0_discrete = mazes_discrete[batch_idx]
-          x = gen_pool(size=batch_size, n_chan=ca.n_hidden_chan, height=x0_discrete.shape[1], width=x0_discrete.shape[2])
+          x = gen_pool(size=batch_size, n_chan=cfg.n_hid_chan, height=x0_discrete.shape[1], width=x0_discrete.shape[2])
           target_paths_mini_batch = target_paths[batch_idx]
           ca.reset(x0)
 

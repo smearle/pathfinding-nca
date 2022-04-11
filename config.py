@@ -13,6 +13,9 @@ class Config():
   # How many mazes on which to train at a time
   n_data = 256
 
+  # The width (and height, mazes are square for now) of the maze.
+  width = 16
+
   # Size of validation dataset
   n_val_data = 64
   val_batch_size = 64
@@ -32,7 +35,7 @@ class Config():
   n_hid_chan = 96  
 
   # How often to print results to the console.
-  log_interval = 512  
+  log_interval = 512
 
   # How often to save the model and optimizer to disk.
   save_interval = log_interval * 5  
@@ -59,7 +62,7 @@ class Config():
   model = "NCA"
 
 
-class ClArgsConfig():
+class ClArgsConfig(Config):
 
   def __init__(self):
     """Set default arguments and get command line arguments."""
@@ -81,8 +84,10 @@ class ClArgsConfig():
     [setattr(self, k, v) for k, v in vars(args).items()]
 
     assert self.expected_net_steps % self.step_n == 0, "Expected net steps must be a multiple of step_n."
-    assert self.n_val_data % self.val_batch_size == 0, "Validation dataset size must be a multiple of val_batch_size."
     self.load = True if self.render else self.load
+    self.minibatch_size = 1 if self.model == "GCN" else self.minibatch_size
+    self.val_batch_size = 1 if self.model == "GCN" else self.val_batch_size
+    assert self.n_val_data % self.val_batch_size == 0, "Validation dataset size must be a multiple of val_batch_size."
     self.log_dir = get_exp_name(self)
 
 

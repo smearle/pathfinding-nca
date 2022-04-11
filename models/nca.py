@@ -2,8 +2,10 @@ from pdb import set_trace as TT
 
 import torch
 
+from models.nn import PathfindingNN
 
-class NCA(torch.nn.Module):
+
+class NCA(PathfindingNN):
   def __init__(self, n_in_chan=4, n_hid_chan=9, drop_diagonals=True):
     """A Neural Cellular Automata model for pathfinding over grid-based mazes.
     
@@ -26,16 +28,14 @@ class NCA(torch.nn.Module):
 
     # self.w2.weight.data.zero_()
 
-    # The initial/actual state of the board (so that we can use walls to simulate path-flood).
-    self.x0 = None
-
   def forward(self, x, update_rate=0.5):
-    y = torch.cat([self.x0, x], dim=1)
-    y = self.l1(y)
+    x = super().forward(x)
+    y = self.l1(x)
     y = torch.relu(y)
     y = self.l2(y)
-    y = (torch.sigmoid(y) - 0.5) * 2
-    b, c, h, w = y.shape
+    # y = torch.relu(y)
+    # y = (torch.sigmoid(y) - 0.5) * 2
+    # b, c, h, w = y.shape
 
     return y
 
