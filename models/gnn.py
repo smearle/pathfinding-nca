@@ -14,9 +14,10 @@ from models.nn import PathfindingNN
 class GCN(PathfindingNN):
     def __init__(self, n_in_chan, n_hid_chan, **kwargs):
         super().__init__()
-        self.conv1 = GCNConv(n_hid_chan + n_in_chan, n_hid_chan)
-        self.conv2 = GCNConv(n_hid_chan, n_hid_chan)
+        self.gconv1 = GCNConv(n_hid_chan + n_in_chan, n_hid_chan)
+        self.gconv2 = GCNConv(n_hid_chan, n_hid_chan)
         self.grid_edges = None
+        self.self_edges = None
 
     def forward(self, x: Tensor) -> Tensor:
         """Take in a batched 2D maze, then preprocess for consumption by a graph neural network.
@@ -35,6 +36,7 @@ class GCN(PathfindingNN):
 
         if self.grid_edges is None:
             self.grid_edges = get_grid_edges(*x.shape[-2:])  # [None,...]
+            self.self_edges = get_self_edges(*x.shape[-2:])
 
         # Flatten along width and height dimensions and remove batch dimension.
         x = x.view(x.shape[0], -1)
@@ -53,8 +55,8 @@ class GCN(PathfindingNN):
         # x: Node feature matrix of shape [num_nodes, in_channels]
         # edge_index: Graph connectivity matrix of shape [2, num_edges]
         x = x.transpose(1, 0)
-        x = self.conv1(x, edge_index).relu()
-        x = self.conv2(x, edge_index)
+        x = self.gconv1(x, edge_index).relu()
+        x = self.gconv2(x, self.self_edges)
         return x
 
 
@@ -84,3 +86,13 @@ def get_grid_edges(width, height):
     edges = np.ravel_multi_index(edges, (width, height))
 
     return torch.Tensor(edges).long()
+
+def get_self_edges(width, height):
+    node_indices = np.indices((width, height)).transpose(1, 2, 0)
+    self_edges = np.stack((node_indices, node_indices))
+    self_edges = self_edges.transpose(3, 0, 1, 2).reshape(2, 2, -1)
+    self_edges = np.ravel_multi_index(self_edges, (width, height))
+
+    return torch.Tensor(self_edges).long()
+
+

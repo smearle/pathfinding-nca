@@ -190,4 +190,4 @@ def gen_rand_mazes(n_data):
 
 
 if __name__ == "__main__":
-    main(n_data=256)
+    main(n_data=1024)

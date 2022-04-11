@@ -110,7 +110,7 @@ def log(logger, lr_sched, maze_ims, x, target_paths, render_batch_idx, cfg):
         # print(f'path activation min: {render_paths.min()}, max: {render_paths.max()}')
     pl.savefig(f'{cfg.log_dir}/training_progress.png')
     pl.close()
-    fps = cfg.step_n * cfg.minibatch_size / (timer() - logger.last_time)
+    fps = cfg.step_n * cfg.minibatch_size * cfg.log_interval / (timer() - logger.last_time)
     print('\rstep_n:', len(logger.loss_log),
       ' loss: {:.6e}'.format(logger.loss_log[-1]),
       ' fps: {:.2f}'.format(fps), 
