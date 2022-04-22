@@ -29,9 +29,9 @@ class GCN(PathfindingNN):
         # Cannot use batches with pyg (apparently...?)
         assert batch_size == 1
 
-        x = super().forward(x)
+        x = super().add_initial_maze(x)
 
-        # Remove batch dimension
+        # Remove batch dimension, because GNNs don't allow batches (??) :'(
         x = x[0]
 
         if self.grid_edges is None:
@@ -44,18 +44,18 @@ class GCN(PathfindingNN):
         # Batch the edge indices
         # edge_index = self.grid_edges * torch.ones((x.shape[0], *self.grid_edges.shape[1:]))
 
-        x = self.forward_gnn(x, self.grid_edges)
+        x = self.forward_gnn(x)
 
         # Reshape back into (bathched) 2D grid.
         x = x.reshape(batch_size, n_chan, width, height)
 
         return x
 
-    def forward_gnn(self, x: Tensor, edge_index: Tensor) -> Tensor:
+    def forward_gnn(self, x: Tensor) -> Tensor:
         # x: Node feature matrix of shape [num_nodes, in_channels]
         # edge_index: Graph connectivity matrix of shape [2, num_edges]
         x = x.transpose(1, 0)
-        x = self.gconv1(x, edge_index).relu()
+        x = self.gconv1(x, self.grid_edges).relu()
         x = self.gconv2(x, self.self_edges)
         return x
 

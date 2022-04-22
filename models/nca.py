@@ -29,7 +29,7 @@ class NCA(PathfindingNN):
     # self.w2.weight.data.zero_()
 
   def forward(self, x, update_rate=0.5):
-    x = super().forward(x)
+    x = super().add_initial_maze(x)
     y = self.l1(x)
     y = torch.relu(y)
     y = self.l2(y)

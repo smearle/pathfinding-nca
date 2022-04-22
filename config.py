@@ -6,7 +6,8 @@ import torch
 
 
 class Config():
-  """Default configuration."""
+  """Default configuration. Note that all of these static variables are treated as command line arguments via the 
+  `ClArgsConfig` class below."""
   # The name of the experiment.
   exp_name = "0"
 

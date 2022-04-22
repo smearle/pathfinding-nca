@@ -49,7 +49,11 @@ def main():
   # param_n = sum(p.numel() for p in model.parameters())
   # print('model param count:', param_n)
   opt = torch.optim.Adam(model.parameters(), cfg.learning_rate)
-  maze_data_train, maze_data_val, _ = load_dataset(cfg.n_data, cfg.device)
+  try:
+    maze_data_train, maze_data_val, _ = load_dataset(cfg.n_data, cfg.device)
+  except FileNotFoundError as e:
+    print("No maze data files found. Run `python mazes.py` to generate the dataset.")
+    raise
   maze_data_val.get_subset(cfg.n_val_data)
   # cfg.n_data = maze_data_train.mazes_onehot.shape[0]
 
@@ -59,7 +63,11 @@ def main():
   else:
     if cfg.overwrite and os.path.exists(cfg.log_dir):
       shutil.rmtree(cfg.log_dir)
-    os.mkdir(cfg.log_dir)
+    try:
+      os.mkdir(cfg.log_dir)
+    except FileExistsError:
+      print(f"Experiment log folder {cfg.log_dir} already exists. Use `--load` or `--overwrite` command line arguments "\
+      "to load or overwrite it.")
     logger = Logger()
 
   # Save a dictionary of the config to a json for future reference.
