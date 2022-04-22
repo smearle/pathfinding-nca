@@ -24,7 +24,7 @@ class Config():
   render_minibatch_size = 8  # how many mazes to render at once
 
   # Number of steps after which we calculate loss and update the network.
-  step_n = 64  
+  n_layers = 64  
 
   # How long an episode should be, in expectation. Random because we sample from pool of in-progress mazes at random.  
   expected_net_steps = 64 * 2 
@@ -32,8 +32,11 @@ class Config():
   # The number in/out channels, including the input channels (n_in_chan)
   # n_aux_chan = 48  
 
-  # The number of channels in the hidden layers.
+  # The number of channels in the hidden layers. (For NCA and GCA models.)
   n_hid_chan = 96  
+
+  # The number of hidden nodes in the hidden layers. (For MLP models.)
+  n_hidden = 256
 
   # How often to print results to the console.
   log_interval = 512
@@ -62,6 +65,9 @@ class Config():
   # Which model to load/train.
   model = "NCA"
 
+  # Whether the model is a cellular automaton-type model.
+  ca_model = True
+
 
 class ClArgsConfig(Config):
 
@@ -84,11 +90,16 @@ class ClArgsConfig(Config):
     # Command-line arguments will overwrite default config attributes.
     [setattr(self, k, v) for k, v in vars(args).items()]
 
-    assert self.expected_net_steps % self.step_n == 0, "Expected net steps must be a multiple of step_n."
+    assert self.expected_net_steps % self.n_layers == 0, "Expected net steps must be a multiple of step_n."
     self.load = True if self.render else self.load
     self.minibatch_size = 1 if self.model == "GCN" else self.minibatch_size
     self.val_batch_size = 1 if self.model == "GCN" else self.val_batch_size
     assert self.n_val_data % self.val_batch_size == 0, "Validation dataset size must be a multiple of val_batch_size."
+    
+    # For now, only the MLP can be not cellular-automaton-like.
+    # TODO: Allow this to be False for non-MLP models. Allow it to be true for MLP
+    self.ca_model = self.model != "MLP"
+    
     self.log_dir = get_exp_name(self)
 
 

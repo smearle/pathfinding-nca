@@ -20,8 +20,7 @@ from tqdm import tqdm_notebook, tnrange
 
 from config import ClArgsConfig
 from mazes import gen_rand_mazes, load_dataset, render_discrete, Mazes
-from models.gnn import GCN
-from models.nca import NCA
+from models import NCA, GCN, MLP
 from training import train
 from utils import Logger, VideoWriter, gen_pool, get_mse_loss, to_path, load
 
@@ -37,15 +36,22 @@ def main():
   else:
       print('Not using GPU/CUDA, using CPU.')
     
-  n_in_chan = 4  # The number of channels in the one-hot encodings of the training mazes.
   cfg = ClArgsConfig()
+  cfg.n_in_chan = 4  # The number of channels in the one-hot encodings of the training mazes.
   model_cls = globals()[cfg.model]
   
   # Setup training
-  model = model_cls(n_in_chan, cfg.n_hid_chan)
+  model = model_cls(cfg)
   # Set a dummy initial maze state.
-  model.reset(torch.zeros(cfg.minibatch_size, n_in_chan, cfg.width, cfg.width))
-  torchinfo.summary(model, input_size=(cfg.minibatch_size, cfg.n_hid_chan, cfg.width, cfg.width))
+  model.reset(torch.zeros(cfg.minibatch_size, cfg.n_in_chan, cfg.width, cfg.width))
+
+  # FIXME: ad hoc (?)
+  if cfg.model == "MLP":
+    torchinfo.summary(model, input_size=(cfg.minibatch_size, cfg.n_in_chan, (cfg.width + 2), (cfg.width + 2)))
+
+  else:
+    torchinfo.summary(model, input_size=(cfg.minibatch_size, cfg.n_hid_chan, cfg.width, (cfg.width + 2)))
+
   # param_n = sum(p.numel() for p in model.parameters())
   # print('model param count:', param_n)
   opt = torch.optim.Adam(model.parameters(), cfg.learning_rate)
@@ -90,7 +96,7 @@ def main():
 # pl.imshow(np.hstack(target_paths[:cfg.render_minibatch_size].cpu()))
 # pl.tight_layout()
 
-  assert n_in_chan == mazes_onehot.shape[1]
+  assert cfg.n_in_chan == mazes_onehot.shape[1]
 
   # The set of initial mazes (padded with 0s, channel-wise, to act as the initial state of the CA).
 

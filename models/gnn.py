@@ -6,14 +6,13 @@ import torch
 from torch import Tensor
 from torch_geometric.nn import GCNConv
 
-from torch_geometric.datasets import Planetoid
-
 from models.nn import PathfindingNN
 
 
 class GCN(PathfindingNN):
-    def __init__(self, n_in_chan, n_hid_chan, **kwargs):
+    def __init__(self, cfg):
         super().__init__()
+        n_in_chan, n_hid_chan = cfg.n_in_chan, cfg.n_hid_chan
         self.gconv1 = GCNConv(n_hid_chan + n_in_chan, n_hid_chan)
         self.gconv2 = GCNConv(n_hid_chan, n_hid_chan)
         self.grid_edges = None

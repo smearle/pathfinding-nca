@@ -18,7 +18,7 @@ def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, log
   # Upper bound of net steps = step_n * m. Expected net steps = (minibatch_size / data_n) * m * step_n. (Since we select from pool
   # randomly before each mini-episode.)
   minibatch_size = min(cfg.minibatch_size, cfg.n_data)
-  m = int(cfg.expected_net_steps / cfg.step_n * cfg.n_data / minibatch_size)
+  m = int(cfg.expected_net_steps / cfg.n_layers * cfg.n_data / minibatch_size)
   # m = expected_net_steps
   lr_sched = torch.optim.lr_scheduler.MultiStepLR(opt, [10000], 0.1)
   logger.last_time = timer()
@@ -51,14 +51,23 @@ def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, log
 
     # step_n = np.random.randint(32, 96)
 
-    # The following line is equivalent to this code:
-    # for k in range(step_n):
-      # x = model(x)
-    # It uses gradient checkpointing to save memory, which enables larger
-    # batches and longer CA step sequences. Surprisingly, this version
-    # is also ~2x faster than a simple loop, even though it performs
-    # the forward pass twice!
-    x = torch.utils.checkpoint.checkpoint_sequential([model]*cfg.step_n, 16, x)
+    # Ad hoc:
+    if cfg.model == "MLP":
+      assert not cfg.ca_model  # TODO
+      x = x0  # tehe
+
+    if not cfg.ca_model:
+      x = model(x)
+
+    else:
+      # The following line is equivalent to this code:
+      # for k in range(step_n):
+        # x = model(x)
+      # It uses gradient checkpointing to save memory, which enables larger
+      # batches and longer CA step sequences. Surprisingly, this version
+      # is also ~2x faster than a simple loop, even though it performs
+      # the forward pass twice!
+      x = torch.utils.checkpoint.checkpoint_sequential([model]*cfg.n_layers, 16, x)
     
     loss = get_mse_loss(x, target_paths_mini_batch)
 

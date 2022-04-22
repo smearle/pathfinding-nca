@@ -6,7 +6,7 @@ from models.nn import PathfindingNN
 
 
 class NCA(PathfindingNN):
-  def __init__(self, n_in_chan=4, n_hid_chan=9, drop_diagonals=True):
+  def __init__(self, cfg):
     """A Neural Cellular Automata model for pathfinding over grid-based mazes.
     
     Args:
@@ -15,6 +15,7 @@ class NCA(PathfindingNN):
       drop_diagonals: Whether to drop diagonals in the 3x3 input patches to each conv layer.
       """
     super().__init__()
+    n_in_chan, n_hid_chan = cfg.n_in_chan, cfg.n_hid_chan
     # Number of hidden channels, also number of writable channels the the output. (None-maze channels at the input.)
     self.n_hidden_chan = n_hid_chan  
 
