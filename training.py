@@ -42,10 +42,10 @@ def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, log
 
         # Ad hoc:
         if cfg.model == "MLP":
-            assert not cfg.ca_model    # TODO
+            assert not cfg.shared_weights    # TODO
             x = x0    # tehe
 
-        if not cfg.ca_model:
+        if not cfg.shared_weights:
             x = model(x)
 
         else:
@@ -61,11 +61,13 @@ def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, log
         loss = get_mse_loss(x, target_paths_mini_batch)
 
         with torch.no_grad():
-            loss.backward()
-            for p in model.parameters():
-                p.grad /= (p.grad.norm()+1e-8)     # normalize gradients 
-            opt.step()
-            opt.zero_grad()
+            if "Fixed" not in cfg.model:
+                loss.backward()
+                for p in model.parameters():
+                    # TODO: ignore "corner" convolutional weights here if specified in config.
+                    p.grad /= (p.grad.norm()+1e-8)     # normalize gradients 
+                opt.step()
+                opt.zero_grad()
             # lr_sched.step()
             logger.log(loss=loss.item())
                     

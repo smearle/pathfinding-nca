@@ -14,8 +14,8 @@ import torch
 import torchinfo
 
 from config import ClArgsConfig
-from mazes import load_dataset, render_discrete
-from models import NCA, GCN, MLP
+from mazes import load_dataset, Mazes, render_discrete
+from models import FixedBfsNCA, GCN, MLP, NCA
 from training import train
 from utils import Logger, VideoWriter, gen_pool, get_mse_loss, to_path, load
 
@@ -33,6 +33,7 @@ def main():
         
     cfg = ClArgsConfig()
     cfg.n_in_chan = 4    # The number of channels in the one-hot encodings of the training mazes.
+    cfg.empty_chan, cfg.wall_chan, cfg.src_chan, cfg.trg_chan = 0, 1, 2, 3
     model_cls = globals()[cfg.model]
     
     # Setup training
@@ -64,11 +65,11 @@ def main():
     else:
         if cfg.overwrite and os.path.exists(cfg.log_dir):
             shutil.rmtree(cfg.log_dir)
-    try:
-        os.mkdir(cfg.log_dir)
-    except FileExistsError:
-        print(f"Experiment log folder {cfg.log_dir} already exists. Use `--load` or `--overwrite` command line arguments "\
-        "to load or overwrite it.")
+        try:
+            os.mkdir(cfg.log_dir)
+        except FileExistsError:
+            print(f"Experiment log folder {cfg.log_dir} already exists. Use `--load` or `--overwrite` command line arguments "\
+            "to load or overwrite it.")
     logger = Logger()
 
     # Save a dictionary of the config to a json for future reference.
@@ -80,8 +81,11 @@ def main():
 # fig, ax = plt.subplots(figsize=(20, 5))
 # plt.imshow(np.hstack(maze_ims[:cfg.render_minibatch_size]))
 
-    path_chan = 4
-    assert path_chan == mazes_discrete.max() + 1
+    if cfg.model == "FixedBfsNCA":
+        path_chan = 5
+    else:
+        path_chan = 4
+        assert path_chan == mazes_discrete.max() + 1
 # solved_mazes = mazes_discrete.clone()
 # solved_mazes[torch.where(target_paths == 1)] = path_chan
 # fig, ax = plt.subplots(figsize=(20, 5))
@@ -123,7 +127,7 @@ def render_trained(ca, maze_data, cfg, pyplot_animation=True):
             img = np.hstack(img.detach())
             # solved_maze_ims = [render_discrete(x0i.argmax(0)[None,...]) for x0i in x0]
             # solved_mazes_im = np.hstack(np.vstack(solved_maze_ims))
-            solved_mazes_im = np.hstack(render_discrete(mazes_discrete[batch_idx]))
+            solved_mazes_im = np.hstack(render_discrete(mazes_discrete[batch_idx], cfg))
             imgs = np.vstack([solved_mazes_im, np.tile(img, (1, 1, 3))])
 
             return imgs
@@ -174,12 +178,12 @@ def render_trained(ca, maze_data, cfg, pyplot_animation=True):
                     vid.add(imgs)
             
 
-def evaluate_train(ca, cfg):
+def evaluate_train(model, cfg):
     """Evaluate the trained model on the training set."""
     # TODO: 
     pass
 
-def evaluate_test(ca, cfg):
+def evaluate_test(model, cfg):
     """Evaluate the trained model on a test set."""
     n_test_minibatches = 10
     n_test_mazes = n_test_minibatches * cfg.minibatch_size
@@ -195,12 +199,12 @@ def evaluate_test(ca, cfg):
             batch_idx = np.arange(i*cfg.minibatch_size, (i+1)*cfg.minibatch_size, dtype=int)
             x0 = test_mazes_onehot[batch_idx]
             x0_discrete = test_mazes_discrete[batch_idx]
-            x = gen_pool(size=cfg.minibatch_size, n_chan=ca.n_out_chan, height=x0_discrete.shape[2], width=x0_discrete.shape[3])
+            x = gen_pool(size=cfg.minibatch_size, n_chan=model.n_out_chan, height=x0_discrete.shape[2], width=x0_discrete.shape[3])
             target_paths_mini_batch = target_paths[batch_idx]
-            ca.reset(x0)
+            model.reset(x0)
 
             for j in range(cfg.n_layers):
-                x = ca(x)
+                x = model(x)
 
                 if j == cfg.n_layers - 1:
                     test_loss = get_mse_loss(x, target_paths_mini_batch).item()

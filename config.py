@@ -63,7 +63,7 @@ class Config():
     model = "NCA"
 
     # Whether the model is a cellular automaton-type model.
-    ca_model = True
+    shared_weights = True
 
 
 class ClArgsConfig(Config):
@@ -87,6 +87,7 @@ class ClArgsConfig(Config):
         # Command-line arguments will overwrite default config attributes.
         [setattr(self, k, v) for k, v in vars(args).items()]
 
+        self.n_hid_chan = 2
         self.load = True if self.render else self.load
         self.minibatch_size = 1 if self.model == "GCN" else self.minibatch_size
         self.val_batch_size = 1 if self.model == "GCN" else self.val_batch_size
@@ -94,7 +95,7 @@ class ClArgsConfig(Config):
         
         # For now, only the MLP can be not cellular-automaton-like.
         # TODO: Allow this to be False for non-MLP models. Allow it to be true for MLP
-        self.ca_model = self.model != "MLP"
+        self.shared_weights = self.model != "MLP"
         
         self.log_dir = get_exp_name(self)
 
