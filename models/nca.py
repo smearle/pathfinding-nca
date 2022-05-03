@@ -1,12 +1,15 @@
+from collections import OrderedDict
 from pdb import set_trace as TT
 
-import torch
+import torch as th
+from torch import nn
+from config import ClArgsConfig
 
 from models.nn import PathfindingNN
 
 
 class NCA(PathfindingNN):
-    def __init__(self, cfg):
+    def __init__(self, cfg: ClArgsConfig):
         """A Neural Cellular Automata model for pathfinding over grid-based mazes.
         
         Args:
@@ -19,29 +22,15 @@ class NCA(PathfindingNN):
         # Number of hidden channels, also number of writable channels the the output. (None-maze channels at the input.)
         self.n_hid_chan = n_hid_chan    
 
-        conv2d = torch.nn.Conv2d
+        conv2d = nn.Conv2d
 
         # This layer applies a dense layer to each 3x3 block of the input.
-        self.l1 = conv2d(n_hid_chan + n_in_chan, n_hid_chan, kernel_size=3, padding=1)
+        _make_conv = lambda: conv2d(n_hid_chan + n_in_chan, n_hid_chan, kernel_size=3, padding=1)
 
-        # Since the NCA receives the onehot maze as input at each step, we do not write to the channels reserved for this.
-        self.l2 = conv2d(n_hid_chan, n_hid_chan, kernel_size=1) 
+        if not cfg.shared_weights:
+            modules = [nn.Sequential(OrderedDict([(f'conv_{i}', _make_conv()), (f'relu_{i}', nn.ReLU())])) for i in range(cfg.n_layers)]
+        else:
+            conv_0 = _make_conv()
+            modules = [nn.Sequential(conv_0, nn.ReLU()) for _ in range(cfg.n_layers)]
 
-        # self.w2.weight.data.zero_()
-
-    def forward(self, x, update_rate=0.5):
-        x = super().add_initial_maze(x)
-        y = self.l1(x)
-        y = torch.relu(y)
-        y = self.l2(y)
-        # y = torch.relu(y)
-        # y = (torch.sigmoid(y) - 0.5) * 2
-        # b, c, h, w = y.shape
-
-        return y
-
-# def seed(self, n, sz=16):
-#     return torch.zeros(n, self.chn, sz, sz)
-
-# def to_rgb(x):
-    # return x[...,:3,:,:]+0.5
+        self.layers = nn.ModuleList(modules)

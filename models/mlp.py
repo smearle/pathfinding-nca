@@ -23,13 +23,15 @@ class MLP(PathfindingNN):
         # The size of the maze when flattened
         n_input = (cfg.width + 2) ** 2 * (cfg.n_in_chan)
 
-        self.linears = nn.ModuleList([nn.Linear(n_input, cfg.n_hidden)])
+        modules = nn.ModuleList([nn.Linear(n_input, cfg.n_hidden)])
         for _ in range(cfg.n_layers - 2):
-                self.linears.append(nn.Linear(cfg.n_hidden, cfg.n_hidden))
-        self.linears.append(nn.Linear(cfg.n_hidden, n_input))
+                modules.append(nn.Linear(cfg.n_hidden, cfg.n_hidden))
+        modules.append(nn.Linear(cfg.n_hidden, n_input))
+
+        self.layers = modules
 
 
-    def forward(self, input, update_rate=0.5):
+    def forward(self, input):
         # TODO: implement this for MLPs.
         # if self.skip_connections:
             # x = super().add_initial_maze(x)    

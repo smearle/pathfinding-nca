@@ -61,10 +61,12 @@ def get_mse_loss(x, target_paths):
     return loss
 
 
-def gen_pool(size, n_chan, height, width):
+def gen_pool(size, n_chan, height, width, cfg):
     # A set of mazes-in-progress, which will allow us to effectively run episodes up to length m * step_m (where m is some 
     # integer), while computing loss against optimal path and updating weights every step_n-many steps.
-    pool = torch.zeros(size, n_chan, height, width)
+    # NOTE: I think the effect of `sparse_update` here is to only update the last layer. Will break non-shared-weight
+    #   networks. Should implement this more explicitly in the future.
+    pool = torch.zeros(size, n_chan, height, width, requires_grad=not cfg.sparse_update)
 
     return pool
 

@@ -22,7 +22,7 @@ def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, log
     # m = n_layers
     lr_sched = torch.optim.lr_scheduler.MultiStepLR(opt, [10000], 0.1)
     logger.last_time = timer()
-    hid_states = gen_pool(mazes_onehot.shape[0], cfg.n_hid_chan, mazes_onehot.shape[2], mazes_onehot.shape[3])
+    hid_states = gen_pool(mazes_onehot.shape[0], cfg.n_hid_chan, mazes_onehot.shape[2], mazes_onehot.shape[3], cfg)
 
     for i in range(logger.n_step, cfg.n_updates):
         with torch.no_grad():
@@ -30,7 +30,6 @@ def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, log
             batch_idx = np.random.choice(hid_states.shape[0], minibatch_size, replace=False)
             render_batch_idx = batch_idx[:cfg.render_minibatch_size]
 
-            x = hid_states[batch_idx]
             # x = torch.zeros(x_maze.shape[0], n_chan, x_maze.shape[2], x_maze.shape[3])
             # x[:, :4, :, :] = x_maze
             x0 = mazes_onehot[batch_idx].clone()
@@ -38,19 +37,19 @@ def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, log
 
             model.reset(x0)
 
+        x = hid_states[batch_idx]
+
         # step_n = np.random.randint(32, 96)
 
+        # TODO: move initial auxiliary state to model? Probably a better way...
         # Ad hoc:
         if cfg.model == "MLP":
             assert not cfg.shared_weights    # TODO
             x = x0    # tehe
 
-        if not cfg.shared_weights:
-            x = model(x)
-
         else:
             # The following line is equivalent to this code:
-            # for k in range(step_n):
+            # for k in range(cfg.n_layers):
                 # x = model(x)
             # It uses gradient checkpointing to save memory, which enables larger
             # batches and longer CA step sequences. Surprisingly, this version
@@ -62,6 +61,8 @@ def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, log
 
         with torch.no_grad():
             if "Fixed" not in cfg.model:
+                # NOTE: why are we doing this??
+                model.reset(x0)
                 loss.backward()
                 for p in model.parameters():
                     # TODO: ignore "corner" convolutional weights here if specified in config.
@@ -82,6 +83,57 @@ def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, log
 
             if i % cfg.log_interval == 0:
                 log(logger, lr_sched, maze_ims, x, target_paths, render_batch_idx, cfg)
+
+
+def evaluate(model, data, batch_size, cfg, render=False):
+    # TODO: re-use this function when evaluating on training/test set, after training.
+    """Evaluate the trained model on a dataset without collecting gradients."""
+    mazes_onehot, mazes_discrete, target_paths = data.mazes_onehot, data.mazes_discrete, \
+        data.target_paths
+
+    with torch.no_grad():
+        test_losses = []
+        i = 0
+
+        for i in range(mazes_onehot.shape[0] // batch_size):
+            batch_idx = np.arange(i*batch_size, (i+1)*batch_size, dtype=int)
+            x0 = mazes_onehot[batch_idx]
+            x0_discrete = mazes_discrete[batch_idx]
+
+            if cfg.model == "MLP":
+                x = x0
+
+            else:
+                x = gen_pool(size=batch_size, n_chan=cfg.n_hid_chan, height=x0_discrete.shape[1], width=x0_discrete.shape[2], cfg=cfg)
+
+            target_paths_mini_batch = target_paths[batch_idx]
+            model.reset(x0)
+
+            for j in range(cfg.n_layers):
+                x = model(x)
+
+                if j == cfg.n_layers - 1:
+                    test_loss = get_mse_loss(x, target_paths_mini_batch).item()
+                    test_losses.append(test_loss)
+                    # clear_output(True)
+                    if render:
+                        fig, ax = plt.subplots(figsize=(10, 10))
+                        solved_maze_ims = np.hstack(render_discrete(x0_discrete[:cfg.render_minibatch_size]))
+                        target_path_ims = np.tile(np.hstack(
+                            target_paths_mini_batch[:cfg.render_minibatch_size].cpu())[...,None], (1, 1, 3)
+                            )
+                        predicted_path_ims = to_path(x[:cfg.render_minibatch_size])[...,None].cpu()
+                        # img = (img - img.min()) / (img.max() - img.min())
+                        predicted_path_ims = np.hstack(predicted_path_ims)
+                        predicted_path_ims = np.tile(predicted_path_ims, (1, 1, 3))
+                        imgs = np.vstack([solved_maze_ims, target_path_ims, predicted_path_ims])
+                        plt.imshow(imgs)
+                        plt.show()
+
+    mean_eval_loss = np.mean(test_losses)
+    # print(f'Mean evaluation loss: {mean_eval_loss}') 
+
+    return mean_eval_loss
 
 
 def log(logger, lr_sched, maze_ims, x, target_paths, render_batch_idx, cfg):
@@ -114,58 +166,6 @@ def log(logger, lr_sched, maze_ims, x, target_paths, render_batch_idx, cfg):
         ' lr:', lr_sched.get_last_lr(), end=''
         )
     logger.last_time = timer()
-
-
-def evaluate(model, data, batch_size, cfg, render=False):
-    # TODO: re-use this function when evaluating on training/test set, after training.
-    """Evaluate the trained model on a dataset without collecting gradients."""
-    mazes_onehot, mazes_discrete, target_paths = data.mazes_onehot, data.mazes_discrete, \
-        data.target_paths
-
-    with torch.no_grad():
-        test_losses = []
-        i = 0
-
-        for i in range(mazes_onehot.shape[0] // batch_size):
-            batch_idx = np.arange(i*batch_size, (i+1)*batch_size, dtype=int)
-            x0 = mazes_onehot[batch_idx]
-            x0_discrete = mazes_discrete[batch_idx]
-
-            if cfg.model == "MLP":
-                x = x0
-
-            else:
-                x = gen_pool(size=batch_size, n_chan=cfg.n_hid_chan, height=x0_discrete.shape[1], width=x0_discrete.shape[2])
-
-            target_paths_mini_batch = target_paths[batch_idx]
-            model.reset(x0)
-
-            for j in range(cfg.n_layers):
-                x = model(x)
-
-                if j == cfg.n_layers - 1:
-                    test_loss = get_mse_loss(x, target_paths_mini_batch).item()
-                    test_losses.append(test_loss)
-                    # clear_output(True)
-                    if render:
-                        fig, ax = plt.subplots(figsize=(10, 10))
-                        solved_maze_ims = np.hstack(render_discrete(x0_discrete[:cfg.render_minibatch_size]))
-                        target_path_ims = np.tile(np.hstack(
-                            target_paths_mini_batch[:cfg.render_minibatch_size].cpu())[...,None], (1, 1, 3)
-                            )
-                        predicted_path_ims = to_path(x[:cfg.render_minibatch_size])[...,None].cpu()
-                        # img = (img - img.min()) / (img.max() - img.min())
-                        predicted_path_ims = np.hstack(predicted_path_ims)
-                        predicted_path_ims = np.tile(predicted_path_ims, (1, 1, 3))
-                        imgs = np.vstack([solved_maze_ims, target_path_ims, predicted_path_ims])
-                        plt.imshow(imgs)
-                        plt.show()
-
-    mean_eval_loss = np.mean(test_losses)
-    # print(f'Mean evaluation loss: {mean_eval_loss}') 
-
-    return mean_eval_loss
-
 
 
 def smooth(y, box_pts):

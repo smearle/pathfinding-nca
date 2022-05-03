@@ -1,4 +1,5 @@
-from abc import ABC
+from abc import ABC, abstractmethod
+from pdb import set_trace as TT
 
 import torch
 from torch import nn
@@ -12,6 +13,7 @@ class PathfindingNN(ABC, nn.Module):
         passes through the network until the next reset.
         """
         nn.Module.__init__(self)
+        self.n_step = 0
 
         # The initial/actual state of the board (so that we can use walls to simulate path-flood).
         self.initial_maze = None
@@ -23,8 +25,21 @@ class PathfindingNN(ABC, nn.Module):
         return x
 
     def forward(self, x):
-        raise NotImplementedError
+        for _ in range(1 if not self.is_torchinfo_dummy else len(self.layers)):
+            x = self.add_initial_maze(x)
+            x = self.forward_layer(x, self.n_step)
+            self.n_step += 1
 
-    def reset(self, initial_maze):
+        return x
+
+    def forward_layer(self, x, i):
+        # assert hasattr(self, 'layers'), "Subclass of PathfindingNN must have `layers` attribute."
+        x = self.layers[i](x)
+
+        return x
+
+    def reset(self, initial_maze, is_torchinfo_dummy=False):
         """Store the initia maze to concatenate with later activations."""
+        self.is_torchinfo_dummy = is_torchinfo_dummy
         self.initial_maze = initial_maze
+        self.n_step = 0

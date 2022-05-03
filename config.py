@@ -65,6 +65,10 @@ class Config():
     # Whether the model is a cellular automaton-type model.
     shared_weights = True
 
+    # Originally this was a bug. But the shared-weight NCA still converges? Also ~3x faster as backprop becomes much 
+    # cheaper. Adding as cl arg to investigate further. I think this causes only the last layer to be updated?
+    sparse_update = False
+
 
 class ClArgsConfig(Config):
 
@@ -81,27 +85,27 @@ class ClArgsConfig(Config):
         args.add_argument('--overwrite', action='store_true')
 
         # Include all parameters in the Config class as command-line arguments.
-        [args.add_argument('--' + k, type=type(v), default=v) for k, v in self.__dict__.items()]
+        [args.add_argument('--' + k, action=argparse.BooleanOptionalAction) if type(v) is bool else \
+            args.add_argument('--' + k, type=type(v), default=v) for k, v in self.__dict__.items()]
         args = args.parse_args()
 
         # Command-line arguments will overwrite default config attributes.
         [setattr(self, k, v) for k, v in vars(args).items()]
 
-        self.n_hid_chan = 2
+        self.n_hid_chan = 2 if cfg.model == "FixedBfsNCA" else self.n_hid_chan
         self.load = True if self.render else self.load
         self.minibatch_size = 1 if self.model == "GCN" else self.minibatch_size
         self.val_batch_size = 1 if self.model == "GCN" else self.val_batch_size
         assert self.n_val_data % self.val_batch_size == 0, "Validation dataset size must be a multiple of val_batch_size."
-        
-        # For now, only the MLP can be not cellular-automaton-like.
-        # TODO: Allow this to be False for non-MLP models. Allow it to be true for MLP
-        self.shared_weights = self.model != "MLP"
+        if self.sparse_update:
+            assert self.shared_weights, "Sparse update only works with shared weights. (I think?)"
         
         self.log_dir = get_exp_name(self)
 
 
 def get_exp_name(cfg):
-    exp_name = os.path.join("log", f"{cfg.model}_{cfg.n_hid_chan}-hid_{cfg.n_data}-data_{cfg.n_layers}-layer_{cfg.exp_name}")
+    exp_name = os.path.join("log", f"{cfg.model}_shared-{(1 if cfg.shared_weights else 0)}_{cfg.n_hid_chan}-hid" +
+        f"_{cfg.n_data}-data_{cfg.n_layers}-layer{('_sparseUpdate' if cfg.sparse_update else '')}_{cfg.exp_name}")
 
     return exp_name
 

@@ -39,7 +39,7 @@ def main():
     # Setup training
     model = model_cls(cfg)
     # Set a dummy initial maze state.
-    model.reset(torch.zeros(cfg.minibatch_size, cfg.n_in_chan, cfg.width + 2, cfg.width + 2))
+    model.reset(torch.zeros(cfg.minibatch_size, cfg.n_in_chan, cfg.width + 2, cfg.width + 2), is_torchinfo_dummy=True)
 
     # FIXME: ad hoc (?)
     if cfg.model == "MLP":
@@ -110,7 +110,7 @@ def render_trained(ca, maze_data, cfg, pyplot_animation=True):
     """Generate a video showing the behavior of the trained NCA on mazes from its training distribution.
     """
     mazes_onehot, mazes_discrete = maze_data.mazes_onehot, maze_data.mazes_discrete
-    pool = gen_pool(mazes_onehot.shape[0], ca.n_hid_chan, mazes_onehot.shape[2], mazes_onehot.shape[3])
+    pool = gen_pool(mazes_onehot.shape[0], ca.n_hid_chan, mazes_onehot.shape[2], mazes_onehot.shape[3], cfg)
     render_minibatch_size = min(cfg.render_minibatch_size, mazes_onehot.shape[0])
     batch_idx = np.random.choice(pool.shape[0], render_minibatch_size, replace=False)
     x = pool[batch_idx]
@@ -199,7 +199,7 @@ def evaluate_test(model, cfg):
             batch_idx = np.arange(i*cfg.minibatch_size, (i+1)*cfg.minibatch_size, dtype=int)
             x0 = test_mazes_onehot[batch_idx]
             x0_discrete = test_mazes_discrete[batch_idx]
-            x = gen_pool(size=cfg.minibatch_size, n_chan=model.n_out_chan, height=x0_discrete.shape[2], width=x0_discrete.shape[3])
+            x = gen_pool(size=cfg.minibatch_size, n_chan=model.n_out_chan, height=x0_discrete.shape[2], width=x0_discrete.shape[3], cfg=cfg)
             target_paths_mini_batch = target_paths[batch_idx]
             model.reset(x0)
 
