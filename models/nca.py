@@ -25,7 +25,13 @@ class NCA(PathfindingNN):
         conv2d = nn.Conv2d
 
         # This layer applies a dense layer to each 3x3 block of the input.
-        _make_conv = lambda: conv2d(n_hid_chan + n_in_chan, n_hid_chan, kernel_size=3, padding=1)
+        _make_conv = lambda: conv2d(
+            n_hid_chan + n_in_chan, 
+            # If we're not repeatedly feeding the input maze, replace this with some extra hidden channels.
+            n_hid_chan + (n_in_chan if not self.skip_connections else 0),
+            kernel_size=3, 
+            padding=1
+        )
 
         if not cfg.shared_weights:
             modules = [nn.Sequential(OrderedDict([(f'conv_{i}', _make_conv()), (f'relu_{i}', nn.ReLU())])) for i in range(cfg.n_layers)]

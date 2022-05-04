@@ -6,7 +6,7 @@ from torch import nn
 
 
 class PathfindingNN(ABC, nn.Module):
-    def __init__(self, n_in_chan=4, n_hid_chan=9, drop_diagonals=True):
+    def __init__(self, n_in_chan=4, n_hid_chan=9, skip_connections=True):
         """A Neural Network for pathfinding.
         
         The underlying state of the maze is given through `reset()`, then concatenated with the input at all subsequent
@@ -14,6 +14,7 @@ class PathfindingNN(ABC, nn.Module):
         """
         nn.Module.__init__(self)
         self.n_step = 0
+        self.skip_connections = skip_connections
 
         # The initial/actual state of the board (so that we can use walls to simulate path-flood).
         self.initial_maze = None
@@ -25,8 +26,10 @@ class PathfindingNN(ABC, nn.Module):
         return x
 
     def forward(self, x):
+        # This forward pass will iterate through a single layer (or all layers if passing dummy input via `torchinfo`).
         for _ in range(1 if not self.is_torchinfo_dummy else len(self.layers)):
-            x = self.add_initial_maze(x)
+            if self.skip_connections or self.n_step == 0:
+                x = self.add_initial_maze(x)
             x = self.forward_layer(x, self.n_step)
             self.n_step += 1
 

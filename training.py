@@ -6,6 +6,7 @@ import numpy as np
 from timeit import default_timer as timer
 import torch as th
 import torchvision.models as models
+from tqdm import tqdm
 from config import ClArgsConfig
 from mazes import Mazes, render_discrete
 from models.nn import PathfindingNN
@@ -15,16 +16,12 @@ from utils import gen_pool, get_mse_loss, to_path, save
 
 def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, logger, cfg: ClArgsConfig):
     mazes_onehot, maze_ims = maze_data.mazes_onehot, maze_data.maze_ims
-    # Upper bound of net steps = step_n * m. Expected net steps = (minibatch_size / data_n) * m * step_n. (Since we select from pool
-    # randomly before each mini-episode.)
     minibatch_size = min(cfg.minibatch_size, cfg.n_data)
-    m = int(cfg.n_layers / cfg.n_layers * cfg.n_data / minibatch_size)
-    # m = n_layers
     lr_sched = th.optim.lr_scheduler.MultiStepLR(opt, [10000], 0.1)
     logger.last_time = timer()
     hid_states = gen_pool(mazes_onehot.shape[0], cfg.n_hid_chan, mazes_onehot.shape[2], mazes_onehot.shape[3], cfg)
 
-    for i in range(logger.n_step, cfg.n_updates):
+    for i in tqdm(range(logger.n_step, cfg.n_updates)):
         with th.no_grad():
             # Randomly select indices of data-points on which to train during this update step (i.e., minibatch)
             batch_idx = np.random.choice(hid_states.shape[0], minibatch_size, replace=False)
@@ -48,7 +45,8 @@ def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, log
             x = x0    # tehe
 
         else:
-            # FYI: this is from the differentiating NCA textures notebook. Weird checkpointing behavior indeed!
+            # FYI: this is from the differentiating NCA textures notebook. Weird checkpointing behavior indeed! See the
+            #   comments about the `sparse_updates` arg. -SE
             # The following line is equivalent to this code:
             # for k in range(cfg.n_layers):
                 # x = model(x)
@@ -58,12 +56,11 @@ def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, log
             # the forward pass twice!
             # x = th.utils.checkpoint.checkpoint_sequential([model]*cfg.n_layers, 32, x)
 
-            for j in range(cfg.n_layers // cfg.loss_interval):
-                x = th.utils.checkpoint.checkpoint_sequential([model]*cfg.loss_interval, 16, x)
+            loss = 0
 
-                # TODO: compute the loss
-        
-        loss = get_mse_loss(x, target_paths_mini_batch)
+            for _ in range(cfg.n_layers // cfg.loss_interval):
+                x = th.utils.checkpoint.checkpoint_sequential([model]*cfg.loss_interval, 16, x)
+                loss += get_mse_loss(x, target_paths_mini_batch)
 
         with th.no_grad():
             if "Fixed" not in cfg.model:
@@ -87,7 +84,6 @@ def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, log
                     
             if i % cfg.save_interval == 0:
                 save(model, opt, maze_data, logger, cfg)
-
                 # print(f'Saved CA and optimizer state dicts and maze archive to {cfg.log_dir}')
 
             if i % cfg.eval_interval == 0:
@@ -173,7 +169,7 @@ def log(logger, lr_sched, maze_ims, x, target_paths, render_batch_idx, cfg):
     plt.savefig(f'{cfg.log_dir}/training_progress.png')
     plt.close()
     fps = cfg.n_layers * cfg.minibatch_size * cfg.log_interval / (timer() - logger.last_time)
-    print('\rstep_n:', len(logger.loss_log),
+    print('step_n:', len(logger.loss_log),
         ' loss: {:.6e}'.format(logger.loss_log[-1]),
         ' fps: {:.2f}'.format(fps), 
         ' lr:', lr_sched.get_last_lr(), end=''

@@ -23,7 +23,7 @@ from utils import Logger, VideoWriter, gen_pool, get_mse_loss, to_path, load
 np.set_printoptions(threshold=sys.maxsize)
 
 
-def main():
+def experiment_main(cfg=None):
     os.system('nvidia-smi -L')
     if torch.cuda.is_available():
             print('Using GPU/CUDA.')
@@ -31,9 +31,9 @@ def main():
     else:
             print('Not using GPU/CUDA, using CPU.')
         
-    cfg = ClArgsConfig()
+    if cfg is None:
+        cfg = ClArgsConfig()
     cfg.n_in_chan = 4    # The number of channels in the one-hot encodings of the training mazes.
-    cfg.empty_chan, cfg.wall_chan, cfg.src_chan, cfg.trg_chan = 0, 1, 2, 3
     model_cls = globals()[cfg.model]
     
     # Setup training
@@ -67,10 +67,10 @@ def main():
             shutil.rmtree(cfg.log_dir)
         try:
             os.mkdir(cfg.log_dir)
-        except FileExistsError:
-            print(f"Experiment log folder {cfg.log_dir} already exists. Use `--load` or `--overwrite` command line arguments "\
+            logger = Logger()
+        except FileExistsError as e:
+            raise FileExistsError(f"Experiment log folder {cfg.log_dir} already exists. Use `--load` or `--overwrite` command line arguments "\
             "to load or overwrite it.")
-    logger = Logger()
 
     # Save a dictionary of the config to a json for future reference.
     json.dump(cfg.__dict__, open(f'{cfg.log_dir}/config.json', 'w'))
@@ -227,4 +227,4 @@ def evaluate_test(model, cfg):
 
 
 if __name__ == '__main__':
-    main()
+    experiment_main()

@@ -5,6 +5,11 @@ from pdb import set_trace as TT
 import torch
 
 
+class ImmutableConfig():
+    # The channel of the maze corresponding to empty/traversable space.
+    empty_chan, wall_chan, src_chan, trg_chan = 0, 1, 2, 3
+
+
 class Config():
     """Default configuration. Note that all of these static variables are treated as command line arguments via the 
     `ClArgsConfig` class below."""
@@ -15,7 +20,7 @@ class Config():
     n_data = 256
 
     # The width (and height, mazes are square for now) of the maze.
-    width = 16
+    width, height = 16, 16
 
     # Size of validation dataset
     n_val_data = 64
@@ -39,7 +44,7 @@ class Config():
     log_interval = 512
 
     # How often to save the model and optimizer to disk.
-    save_interval = log_interval * 5    
+    save_interval = 2048    
 
     eval_interval = 100
 
@@ -73,29 +78,45 @@ class Config():
     # episode.
     loss_interval = None
 
+    # Whether to feed in the input maze at each pass through the network.
+    skip_connections = True
+
 
 class ClArgsConfig(Config):
 
-    def __init__(self):
+    def __init__(self, args=None):
         """Set default arguments and get command line arguments."""
         # Load default arguments.
         cfg = Config()
+        immutable_cfg = ImmutableConfig()
         [setattr(self, k, getattr(cfg, k)) for k in dir(cfg) if not k.startswith('_')]
 
         # Get command-line arguments.
-        args = argparse.ArgumentParser()
+        if args is None:
+            args = argparse.ArgumentParser()
         args.add_argument('--load', action='store_true')
         args.add_argument('--render', action='store_true')
         args.add_argument('--overwrite', action='store_true')
 
         # Include all parameters in the Config class as command-line arguments.
-        [args.add_argument('--' + k, action=argparse.BooleanOptionalAction) if type(v) is bool else \
-            args.add_argument('--' + k, type=type(v), default=v) for k, v in self.__dict__.items()]
+        for k, v in vars(self).items():
+            if k.startswith('_'):
+                continue
+            if type(v) is bool:
+                args.add_argument('--' + k, action='store_true')
+                continue
+            if type(v) is None: 
+                typ = int
+            else:
+                typ = type(v)
+            args.add_argument(f'--{k}', type=typ, default=v)
+
         args = args.parse_args()
 
         # Command-line arguments will overwrite default config attributes.
         [setattr(self, k, v) for k, v in vars(args).items()]
 
+        [setattr(self, k, getattr(immutable_cfg, k)) for k in dir(immutable_cfg) if not k.startswith('_')]
         self.n_hid_chan = 2 if cfg.model == "FixedBfsNCA" else self.n_hid_chan
         self.load = True if self.render else self.load
         self.minibatch_size = 1 if self.model == "GCN" else self.minibatch_size
@@ -110,8 +131,16 @@ class ClArgsConfig(Config):
         self.log_dir = get_exp_name(self)
 
 
+class BatchConfig(ClArgsConfig):
+    """A class for batch configurations. This is used for parallel SLURM jobs, or a sequence of local jobs."""
+    def __init__(self):
+        args = argparse.ArgumentParser()
+        args.add_argument('--slurm', action='store_true')
+        super().__init__(args)
+
+
 def get_exp_name(cfg):
-    exp_name = os.path.join("log", f"{cfg.model}_shared-{('T' if cfg.shared_weights else 'F')}_{cfg.n_hid_chan}-hid" +
+    exp_name = os.path.join("runs", f"{cfg.model}_shared-{('T' if cfg.shared_weights else 'F')}_{cfg.n_hid_chan}-hid" +
         f"_lr-{cfg.learning_rate}_{cfg.n_data}-data_{cfg.n_layers}-layer{('_sparseUpdate' if cfg.sparse_update else '')}_{cfg.exp_name}")
 
     return exp_name
