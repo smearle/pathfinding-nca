@@ -69,6 +69,10 @@ class Config():
     # cheaper. Adding as cl arg to investigate further. I think this causes only the last layer to be updated?
     sparse_update = False
 
+    # When to compute the loss and update the network. If None, only compute the loss at the end of an `n_layers`-length
+    # episode.
+    loss_interval = None
+
 
 class ClArgsConfig(Config):
 
@@ -97,15 +101,18 @@ class ClArgsConfig(Config):
         self.minibatch_size = 1 if self.model == "GCN" else self.minibatch_size
         self.val_batch_size = 1 if self.model == "GCN" else self.val_batch_size
         assert self.n_val_data % self.val_batch_size == 0, "Validation dataset size must be a multiple of val_batch_size."
-        if self.sparse_update:
-            assert self.shared_weights, "Sparse update only works with shared weights. (I think?)"
+        # if self.sparse_update:
+            # assert self.shared_weights, "Sparse update only works with shared weights. (I think?)"
+        if self.loss_interval is None:
+            self.loss_interval = self.n_layers
+        assert self.n_layers % self.loss_interval == 0, "loss_interval should divide n_layers."
         
         self.log_dir = get_exp_name(self)
 
 
 def get_exp_name(cfg):
-    exp_name = os.path.join("log", f"{cfg.model}_shared-{(1 if cfg.shared_weights else 0)}_{cfg.n_hid_chan}-hid" +
-        f"_{cfg.n_data}-data_{cfg.n_layers}-layer{('_sparseUpdate' if cfg.sparse_update else '')}_{cfg.exp_name}")
+    exp_name = os.path.join("log", f"{cfg.model}_shared-{('T' if cfg.shared_weights else 'F')}_{cfg.n_hid_chan}-hid" +
+        f"_lr-{cfg.learning_rate}_{cfg.n_data}-data_{cfg.n_layers}-layer{('_sparseUpdate' if cfg.sparse_update else '')}_{cfg.exp_name}")
 
     return exp_name
 

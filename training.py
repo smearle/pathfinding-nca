@@ -4,7 +4,7 @@ import pickle
 from matplotlib import pyplot as plt
 import numpy as np
 from timeit import default_timer as timer
-import torch
+import torch as th
 import torchvision.models as models
 from config import ClArgsConfig
 from mazes import Mazes, render_discrete
@@ -20,17 +20,17 @@ def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, log
     minibatch_size = min(cfg.minibatch_size, cfg.n_data)
     m = int(cfg.n_layers / cfg.n_layers * cfg.n_data / minibatch_size)
     # m = n_layers
-    lr_sched = torch.optim.lr_scheduler.MultiStepLR(opt, [10000], 0.1)
+    lr_sched = th.optim.lr_scheduler.MultiStepLR(opt, [10000], 0.1)
     logger.last_time = timer()
     hid_states = gen_pool(mazes_onehot.shape[0], cfg.n_hid_chan, mazes_onehot.shape[2], mazes_onehot.shape[3], cfg)
 
     for i in range(logger.n_step, cfg.n_updates):
-        with torch.no_grad():
+        with th.no_grad():
             # Randomly select indices of data-points on which to train during this update step (i.e., minibatch)
             batch_idx = np.random.choice(hid_states.shape[0], minibatch_size, replace=False)
             render_batch_idx = batch_idx[:cfg.render_minibatch_size]
 
-            # x = torch.zeros(x_maze.shape[0], n_chan, x_maze.shape[2], x_maze.shape[3])
+            # x = th.zeros(x_maze.shape[0], n_chan, x_maze.shape[2], x_maze.shape[3])
             # x[:, :4, :, :] = x_maze
             x0 = mazes_onehot[batch_idx].clone()
             target_paths_mini_batch = target_paths[batch_idx]
@@ -48,6 +48,7 @@ def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, log
             x = x0    # tehe
 
         else:
+            # FYI: this is from the differentiating NCA textures notebook. Weird checkpointing behavior indeed!
             # The following line is equivalent to this code:
             # for k in range(cfg.n_layers):
                 # x = model(x)
@@ -55,15 +56,27 @@ def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, log
             # batches and longer CA step sequences. Surprisingly, this version
             # is also ~2x faster than a simple loop, even though it performs
             # the forward pass twice!
-            x = torch.utils.checkpoint.checkpoint_sequential([model]*cfg.n_layers, 16, x)
+            # x = th.utils.checkpoint.checkpoint_sequential([model]*cfg.n_layers, 32, x)
+
+            for j in range(cfg.n_layers // cfg.loss_interval):
+                x = th.utils.checkpoint.checkpoint_sequential([model]*cfg.loss_interval, 16, x)
+
+                # TODO: compute the loss
         
         loss = get_mse_loss(x, target_paths_mini_batch)
 
-        with torch.no_grad():
+        with th.no_grad():
             if "Fixed" not in cfg.model:
+
                 # NOTE: why are we doing this??
                 model.reset(x0)
+
                 loss.backward()
+
+                # DEBUG: gradient only collected for certain "chunks" of the network as a result of gradient checkpointing.
+                # for name, p in model.named_parameters():
+                    # print(name, "Grad is None?", p.grad is None)
+
                 for p in model.parameters():
                     # TODO: ignore "corner" convolutional weights here if specified in config.
                     p.grad /= (p.grad.norm()+1e-8)     # normalize gradients 
@@ -91,7 +104,7 @@ def evaluate(model, data, batch_size, cfg, render=False):
     mazes_onehot, mazes_discrete, target_paths = data.mazes_onehot, data.mazes_discrete, \
         data.target_paths
 
-    with torch.no_grad():
+    with th.no_grad():
         test_losses = []
         i = 0
 
