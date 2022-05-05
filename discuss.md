@@ -1,4 +1,5 @@
 # Future Locations
+- Try generic skip connections (e.g., adding output after first layer to all following layers)
 - ~~Remove "pool" logic. For now, only apply loss at the end of an `n_layers` length episode of pathfinding.~~ Later, we can appy loss at regular intervals during this episode.
 - Have an option to use skip connection or not. i.e., the initial maze is concatenated with the model's hidden activations after each layer.
 - ~~Add MLP~~

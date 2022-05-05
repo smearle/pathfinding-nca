@@ -17,21 +17,28 @@ class NCA(PathfindingNN):
             n_hid_chan: Number of channels in the hidden layers.
             drop_diagonals: Whether to drop diagonals in the 3x3 input patches to each conv layer.
             """
-        super().__init__()
+        super().__init__(cfg)
         n_in_chan, n_hid_chan = cfg.n_in_chan, cfg.n_hid_chan
         # Number of hidden channels, also number of writable channels the the output. (None-maze channels at the input.)
         self.n_hid_chan = n_hid_chan    
 
         conv2d = nn.Conv2d
 
-        # This layer applies a dense layer to each 3x3 block of the input.
-        _make_conv = lambda: conv2d(
-            n_hid_chan + n_in_chan, 
-            # If we're not repeatedly feeding the input maze, replace this with some extra hidden channels.
-            n_hid_chan + (n_in_chan if not self.skip_connections else 0),
-            kernel_size=3, 
-            padding=1
-        )
+
+        def _make_conv():
+            # This layer applies a dense layer to each 3x3 block of the input.
+            conv = conv2d(
+                n_hid_chan + n_in_chan, 
+                # If we're not repeatedly feeding the input maze, replace this with some extra hidden channels.
+                n_hid_chan + (n_in_chan if not cfg.skip_connections else 0),
+                kernel_size=3, 
+                padding=1
+            )
+            if cfg.cut_conv_corners:
+                conv.weight.data[:, :, 0, 0] = conv.weight.data[:, :, -1, -1] = conv.weight.data[:, :, 0, -1] = \
+                    conv.weight.data[:, :, -1, 0] = 0
+
+            return conv
 
         if not cfg.shared_weights:
             modules = [nn.Sequential(OrderedDict([(f'conv_{i}', _make_conv()), (f'relu_{i}', nn.ReLU())])) for i in range(cfg.n_layers)]
@@ -40,3 +47,4 @@ class NCA(PathfindingNN):
             modules = [nn.Sequential(conv_0, nn.ReLU()) for _ in range(cfg.n_layers)]
 
         self.layers = nn.ModuleList(modules)
+

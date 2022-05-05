@@ -1,12 +1,29 @@
 {
   "model": [
-    "NCA",
+    # "NCA",
     # "GCN",
     # "MLP",
+    "FixedBfsNCA",
+    # "BfsNCA",
+  ],
+
+  "n_layers": [
+    6,
+    # 64,
+  ],
+
+  # How often to calculate the loss.
+  "loss_interval": [
+    null,
+    # 16,
+    # 32,
+    # 64,
   ],
 
   "n_hid_chan": [
-    24,
+    6,
+    # 10,
+    # 24,
     # 48,
     # 96,
   ],
@@ -16,14 +33,12 @@
     # False,
   ],
 
-  # How often to calculate the loss.
-  "loss_interval": [
-    # 16,
-    # 32,
-    64,
+  "skip_connections": [
+    True,
+    # False,
   ],
 
-  "skip_connections": [
+  "cut_conv_corners": [
     # True,
     False,
   ],
@@ -31,12 +46,17 @@
   # Whether to enable the (bug/fix) that limits the gradients accumulated to the last few layers of the network. 
   # Presumably only valid when using shared weights for all layers. Faster, but (persumably) less stable.
   "sparse_update": [
-    True,
-    # False,
+    # True,
+    False,
   ],
 
   "minibatch_size": [
-    16,
+    32,
   ],
+
+  "n_data": [
+    # 256,
+    512,
+  ]
 
 }

@@ -13,9 +13,9 @@ from pdb import set_trace as TT
 import re
 import yaml
 
-from config import BatchConfig, get_exp_name
-from main import experiment_main
-from mazes import Mazes  # Weirdly need this to be able to load dataset of mazes.
+from config import BatchConfig
+from main import main_experiment
+from mazes import Mazes, main_mazes  # Weirdly need this to be able to load dataset of mazes.
 # from cross_eval import vis_cross_eval
 
 
@@ -49,14 +49,21 @@ def dump_config(exp_name, exp_config):
         json.dump(exp_config, f, indent=4)
 
 
-def batch_main():
-    cfg = BatchConfig()
+def main_batch():
+    batch_cfg = BatchConfig()
+    gen_new_data = batch_cfg.gen_new_data
     job_time = 48
     
     with open(os.path.join('configs', 'batch.yaml')) as f:
         batch_hyperparams = yaml.safe_load(f)
 
-    exp_configs = [copy.deepcopy(cfg)]
+    # Generate dataset of mazes if necessary.
+    if gen_new_data:
+        if 'n_data' in batch_hyperparams:
+            setattr(batch_cfg, 'n_data', max(batch_hyperparams['n_data']))
+        main_mazes(batch_cfg)
+
+    exp_configs = [copy.deepcopy(batch_cfg)]
 
     # Create an experiment config for each combination of hyperparameters.
     for key, hyperparams in batch_hyperparams.items():
@@ -64,47 +71,44 @@ def batch_main():
         new_exp_configs = []
         for hyperparam in hyperparams:
             for exp_config in old_exp_configs:
-                print(exp_config)
                 exp_config = copy.deepcopy(exp_config)
                 setattr(exp_config, key, hyperparam)
                 new_exp_configs.append(exp_config)
         exp_configs = new_exp_configs
+    
+    [ec.set_exp_name() for ec in exp_configs]
 
     experiment_names = []
     for exp_cfg in exp_configs:
-        if not cfg.slurm:
-            experiment_main(exp_cfg)
+        if not batch_cfg.slurm:
+            main_experiment(exp_cfg)
 
-        elif not cfg.load:
-            experiment_name = get_exp_name(cfg)
-            experiment_names.append(experiment_name)
-            dump_config(experiment_name, exp_cfg)
+        elif not batch_cfg.load:
+            experiment_names.append(exp_cfg.exp_name)
+            dump_config(exp_cfg.exp_name, exp_cfg)
         else:
 
             # Remove this eventually. Very ad hoc backward compatibility with broken experiment naming schemes:
             found_save_dir = False
             sd_i = 0
-            experiment_name = get_exp_name(exp_cfg)
-            if not os.path.isdir(experiment_name):
-                print(f'No directory found for experiment at {experiment_name}.')
+            if not os.path.isdir(exp_cfg.exp_name):
+                print(f'No directory found for experiment at {exp_cfg.exp_name}.')
             else:
-                exp_config['experiment_name'] = experiment_name
-                experiment_names.append(experiment_name)
-                dump_config(experiment_name, exp_config)
+                exp_config['experiment_name'] = exp_cfg.exp_name
+                experiment_names.append(exp_cfg.exp_name)
+                dump_config(exp_cfg.exp_name, exp_config)
                 break
             sd_i += 1
             if not found_save_dir:
                 print('No save directory found for experiment. Skipping.')
             else:
-                print('Found save dir: ', experiment_name)
+                print('Found save dir: ', exp_cfg.exp_name)
 
-    if cfg.vis_cross_eval:
+    if batch_cfg.vis_cross_eval:
         # vis_cross_eval(exp_configs)
         raise NotImplementedError
 
-        return 
-
-    if cfg.slurm:
+    if batch_cfg.slurm:
         sbatch_file = os.path.join('slurm', 'run.sh')
         for experiment_name in experiment_names:
             # Because of our parallel evo/train implementation, we need an additional CPU for the remote trainer, and 
@@ -113,6 +117,5 @@ def batch_main():
                 job_gpus=1, job_mem=16)
 
 
-
 if __name__ == '__main__':
-    batch_main()
+    main_batch()

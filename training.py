@@ -11,15 +11,16 @@ from config import ClArgsConfig
 from mazes import Mazes, render_discrete
 from models.nn import PathfindingNN
 
-from utils import gen_pool, get_mse_loss, to_path, save
+from utils import get_discrete_loss, get_mse_loss, to_path, save
 
 
-def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, logger, cfg: ClArgsConfig):
+def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_data_val: Mazes, 
+        target_paths: th.Tensor, logger: Logger, cfg: ClArgsConfig):
     mazes_onehot, maze_ims = maze_data.mazes_onehot, maze_data.maze_ims
     minibatch_size = min(cfg.minibatch_size, cfg.n_data)
     lr_sched = th.optim.lr_scheduler.MultiStepLR(opt, [10000], 0.1)
     logger.last_time = timer()
-    hid_states = gen_pool(mazes_onehot.shape[0], cfg.n_hid_chan, mazes_onehot.shape[2], mazes_onehot.shape[3], cfg)
+    hid_states = model.seed(batch_size=mazes_onehot.shape[0])
 
     for i in tqdm(range(logger.n_step, cfg.n_updates)):
         with th.no_grad():
@@ -40,27 +41,36 @@ def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, log
 
         # TODO: move initial auxiliary state to model? Probably a better way...
         # Ad hoc:
-        if cfg.model == "MLP":
-            assert not cfg.shared_weights    # TODO
-            x = x0    # tehe
+        # if cfg.model == "MLP":
+            # assert not cfg.shared_weights    # TODO
+            # x = x0    # tehe
 
-        else:
-            # FYI: this is from the differentiating NCA textures notebook. Weird checkpointing behavior indeed! See the
-            #   comments about the `sparse_updates` arg. -SE
-            # The following line is equivalent to this code:
-            # for k in range(cfg.n_layers):
-                # x = model(x)
-            # It uses gradient checkpointing to save memory, which enables larger
-            # batches and longer CA step sequences. Surprisingly, this version
-            # is also ~2x faster than a simple loop, even though it performs
-            # the forward pass twice!
-            # x = th.utils.checkpoint.checkpoint_sequential([model]*cfg.n_layers, 32, x)
+        # else:
+        # FYI: this is from the differentiating NCA textures notebook. Weird checkpointing behavior indeed! See the
+        #   comments about the `sparse_updates` arg. -SE
+        # The following line is equivalent to this code:
+        # for k in range(cfg.n_layers):
+            # x = model(x)
+        # It uses gradient checkpointing to save memory, which enables larger
+        # batches and longer CA step sequences. Surprisingly, this version
+        # is also ~2x faster than a simple loop, even though it performs
+        # the forward pass twice!
+        # x = th.utils.checkpoint.checkpoint_sequential([model]*cfg.n_layers, 32, x)
 
-            loss = 0
+        loss = 0
 
-            for _ in range(cfg.n_layers // cfg.loss_interval):
+        for _ in range(cfg.n_layers // cfg.loss_interval):
+
+            # Hackish way of storing gradient only at last "chunk" (with checkpointing), or not.
+            if cfg.sparse_update:
                 x = th.utils.checkpoint.checkpoint_sequential([model]*cfg.loss_interval, 16, x)
-                loss += get_mse_loss(x, target_paths_mini_batch)
+            else:
+                for _ in range(cfg.n_layers):
+                    x = model(x)
+
+            loss += get_mse_loss(x, target_paths_mini_batch)
+
+        discrete_loss = get_discrete_loss(x, target_paths_mini_batch)
 
         with th.no_grad():
             if "Fixed" not in cfg.model:
@@ -74,13 +84,19 @@ def train(model: PathfindingNN, opt, maze_data, maze_data_val, target_paths, log
                 # for name, p in model.named_parameters():
                     # print(name, "Grad is None?", p.grad is None)
 
-                for p in model.parameters():
-                    # TODO: ignore "corner" convolutional weights here if specified in config.
+                # for p in model.parameters():
+                for name, p in model.named_parameters():
+                    if p.grad is None:
+                        assert cfg.model == "BfsNCA"
+                        continue
+                    if cfg.cut_conv_corners and "weight" in name:
+                        # Zero out all the corners
+                        p.grad[:, :, 0, 0] = p.grad[:, :, -1, -1] = p.grad[:, :, -1, 0] = p.grad[:, :, 0, -1] = 0
                     p.grad /= (p.grad.norm()+1e-8)     # normalize gradients 
                 opt.step()
                 opt.zero_grad()
             # lr_sched.step()
-            logger.log(loss=loss.item())
+            logger.log(loss=loss.item(), discrete_loss=discrete_loss.item())
                     
             if i % cfg.save_interval == 0:
                 save(model, opt, maze_data, logger, cfg)
@@ -109,11 +125,11 @@ def evaluate(model, data, batch_size, cfg, render=False):
             x0 = mazes_onehot[batch_idx]
             x0_discrete = mazes_discrete[batch_idx]
 
-            if cfg.model == "MLP":
-                x = x0
+            # if cfg.model == "MLP":
+                # x = x0
 
-            else:
-                x = gen_pool(size=batch_size, n_chan=cfg.n_hid_chan, height=x0_discrete.shape[1], width=x0_discrete.shape[2], cfg=cfg)
+            # else:
+            x = model.seed(batch_size=batch_size)
 
             target_paths_mini_batch = target_paths[batch_idx]
             model.reset(x0)
@@ -149,11 +165,18 @@ def log(logger, lr_sched, maze_ims, x, target_paths, render_batch_idx, cfg):
     fig, ax = plt.subplots(2, 4, figsize=(20, 10))
     plt.subplot(411)
         # smooth_loss_log = smooth(logger.loss_log, 10)
-    smooth_loss_log = logger.loss_log
-    plt.plot(smooth_loss_log, '.', alpha=0.1)
-    plt.plot(list(logger.val_loss_log.keys()), list(logger.val_loss_log.values()), '.', alpha=1.0)
+    loss_log = logger.loss_log
+    discrete_loss_log = logger.discrete_loss_log
+    discrete_loss_log = np.where(np.array(discrete_loss_log) == 0, 1e-8, discrete_loss_log)
+    val_loss_log = list(logger.val_loss_log.values())
+    plt.plot(loss_log, '.', alpha=0.1, label='loss')
+    plt.plot(discrete_loss_log, '.', alpha=0.1, label='discrete loss')
+    plt.plot(list(logger.val_loss_log.keys()), list(logger.val_loss_log.values()), '.', alpha=1.0, label='val loss')
+    plt.legend()
     plt.yscale('log')
-    plt.ylim(np.min(smooth_loss_log), logger.loss_log[0])
+    # plt.ylim(np.min(np.hstack((loss_log, discrete_loss_log))), logger.loss_log[0])
+    plt.ylim(np.min(np.hstack((loss_log, discrete_loss_log))), 
+             np.max(np.hstack((loss_log, discrete_loss_log, val_loss_log))))
         # imgs = to_rgb(x).permute([0, 2, 3, 1]).cpu()
     render_paths = to_path(x[:cfg.render_minibatch_size]).cpu()
         # imshow(np.hstack(imgs))

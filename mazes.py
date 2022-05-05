@@ -14,7 +14,7 @@ val_fname = f"{maze_data_fname}_val.pk"
 test_fname = f"{maze_data_fname}_test.pk"
 
 
-def main(cfg):
+def main_mazes(cfg):
     """Generate random mazes for training/testing."""
     if np.any([os.path.exists(fname) for fname in [train_fname, val_fname, test_fname]]):
         overwrite = input("File already exists. Overwrite? (y/n) ")
@@ -193,4 +193,4 @@ def gen_rand_mazes(cfg):
 
 if __name__ == "__main__":
     cfg = ClArgsConfig()
-    main(cfg)
+    main_mazes(cfg)

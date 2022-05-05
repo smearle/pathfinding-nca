@@ -1,6 +1,6 @@
-
 import base64
 import io
+from pdb import set_trace as TT
 import pickle
 import requests
 
@@ -15,12 +15,14 @@ import torch
 class Logger():
     def __init__(self):
         self.loss_log = []
+        self.discrete_loss_log = []
         self.val_loss_log = {}
         self.n_step = 0
 
-    def log(self, loss):
+    def log(self, loss, discrete_loss):
         """Log training loss (once per update step)."""
         self.loss_log.append(loss)
+        self.discrete_loss_log.append(discrete_loss)
         self.n_step += 1
 
     def log_val(self, val_loss):
@@ -61,14 +63,11 @@ def get_mse_loss(x, target_paths):
     return loss
 
 
-def gen_pool(size, n_chan, height, width, cfg):
-    # A set of mazes-in-progress, which will allow us to effectively run episodes up to length m * step_m (where m is some 
-    # integer), while computing loss against optimal path and updating weights every step_n-many steps.
-    # NOTE: I think the effect of `sparse_update` here is to only update the last layer. Will break non-shared-weight
-    #   networks. Should implement this more explicitly in the future.
-    pool = torch.zeros(size, n_chan, height, width, requires_grad=not cfg.sparse_update)
-
-    return pool
+def get_discrete_loss(x, target_paths):
+    paths = to_path(x).round()
+    err = paths - target_paths
+    loss = err.square().float().mean()    #+ overflow_loss
+    return loss
 
 
 def imread(url, max_size=None, mode=None):

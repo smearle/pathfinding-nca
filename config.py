@@ -9,6 +9,7 @@ class ImmutableConfig():
     # The channel of the maze corresponding to empty/traversable space.
     empty_chan, wall_chan, src_chan, trg_chan = 0, 1, 2, 3
 
+    n_in_chan = 4    # The number of channels in the one-hot encodings of the training mazes.
 
 class Config():
     """Default configuration. Note that all of these static variables are treated as command line arguments via the 
@@ -38,7 +39,7 @@ class Config():
     n_hid_chan = 96    
 
     # The number of hidden nodes in the hidden layers. (For MLP models.)
-    n_hidden = 256
+    n_hid_nodes = 256
 
     # How often to print results to the console.
     log_interval = 512
@@ -81,8 +82,13 @@ class Config():
     # Whether to feed in the input maze at each pass through the network.
     skip_connections = True
 
+    # Whether to zero out weights and gradients so as to ignore the corners of each 3x3 patch when using convolutions.
+    cut_conv_corners = False
 
-class ClArgsConfig(Config):
+    test = False
+
+
+class ClArgsConfig(Config, ImmutableConfig):
 
     def __init__(self, args=None):
         """Set default arguments and get command line arguments."""
@@ -116,32 +122,50 @@ class ClArgsConfig(Config):
         # Command-line arguments will overwrite default config attributes.
         [setattr(self, k, v) for k, v in vars(args).items()]
 
+        # Immutable config settings are not available as command-line arguments.
         [setattr(self, k, getattr(immutable_cfg, k)) for k in dir(immutable_cfg) if not k.startswith('_')]
-        self.n_hid_chan = 2 if cfg.model == "FixedBfsNCA" else self.n_hid_chan
+ 
+    def set_exp_name(self):
+        self._validate()
+        self.exp_name = ''.join([
+            f"{self.model}",
+            f"_shared-{('T' if self.shared_weights else 'F')}",
+            f"_skip-{('T' if self.skip_connections else 'F')}",
+            f"_{self.n_hid_chan}-hid",
+            f"_lr-{'{:.0e}'.format(self.learning_rate)}",
+            f"_{self.n_data}-data",
+            f"_{self.n_layers}-layer",
+            f"_cutCorners-{('T' if self.cut_conv_corners else 'F')}",
+            f"_sparseUpdate-{('T' if self.sparse_update else 'F')}",
+            f"_{self.exp_name}",
+
+        ])
+        self.log_dir = os.path.join("runs", self.exp_name)
+
+    def _validate(self):
+        self.n_hid_chan = 2 if self.model == "FixedBfsNCA" else self.n_hid_chan
         self.load = True if self.render else self.load
         self.minibatch_size = 1 if self.model == "GCN" else self.minibatch_size
         self.val_batch_size = 1 if self.model == "GCN" else self.val_batch_size
         assert self.n_val_data % self.val_batch_size == 0, "Validation dataset size must be a multiple of val_batch_size."
         # if self.sparse_update:
             # assert self.shared_weights, "Sparse update only works with shared weights. (I think?)"
+        if self.cut_conv_corners:
+            assert self.model == "NCA", "Cutting corners only works with NCA."
         if self.loss_interval is None:
             self.loss_interval = self.n_layers
         assert self.n_layers % self.loss_interval == 0, "loss_interval should divide n_layers."
-        
-        self.log_dir = get_exp_name(self)
-
 
 class BatchConfig(ClArgsConfig):
     """A class for batch configurations. This is used for parallel SLURM jobs, or a sequence of local jobs."""
     def __init__(self):
         args = argparse.ArgumentParser()
-        args.add_argument('--slurm', action='store_true')
+        # These arguments apply only to the batch of experiments, and will not be considered by individual experiments 
+        # themselves.
+        args.add_argument('--slurm', action='store_true', help='Submit jobs to run in parallel on SLURM.')
+        args.add_argument('--vis_cross_eval', action='store_true')
+        args.add_argument('--gen_new_data', action='store_true', help="Generate new data on which to run the batch"
+                            " of experiments.")
         super().__init__(args)
 
-
-def get_exp_name(cfg):
-    exp_name = os.path.join("runs", f"{cfg.model}_shared-{('T' if cfg.shared_weights else 'F')}_{cfg.n_hid_chan}-hid" +
-        f"_lr-{cfg.learning_rate}_{cfg.n_data}-data_{cfg.n_layers}-layer{('_sparseUpdate' if cfg.sparse_update else '')}_{cfg.exp_name}")
-
-    return exp_name
 
