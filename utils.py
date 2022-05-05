@@ -16,7 +16,7 @@ class Logger():
     def __init__(self):
         self.loss_log = []
         self.discrete_loss_log = []
-        self.val_loss_log = {}
+        self.val_stats_log = {}
         self.n_step = 0
 
     def log(self, loss, discrete_loss):
@@ -25,9 +25,12 @@ class Logger():
         self.discrete_loss_log.append(discrete_loss)
         self.n_step += 1
 
-    def log_val(self, val_loss):
+    def log_val(self, val_stats):
         """Log validation loss."""
-        self.val_loss_log[self.n_step] = val_loss
+        self.val_stats_log[self.n_step] = val_stats
+
+    def get_val_stat(self, k):
+        return {i: self.val_stats_log[i][k] for i in self.val_stats_log}
 
 ca_state_fname = 'ca_state_dict.pt'
 opt_state_fname = 'opt_state_dict.pt'
@@ -66,7 +69,7 @@ def get_mse_loss(x, target_paths):
 def get_discrete_loss(x, target_paths):
     paths = to_path(x).round()
     err = paths - target_paths
-    loss = err.square().float().mean()    #+ overflow_loss
+    loss = err.square()  #.float().mean()    #+ overflow_loss
     return loss
 
 

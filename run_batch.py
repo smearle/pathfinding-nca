@@ -76,33 +76,50 @@ def main_batch():
                 new_exp_configs.append(exp_config)
         exp_configs = new_exp_configs
     
-    [ec.set_exp_name() for ec in exp_configs]
+    # Validate experiment configs, setting unique experiment names and filtering out invalid configs (flagged by 
+    # assertion errors in `config._validate()`).
+    filtered_exp_configs = []
+    for ec in exp_configs:
+        try:
+            ec.set_exp_name()
+            filtered_exp_configs.append(ec)
+        except AssertionError as e:
+            print("Experiment config is invalid:", e)
+            print("Skipping experiment.")
+    exp_configs = filtered_exp_configs
 
     experiment_names = []
     for exp_cfg in exp_configs:
         if not batch_cfg.slurm:
-            main_experiment(exp_cfg)
+            try:
+                main_experiment(exp_cfg)
+            except Exception as e:
+                print("Experiment failed, with error:\n", e)
+                print("Skipping experiment.")
+                continue
 
-        elif not batch_cfg.load:
-            experiment_names.append(exp_cfg.exp_name)
-            dump_config(exp_cfg.exp_name, exp_cfg)
         else:
+            raise NotImplementedError
+        # elif not batch_cfg.load:
+        #     experiment_names.append(exp_cfg.exp_name)
+        #     dump_config(exp_cfg.exp_name, exp_cfg)
+        # else:
 
-            # Remove this eventually. Very ad hoc backward compatibility with broken experiment naming schemes:
-            found_save_dir = False
-            sd_i = 0
-            if not os.path.isdir(exp_cfg.exp_name):
-                print(f'No directory found for experiment at {exp_cfg.exp_name}.')
-            else:
-                exp_config['experiment_name'] = exp_cfg.exp_name
-                experiment_names.append(exp_cfg.exp_name)
-                dump_config(exp_cfg.exp_name, exp_config)
-                break
-            sd_i += 1
-            if not found_save_dir:
-                print('No save directory found for experiment. Skipping.')
-            else:
-                print('Found save dir: ', exp_cfg.exp_name)
+        #     # Remove this eventually. Very ad hoc backward compatibility with broken experiment naming schemes:
+        #     found_save_dir = False
+        #     sd_i = 0
+        #     if not os.path.isdir(exp_cfg.exp_name):
+        #         print(f'No directory found for experiment at {exp_cfg.exp_name}.')
+        #     else:
+        #         exp_config['experiment_name'] = exp_cfg.exp_name
+        #         experiment_names.append(exp_cfg.exp_name)
+        #         dump_config(exp_cfg.exp_name, exp_config)
+        #         break
+        #     sd_i += 1
+        #     if not found_save_dir:
+        #         print('No save directory found for experiment. Skipping.')
+        #     else:
+        #         print('Found save dir: ', exp_cfg.exp_name)
 
     if batch_cfg.vis_cross_eval:
         # vis_cross_eval(exp_configs)

@@ -1,4 +1,3 @@
-from logging import Logger
 from pdb import set_trace as TT
 import pickle
 from matplotlib import pyplot as plt
@@ -8,10 +7,11 @@ import torch as th
 import torchvision.models as models
 from tqdm import tqdm
 from config import ClArgsConfig
+from evaluate import evaluate
 from mazes import Mazes, render_discrete
 from models.nn import PathfindingNN
 
-from utils import get_discrete_loss, get_mse_loss, to_path, save
+from utils import get_discrete_loss, get_mse_loss, Logger, to_path, save
 
 
 def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_data_val: Mazes, 
@@ -63,14 +63,14 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
 
             # Hackish way of storing gradient only at last "chunk" (with checkpointing), or not.
             if cfg.sparse_update:
-                x = th.utils.checkpoint.checkpoint_sequential([model]*cfg.loss_interval, 16, x)
+                x = th.utils.checkpoint.checkpoint_sequential([model]*cfg.loss_interval, min(16, cfg.loss_interval), x)
             else:
                 for _ in range(cfg.n_layers):
                     x = model(x)
 
             loss += get_mse_loss(x, target_paths_mini_batch)
 
-        discrete_loss = get_discrete_loss(x, target_paths_mini_batch)
+        discrete_loss = get_discrete_loss(x, target_paths_mini_batch).float().mean()
 
         with th.no_grad():
             if "Fixed" not in cfg.model:
@@ -98,67 +98,16 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
             # lr_sched.step()
             logger.log(loss=loss.item(), discrete_loss=discrete_loss.item())
                     
-            if i % cfg.save_interval == 0:
+            if i % cfg.save_interval == 0 or i == cfg.n_updates - 1:
                 save(model, opt, maze_data, logger, cfg)
                 # print(f'Saved CA and optimizer state dicts and maze archive to {cfg.log_dir}')
 
             if i % cfg.eval_interval == 0:
-                val_loss = evaluate(model, maze_data_val, cfg.val_batch_size, cfg)
-                logger.log_val(val_loss=val_loss)
+                val_stats = evaluate(model, maze_data_val, cfg.val_batch_size, "validate", cfg)
+                logger.log_val(val_stats)
 
             if i % cfg.log_interval == 0:
                 log(logger, lr_sched, maze_ims, x, target_paths, render_batch_idx, cfg)
-
-
-def evaluate(model, data, batch_size, cfg, render=False):
-    # TODO: re-use this function when evaluating on training/test set, after training.
-    """Evaluate the trained model on a dataset without collecting gradients."""
-    mazes_onehot, mazes_discrete, target_paths = data.mazes_onehot, data.mazes_discrete, \
-        data.target_paths
-
-    with th.no_grad():
-        test_losses = []
-        i = 0
-
-        for i in range(mazes_onehot.shape[0] // batch_size):
-            batch_idx = np.arange(i*batch_size, (i+1)*batch_size, dtype=int)
-            x0 = mazes_onehot[batch_idx]
-            x0_discrete = mazes_discrete[batch_idx]
-
-            # if cfg.model == "MLP":
-                # x = x0
-
-            # else:
-            x = model.seed(batch_size=batch_size)
-
-            target_paths_mini_batch = target_paths[batch_idx]
-            model.reset(x0)
-
-            for j in range(cfg.n_layers):
-                x = model(x)
-
-                if j == cfg.n_layers - 1:
-                    test_loss = get_mse_loss(x, target_paths_mini_batch).item()
-                    test_losses.append(test_loss)
-                    # clear_output(True)
-                    if render:
-                        fig, ax = plt.subplots(figsize=(10, 10))
-                        solved_maze_ims = np.hstack(render_discrete(x0_discrete[:cfg.render_minibatch_size]))
-                        target_path_ims = np.tile(np.hstack(
-                            target_paths_mini_batch[:cfg.render_minibatch_size].cpu())[...,None], (1, 1, 3)
-                            )
-                        predicted_path_ims = to_path(x[:cfg.render_minibatch_size])[...,None].cpu()
-                        # img = (img - img.min()) / (img.max() - img.min())
-                        predicted_path_ims = np.hstack(predicted_path_ims)
-                        predicted_path_ims = np.tile(predicted_path_ims, (1, 1, 3))
-                        imgs = np.vstack([solved_maze_ims, target_path_ims, predicted_path_ims])
-                        plt.imshow(imgs)
-                        plt.show()
-
-    mean_eval_loss = np.mean(test_losses)
-    # print(f'Mean evaluation loss: {mean_eval_loss}') 
-
-    return mean_eval_loss
 
 
 def log(logger, lr_sched, maze_ims, x, target_paths, render_batch_idx, cfg):
@@ -168,15 +117,17 @@ def log(logger, lr_sched, maze_ims, x, target_paths, render_batch_idx, cfg):
     loss_log = logger.loss_log
     discrete_loss_log = logger.discrete_loss_log
     discrete_loss_log = np.where(np.array(discrete_loss_log) == 0, 1e-8, discrete_loss_log)
-    val_loss_log = list(logger.val_loss_log.values())
     plt.plot(loss_log, '.', alpha=0.1, label='loss')
     plt.plot(discrete_loss_log, '.', alpha=0.1, label='discrete loss')
-    plt.plot(list(logger.val_loss_log.keys()), list(logger.val_loss_log.values()), '.', alpha=1.0, label='val loss')
+    val_loss = logger.get_val_stat('mean_eval_loss')
+    val_discrete_loss = logger.get_val_stat('mean_eval_discrete_loss')
+    plt.plot(list(val_loss.keys()), list(val_loss.values()), '.', alpha=1.0, label='val loss')
+    plt.plot(list(val_discrete_loss.keys()), list(val_discrete_loss.values()), '.', alpha=1.0, label='val discrete loss')
     plt.legend()
     plt.yscale('log')
     # plt.ylim(np.min(np.hstack((loss_log, discrete_loss_log))), logger.loss_log[0])
     plt.ylim(np.min(np.hstack((loss_log, discrete_loss_log))), 
-             np.max(np.hstack((loss_log, discrete_loss_log, val_loss_log))))
+             np.max(np.hstack((loss_log, discrete_loss_log, list(val_loss.values())))))
         # imgs = to_rgb(x).permute([0, 2, 3, 1]).cpu()
     render_paths = to_path(x[:cfg.render_minibatch_size]).cpu()
         # imshow(np.hstack(imgs))

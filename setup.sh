@@ -1,4 +1,4 @@
-# Using python 3.10
+# Using python 3.9 (`pyg` does not yet suport python 3.10)
 python -m pip install -r requirements.txt
 
 
@@ -16,6 +16,7 @@ conda install pytorch torchvision torchaudio cudatoolkit=10.2 -c pytorch
 
 # No distinction between CUDA/CPU
 conda install pyg -c pyg
+
 
 # Is this only applicable to CPU-only, or M1 Macs?
 # conda install scikit-learn-intelex

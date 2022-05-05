@@ -42,10 +42,10 @@ class Config():
     n_hid_nodes = 256
 
     # How often to print results to the console.
-    log_interval = 512
+    log_interval = 500
 
     # How often to save the model and optimizer to disk.
-    save_interval = 2048    
+    save_interval = 2000
 
     eval_interval = 100
 
@@ -135,6 +135,7 @@ class ClArgsConfig(Config, ImmutableConfig):
             f"_lr-{'{:.0e}'.format(self.learning_rate)}",
             f"_{self.n_data}-data",
             f"_{self.n_layers}-layer",
+            (f"_{self.loss_interval}-loss" if self.loss_interval != self.n_layers else ''),
             f"_cutCorners-{('T' if self.cut_conv_corners else 'F')}",
             f"_sparseUpdate-{('T' if self.sparse_update else 'F')}",
             f"_{self.exp_name}",
@@ -148,8 +149,9 @@ class ClArgsConfig(Config, ImmutableConfig):
         self.minibatch_size = 1 if self.model == "GCN" else self.minibatch_size
         self.val_batch_size = 1 if self.model == "GCN" else self.val_batch_size
         assert self.n_val_data % self.val_batch_size == 0, "Validation dataset size must be a multiple of val_batch_size."
-        # if self.sparse_update:
-            # assert self.shared_weights, "Sparse update only works with shared weights. (I think?)"
+        if self.sparse_update:
+            assert self.shared_weights, "Sparse update only works with shared weights. (Otherwise early layers may not "\
+                "be updated.)"
         if self.cut_conv_corners:
             assert self.model == "NCA", "Cutting corners only works with NCA."
         if self.loss_interval is None:

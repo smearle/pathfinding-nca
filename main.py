@@ -14,10 +14,11 @@ import torch
 import torchinfo
 
 from config import ClArgsConfig
+from evaluate import evaluate
 from mazes import load_dataset, Mazes, render_discrete
 from models import BfsNCA, FixedBfsNCA, GCN, MLP, NCA
 from models.nn import PathfindingNN
-from training import train
+from train import train
 from utils import Logger, VideoWriter, get_discrete_loss, get_mse_loss, to_path, load
 
 
@@ -60,16 +61,22 @@ def main_experiment(cfg=None):
     except FileNotFoundError as e:
         print("No maze data files found. Run `python mazes.py` to generate the dataset.")
         raise
-    maze_data_val.get_subset(cfg.n_val_data)
+    # maze_data_val.get_subset(cfg.n_val_data)
   # cfg.n_data = maze_data_train.mazes_onehot.shape[0]
 
+    loaded = False
     if cfg.load:
-        model, opt, logger = load(model, opt, cfg)
+        try:
+            model, opt, logger = load(model, opt, cfg)
+            loaded = True
+        except FileNotFoundError as e:
+            print("Failed to load, with error:\n", e)
+            print("Attempting to start experiment from scratch (but not overwriting---empty directory will thwart job).")
 
         if cfg.test:
-            return evaluate(model, maze_data_test, "test", cfg)
+            return evaluate(model, maze_data_test, cfg.val_batch_size, "test", cfg)
 
-    else:
+    if not loaded:
         if cfg.overwrite and os.path.exists(cfg.log_dir):
             shutil.rmtree(cfg.log_dir)
         try:
@@ -196,74 +203,6 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True):
         anim = animation.FuncAnimation(
         fig, animate, interval=1, frames=cfg.n_layers, blit=True, save_count=50)
         anim.save(f'{cfg.log_dir}/path_nca_anim.mp4', fps=10, extra_args=['-vcodec', 'libx264'])
-            
-
-def evaluate_train(model, cfg):
-    """Evaluate the trained model on the training set."""
-    # TODO: 
-    pass
-
-
-def evaluate(model, maze_data, name, cfg):
-    """Evaluate the trained model on a test set."""
-    n_eval_minibatches = 10
-    # n_test_mazes = n_test_minibatches * cfg.minibatch_size
-    test_mazes_onehot, test_mazes_discrete, target_paths = maze_data.mazes_onehot, maze_data.mazes_discrete, \
-        maze_data.target_paths
-
-    with torch.no_grad():
-        eval_losses = []
-        eval_discrete_losses = []
-        i = 0
-
-        for i in range(n_eval_minibatches):
-            batch_idx = np.arange(i*cfg.minibatch_size, (i+1)*cfg.minibatch_size, dtype=int)
-            x0 = test_mazes_onehot[batch_idx]
-            x0_discrete = test_mazes_discrete[batch_idx]
-            x = model.seed(batch_size=cfg.minibatch_size)
-            target_paths_mini_batch = target_paths[batch_idx]
-            model.reset(x0)
-
-            for j in range(cfg.n_layers):
-                x = model(x)
-
-                if j == cfg.n_layers - 1:
-                    test_loss = get_mse_loss(x, target_paths_mini_batch).item()
-                    test_discrete_loss = get_discrete_loss(x, target_paths_mini_batch).item()
-                    eval_losses.append(test_loss)
-                    eval_discrete_losses.append(test_discrete_loss)
-                    # clear_output(True)
-                    fig, ax = plt.subplots(figsize=(10, 10))
-                    solved_maze_ims = np.hstack(render_discrete(x0_discrete[:cfg.render_minibatch_size], cfg))
-                    target_path_ims = np.tile(np.hstack(
-                        target_paths_mini_batch[:cfg.render_minibatch_size].cpu())[...,None], (1, 1, 3)
-                        )
-                    predicted_path_ims = to_path(x[:cfg.render_minibatch_size])[...,None].cpu()
-                    # img = (img - img.min()) / (img.max() - img.min())
-                    predicted_path_ims = np.hstack(predicted_path_ims)
-                    predicted_path_ims = np.tile(predicted_path_ims, (1, 1, 3))
-                    imgs = np.vstack([solved_maze_ims, target_path_ims, predicted_path_ims])
-                    # plt.imshow(imgs)
-                    # plt.show()
-
-    mean_eval_loss = np.mean(eval_losses)
-    std_eval_loss = np.std(eval_losses)
-    mean_discrete_eval_loss = np.mean(eval_discrete_losses)
-    std_discrete_eval_loss = np.std(eval_discrete_losses)
-    # print(f'Mean {name} loss: {mean_eval_loss}\nMean {name} discrete loss: {mean_discrete_eval_loss}') 
-
-    # Dump stats to a json file
-    stats = {
-        'mean_eval_loss': mean_eval_loss,
-        'std_eval_loss': std_eval_loss,
-        'mean_discrete_eval_loss': mean_discrete_eval_loss,
-        'std_discrete_eval_loss': std_discrete_eval_loss,
-    }
-    with open(f'{cfg.log_dir}/{name}_stats.json', 'w') as f:
-        json.dump(stats, f, indent=4)
-    print(json.dumps(stats, indent=4))
-
-    return stats
 
 
 if __name__ == '__main__':
