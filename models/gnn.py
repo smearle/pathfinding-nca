@@ -16,11 +16,10 @@ class GCN(PathfindingNN):
         n_in_chan, n_hid_chan = cfg.n_in_chan, cfg.n_hid_chan
         self.grid_edges = None
         self.self_edges = None
-        self.n_out_chan = n_hid_chan, n_hid_chan + (n_in_chan if not cfg.skip_connections else 0)
 
         def _make_convs():
             gconv0 = GCNConv(n_hid_chan + n_in_chan, n_hid_chan)
-            gconv1 = GCNConv()
+            gconv1 = GCNConv(n_hid_chan, self.n_out_chan)
             return gconv0, gconv1
             
         if not cfg.shared_weights:
@@ -56,7 +55,7 @@ class GCN(PathfindingNN):
         # edge_index = self.grid_edges * th.ones((x.shape[0], *self.grid_edges.shape[1:]))
 
         # Reshape back into (batched) 2D grid.
-        x = x.reshape(batch_size, n_chan, width, height)
+        x = x.reshape(batch_size, self.n_out_chan, width, height)
 
         return x
 

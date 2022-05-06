@@ -1,4 +1,4 @@
-# Using python 3.10
+# Using python 3.9 (pyg a.k.a. torch_geometric does not support python 3.10)
 python -m pip install -r requirements.txt
 
 
@@ -9,14 +9,14 @@ python -m pip install -r requirements.txt
 # conda install pytorch torchvision torchaudio -c pytorch
 
 # For most GPUs:
-conda install pytorch torchvision torchaudio cudatoolkit=10.2 -c pytorch
+# conda install pytorch torchvision torchaudio cudatoolkit=10.2 -c pytorch
 
 # For 3090:
-# conda install pytorch torchvision torchaudio cudatoolkit=11.3 -c pytorch
+conda install pytorch torchvision torchaudio cudatoolkit=11.3 -c pytorch
 
 # No distinction between CUDA/CPU
 conda install pyg -c pyg
 
 
 # Is this only applicable to CPU-only, or M1 Macs?
-# conda install scikit-learn-intelex
+conda install scikit-learn-intelex

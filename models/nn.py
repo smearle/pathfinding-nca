@@ -22,7 +22,7 @@ class PathfindingNN(ABC, nn.Module):
         self.initial_maze = None
 
         # Reserve some channels for concatenating the input maze if using skip connectiions.
-        self.n_out_chan = cfg.n_hid_chan + (cfg.n_in_chan if cfg.skip_connections else 0)
+        self.n_out_chan = cfg.n_hid_chan + (cfg.n_in_chan if not cfg.skip_connections else 0)
 
 
     def add_initial_maze(self, x):

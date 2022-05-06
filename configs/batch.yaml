@@ -1,19 +1,19 @@
 {
   "model": [
-    "NCA",
-    # "GCN",
-    "MLP",
+#     "NCA",
+    "GCN",
+#     "MLP",
     # "FixedBfsNCA",
     # "BfsNCA",
   ],
 
   "n_layers": [
-    # 4,
-    # 8,
+    4,
+    8,
     16,
-    32,
-    64,
-    96,
+#     32,
+#     64,
+#     96,
   ],
 
   # How often to calculate the loss.
@@ -22,18 +22,20 @@
     4,
     8,
     16,
-    32,
-    64,
+#     32,
+#     64,
   ],
 
   "n_hid_chan": [
     # 6,
     # 10,
     # 8,
-    16,
+#     16,
     # 24,
     48,
     96,
+    128,
+    256,
   ],
 
   "shared_weights": [
@@ -48,7 +50,7 @@
 
   "cut_conv_corners": [
     True,
-    False,
+#     False,
   ],
 
   # Whether to enable the (bug/fix) that limits the gradients accumulated to the last few layers of the network. 

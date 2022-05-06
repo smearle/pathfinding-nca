@@ -11,6 +11,7 @@ import json
 import os
 from pdb import set_trace as TT
 import re
+import traceback
 import yaml
 
 from config import BatchConfig
@@ -94,7 +95,8 @@ def main_batch():
             try:
                 main_experiment(exp_cfg)
             except Exception as e:
-                print("Experiment failed, with error:\n", e)
+                print("Experiment failed, with error:")
+                print(traceback.format_exc())
                 print("Skipping experiment.")
                 continue
 
