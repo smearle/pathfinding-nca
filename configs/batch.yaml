@@ -32,7 +32,7 @@
     # 8,
 #     16,
     # 24,
-    48,
+#     48,
     96,
     128,
     256,
@@ -50,7 +50,7 @@
 
   "cut_conv_corners": [
     True,
-#     False,
+    False,
   ],
 
   # Whether to enable the (bug/fix) that limits the gradients accumulated to the last few layers of the network. 
@@ -60,12 +60,12 @@
     False,
   ],
 
-  "minibatch_size": [
-    32,
-  ],
+#   "minibatch_size": [
+#     32,
+#   ],
 
   "n_data": [
-    # 256,
+#     256,
     # 512,
     # 1024,
     2048,
