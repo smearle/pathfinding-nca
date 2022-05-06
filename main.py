@@ -46,12 +46,7 @@ def main_experiment(cfg=None):
     model.reset(torch.zeros(cfg.minibatch_size, cfg.n_in_chan, cfg.width + 2, cfg.width + 2), is_torchinfo_dummy=True)
 
     dummy_input = model.seed(batch_size=cfg.minibatch_size)
-    # FIXME: ad hoc (?)
-    if cfg.model == "MLP":
-        torchinfo.summary(model, input_size=dummy_input.shape)
-
-    else:
-        torchinfo.summary(model, input_size=dummy_input.shape)
+    torchinfo.summary(model, input_size=dummy_input.shape)
 
     # param_n = sum(p.numel() for p in model.parameters())
     # print('model param count:', param_n)
@@ -71,9 +66,13 @@ def main_experiment(cfg=None):
             loaded = True
         except FileNotFoundError as e:
             print("Failed to load, with error:\n", e)
-            print("Attempting to start experiment from scratch (but not overwriting---empty directory will thwart job).")
+            if cfg.evaluate:
+                print("Skipping evaluation.")
+                return
+            else:
+                print("Attempting to start experiment from scratch (not overwriting).")
 
-        if cfg.test:
+        if cfg.evaluate:
             return evaluate(model, maze_data_test, cfg.val_batch_size, "test", cfg)
 
     if not loaded:

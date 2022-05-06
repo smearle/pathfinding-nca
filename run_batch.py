@@ -15,6 +15,7 @@ import traceback
 import yaml
 
 from config import BatchConfig
+from cross_eval import vis_cross_eval
 from main import main_experiment
 from mazes import Mazes, main_mazes  # Weirdly need this to be able to load dataset of mazes.
 # from cross_eval import vis_cross_eval
@@ -64,30 +65,69 @@ def main_batch():
             setattr(batch_cfg, 'n_data', max(batch_hyperparams['n_data']))
         main_mazes(batch_cfg)
 
-    exp_configs = [copy.deepcopy(batch_cfg)]
 
-    # Create an experiment config for each combination of hyperparameters.
-    for key, hyperparams in batch_hyperparams.items():
-        old_exp_configs = exp_configs
-        new_exp_configs = []
-        for hyperparam in hyperparams:
-            for exp_config in old_exp_configs:
-                exp_config = copy.deepcopy(exp_config)
-                setattr(exp_config, key, hyperparam)
-                new_exp_configs.append(exp_config)
-        exp_configs = new_exp_configs
+    if batch_cfg.load_all:
+        # Create an experiment config for each log folder present in the `runs` directory.
+        exp_dirs = []
+        exp_configs = []
+        for (dirpath, dirnames, filenames) in os.walk('runs'):
+            exp_dirs.extend(dirnames)
+            break
+        for exp_dir in exp_dirs:
+            exp_config = copy.deepcopy(batch_cfg)
+            cfg_path = os.path.join('runs', exp_dir, 'config.json')
+            if not os.path.exists(cfg_path):
+                print(f"Experiment config path does not exist:\n{cfg_path}")
+                print("Skipping experiment.")
+                continue
+            load_config = json.load(open(cfg_path))
+            [setattr(exp_config, k, v) for k, v in load_config.items()]
+
+            if batch_cfg.filter_by_config:
+                # Exclude experiments that would not have been launched by the batch config.
+                invalid_cfg = False
+                for k, v in vars(exp_config).items():
+                    if k in batch_hyperparams and v not in batch_hyperparams[k]:
+                        invalid_cfg = True
+                        break
+                if invalid_cfg:
+                    continue
+
+            setattr(exp_config, 'load', True)
+            setattr(exp_config, 'evaluate', True)
+            exp_configs.append(exp_config)
+
+    else:
+        # Create an experiment config for each combination of hyperparameters.
+        exp_configs = [copy.deepcopy(batch_cfg)]
+        for key, hyperparams in batch_hyperparams.items():
+            old_exp_configs = exp_configs
+            new_exp_configs = []
+            for hyperparam in hyperparams:
+                for exp_config in old_exp_configs:
+                    exp_config = copy.deepcopy(exp_config)
+                    setattr(exp_config, key, hyperparam)
+                    new_exp_configs.append(exp_config)
+            exp_configs = new_exp_configs
     
     # Validate experiment configs, setting unique experiment names and filtering out invalid configs (flagged by 
     # assertion errors in `config._validate()`).
     filtered_exp_configs = []
     for ec in exp_configs:
         try:
-            ec.set_exp_name()
+            # TODO: remove this once we implement `full_exp_name` inside `config.py`.
+            if not batch_cfg.load_all:
+                ec.set_exp_name()
+            else:
+                ec.validate()
             filtered_exp_configs.append(ec)
         except AssertionError as e:
             print("Experiment config is invalid:", e)
             print("Skipping experiment.")
     exp_configs = filtered_exp_configs
+
+    if batch_cfg.vis_cross_eval:
+        return vis_cross_eval(exp_configs)
 
     experiment_names = []
     for exp_cfg in exp_configs:
@@ -122,10 +162,6 @@ def main_batch():
         #         print('No save directory found for experiment. Skipping.')
         #     else:
         #         print('Found save dir: ', exp_cfg.exp_name)
-
-    if batch_cfg.vis_cross_eval:
-        # vis_cross_eval(exp_configs)
-        raise NotImplementedError
 
     if batch_cfg.slurm:
         sbatch_file = os.path.join('slurm', 'run.sh')

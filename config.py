@@ -85,7 +85,7 @@ class Config():
     # Whether to zero out weights and gradients so as to ignore the corners of each 3x3 patch when using convolutions.
     cut_conv_corners = False
 
-    test = False
+    evaluate = False
 
 
 class ClArgsConfig(Config, ImmutableConfig):
@@ -126,7 +126,9 @@ class ClArgsConfig(Config, ImmutableConfig):
         [setattr(self, k, getattr(immutable_cfg, k)) for k in dir(immutable_cfg) if not k.startswith('_')]
  
     def set_exp_name(self):
-        self._validate()
+        self.validate()
+        # TODO: create distinct `full_exp_name` attribute where we'll write this thing, so we don't overwrite the user-
+        # supplied `exp_name`.
         self.exp_name = ''.join([
             f"{self.model}",
             f"_shared-{('T' if self.shared_weights else 'F')}",
@@ -143,7 +145,7 @@ class ClArgsConfig(Config, ImmutableConfig):
         ])
         self.log_dir = os.path.join("runs", self.exp_name)
 
-    def _validate(self):
+    def validate(self):
         self.n_hid_chan = 2 if self.model == "FixedBfsNCA" else self.n_hid_chan
         self.load = True if self.render else self.load
         # self.minibatch_size = 1 if self.model == "GCN" else self.minibatch_size
@@ -154,8 +156,8 @@ class ClArgsConfig(Config, ImmutableConfig):
                 "be updated.)"
         if self.model == "GCN":
             self.cut_conv_corners = True
-        if self.cut_conv_corners and not self.model == "GCN":
-            assert self.model == "NCA", "Cutting corners only works with NCA."
+        elif self.cut_conv_corners:
+            assert self.model == "NCA", "Cutting corners only works with NCA (optional) or GCN (forced)."
         if self.loss_interval is None:
             self.loss_interval = self.n_layers
         
@@ -165,6 +167,9 @@ class ClArgsConfig(Config, ImmutableConfig):
             self.n_updates = int(self.n_updates * 32 / self.minibatch_size) 
 
         assert self.n_layers % self.loss_interval == 0, "loss_interval should divide n_layers."
+        if self.minibatch_size < 32:
+            assert 32 % self.minibatch_size == 0, "minibatch_size should divide 32."
+            self.n_updates = self.n_updates * 32 // self.minibatch_size
 
 class BatchConfig(ClArgsConfig):
     """A class for batch configurations. This is used for parallel SLURM jobs, or a sequence of local jobs."""
@@ -173,9 +178,14 @@ class BatchConfig(ClArgsConfig):
         # These arguments apply only to the batch of experiments, and will not be considered by individual experiments 
         # themselves.
         args.add_argument('--slurm', action='store_true', help='Submit jobs to run in parallel on SLURM.')
-        args.add_argument('--vis_cross_eval', action='store_true')
+        args.add_argument('-vce', '--vis_cross_eval', action='store_true', help='Visualize results of batch of '\
+            'experiments in a table.')
         args.add_argument('--gen_new_data', action='store_true', help="Generate new data on which to run the batch"
                             " of experiments.")
+        args.add_argument('-la', '--load_all', action='store_true', help="Load all experiments present in the folder,"
+            " instead of attempting to load all those specified in the batch config file.")
+        args.add_argument('-fc', '--filter_by_config', action='store_true', help="If loading all, filter out "
+            "experiments that would not have been specified by the batch config file.")
         super().__init__(args)
 
 
