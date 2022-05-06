@@ -1,4 +1,4 @@
-# Using python 3.9 (`pyg` does not yet suport python 3.10)
+# Using python 3.10
 python -m pip install -r requirements.txt
 
 

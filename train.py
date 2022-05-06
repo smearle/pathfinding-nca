@@ -9,6 +9,7 @@ from tqdm import tqdm
 from config import ClArgsConfig
 from evaluate import evaluate
 from mazes import Mazes, render_discrete
+from models.gnn import GCN
 from models.nn import PathfindingNN
 
 from utils import get_discrete_loss, get_mse_loss, Logger, to_path, save
@@ -89,7 +90,7 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                     if p.grad is None:
                         assert cfg.model == "BfsNCA"
                         continue
-                    if cfg.cut_conv_corners and "weight" in name:
+                    if not isinstance(model, GCN) and cfg.cut_conv_corners and "weight" in name:
                         # Zero out all the corners
                         p.grad[:, :, 0, 0] = p.grad[:, :, -1, -1] = p.grad[:, :, -1, 0] = p.grad[:, :, 0, -1] = 0
                     p.grad /= (p.grad.norm()+1e-8)     # normalize gradients 

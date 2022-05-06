@@ -109,7 +109,7 @@ class ClArgsConfig(Config, ImmutableConfig):
             if k.startswith('_'):
                 continue
             if type(v) is bool:
-                args.add_argument('--' + k, action='store_true')
+                args.add_argument('--' + k, action=argparse.BooleanOptionalAction)
                 continue
             if type(v) is None: 
                 typ = int
@@ -146,16 +146,24 @@ class ClArgsConfig(Config, ImmutableConfig):
     def _validate(self):
         self.n_hid_chan = 2 if self.model == "FixedBfsNCA" else self.n_hid_chan
         self.load = True if self.render else self.load
-        self.minibatch_size = 1 if self.model == "GCN" else self.minibatch_size
+        # self.minibatch_size = 1 if self.model == "GCN" else self.minibatch_size
         self.val_batch_size = 1 if self.model == "GCN" else self.val_batch_size
         assert self.n_val_data % self.val_batch_size == 0, "Validation dataset size must be a multiple of val_batch_size."
         if self.sparse_update:
             assert self.shared_weights, "Sparse update only works with shared weights. (Otherwise early layers may not "\
                 "be updated.)"
-        if self.cut_conv_corners:
+        if self.model == "GCN":
+            self.cut_conv_corners = True
+        if self.cut_conv_corners and not self.model == "GCN":
             assert self.model == "NCA", "Cutting corners only works with NCA."
         if self.loss_interval is None:
             self.loss_interval = self.n_layers
+        
+        # For backward compatibility, we assume 50k updates, where each update is following a 32-batch of episodes. So
+        # we ensure that we have approximately the same number of episodes given different batch sizes here.
+        if self.minibatch_size != 32:
+            self.n_updates = int(self.n_updates * 32 / self.minibatch_size) 
+
         assert self.n_layers % self.loss_interval == 0, "loss_interval should divide n_layers."
 
 class BatchConfig(ClArgsConfig):

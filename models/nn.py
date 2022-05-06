@@ -27,13 +27,13 @@ class PathfindingNN(ABC, nn.Module):
             x = th.cat([self.initial_maze, x], dim=1)
         else:
             # Overwrite the additional hidden channels with the underlying state of the maze.
-            x[:, self.n_hid_chan: self.n_hid_chan + self.initial_maze.shape[1]] = self.initial_maze
+            x[:, self.cfg.n_hid_chan: self.cfg.n_hid_chan + self.initial_maze.shape[1]] = self.initial_maze
 
         return x
 
     def forward(self, x):
         # This forward pass will iterate through a single layer (or all layers if passing dummy input via `torchinfo`).
-        for _ in range(1 if not self.is_torchinfo_dummy else len(self.layers)):
+        for _ in range(1 if not self.is_torchinfo_dummy else self.cfg.n_layers):
             if self.cfg.skip_connections or self.n_step == 0:
                 x = self.add_initial_maze(x)
             x = self.forward_layer(x, self.n_step)
@@ -56,14 +56,13 @@ class PathfindingNN(ABC, nn.Module):
     def seed(self, batch_size):
         # NOTE: I think the effect of `sparse_update` here is to only update the last layer. Will break non-shared-weight
         #   networks. Should implement this more explicitly in the future.
-        cfg = self.cfg
 
-        if cfg.skip_connections:
-            n_chan = self.n_hid_chan
+        if self.cfg.skip_connections:
+            n_chan = self.cfg.n_hid_chan
         else:
-            n_chan = self.n_hid_chan + self.cfg.n_in_chan
+            n_chan = self.cfg.n_hid_chan + self.cfg.n_in_chan
 
-        x = th.zeros(batch_size, n_chan, cfg.height + 2, cfg.width + 2, requires_grad=False)
+        x = th.zeros(batch_size, n_chan, self.cfg.height + 2, self.cfg.width + 2, requires_grad=False)
         # x = th.zeros(batch_size, n_chan, cfg.height + 2, cfg.width + 2, requires_grad=not cfg.sparse_update)
 
         return x
