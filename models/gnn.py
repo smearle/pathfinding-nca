@@ -61,12 +61,18 @@ class GCN(PathfindingNN):
 
     def reset(self, x0, is_torchinfo_dummy=False):
         if self.grid_edges is None:
-            self.grid_edges = get_grid_edges(x0.shape[0], *x0.shape[-2:])
-            self.self_edges = get_self_edges(x0.shape[0], *x0.shape[-2:])
+            batch_size = x0.shape[0]
+            width, height = x0.shape[-2:]
+            n_nodes = width * height
+            grid_edges = get_grid_edges(*x0.shape[-2:])
+            self_edges = get_self_edges(*x0.shape[-2:])
+            self.grid_edges = batch_edges(grid_edges, batch_size, n_nodes)
+            self.self_edges = batch_edges(self_edges, batch_size, n_nodes)
+            # Print max of both sets of edges
         super().reset(x0, is_torchinfo_dummy)         
 
 
-def get_grid_edges(batch_size, width, height):
+def get_grid_edges(width, height):
     """Create an edge matrix of shape (2, n_edges) for a graph corresponding to a 2D grid, in which grid cells sharing
     a border are connected by an edge."""
     # The 2D indices of all nodes, with shape (width, height, 2)
@@ -91,27 +97,31 @@ def get_grid_edges(batch_size, width, height):
     # Array of flattened 1D indices in flattened grid, e.g., (2, width * (height - 1))
     edges = np.ravel_multi_index(edges, (width, height))
 
-    edges = batch_edges(batch_size, edges)
-
     return th.Tensor(edges).long()
 
-def get_self_edges(batch_size, width, height):
+def get_self_edges(width, height):
     node_indices = np.indices((width, height)).transpose(1, 2, 0)
     self_edges = np.stack((node_indices, node_indices))
     self_edges = self_edges.transpose(3, 0, 1, 2).reshape(2, 2, -1)
     self_edges = np.ravel_multi_index(self_edges, (width, height))
 
-    edges = batch_edges(batch_size, self_edges)
-
     return th.Tensor(self_edges).long()
 
 
-def batch_edges(batch_size, edges):
-    # Batch it
-    n_edges = edges.shape[1]
-    edges = np.tile(edges, (1, batch_size))
-    for i in range(batch_size):
-        ii = i * n_edges
-        edges[ii:] += ii
+def batch_edges(edges, batch_size, n_nodes):
+    """
+    Batch edges into connected components width identical connectivity.
+
+    For each set of edges, increment all the node indices to refer to the next connected component. 
+
+    Args:
+        edges (th.Tensor): Tensor of shape (2, n_edges), corresponding to the graph
+        batch_size (int): Number of connected components in the output.
+        n_nodes (int): Number of nodes in each connected component in the output.
+    """
+    n_edges = edges.shape[-1]
+    edges = th.tile(edges, (1, batch_size))
+    for i in range(1, batch_size):
+        edges[:, i * n_edges:] += n_nodes
 
     return edges

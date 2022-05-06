@@ -147,7 +147,7 @@ def log(logger, lr_sched, maze_ims, x, target_paths, render_batch_idx, cfg):
     print('step_n:', len(logger.loss_log),
         ' loss: {:.6e}'.format(logger.loss_log[-1]),
         ' fps: {:.2f}'.format(fps), 
-        ' lr:', lr_sched.get_last_lr(), end=''
+        ' lr:', lr_sched.get_last_lr(), # end=''
         )
     logger.last_time = timer()
 

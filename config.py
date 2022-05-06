@@ -147,7 +147,7 @@ class ClArgsConfig(Config, ImmutableConfig):
         self.n_hid_chan = 2 if self.model == "FixedBfsNCA" else self.n_hid_chan
         self.load = True if self.render else self.load
         # self.minibatch_size = 1 if self.model == "GCN" else self.minibatch_size
-        self.val_batch_size = 1 if self.model == "GCN" else self.val_batch_size
+        # self.val_batch_size = 1 if self.model == "GCN" else self.val_batch_size
         assert self.n_val_data % self.val_batch_size == 0, "Validation dataset size must be a multiple of val_batch_size."
         if self.sparse_update:
             assert self.shared_weights, "Sparse update only works with shared weights. (Otherwise early layers may not "\
