@@ -21,6 +21,10 @@ class PathfindingNN(ABC, nn.Module):
         # The initial/actual state of the board (so that we can use walls to simulate path-flood).
         self.initial_maze = None
 
+        # Reserve some channels for concatenating the input maze if using skip connectiions.
+        self.n_out_chan = cfg.n_hid_chan + (cfg.n_in_chan if cfg.skip_connections else 0)
+
+
     def add_initial_maze(self, x):
         if self.cfg.skip_connections:
             # Concatenate the underlying state of the maze with the input along the channel dimension.

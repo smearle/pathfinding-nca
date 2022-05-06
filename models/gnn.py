@@ -16,10 +16,11 @@ class GCN(PathfindingNN):
         n_in_chan, n_hid_chan = cfg.n_in_chan, cfg.n_hid_chan
         self.grid_edges = None
         self.self_edges = None
+        self.n_out_chan = n_hid_chan, n_hid_chan + (n_in_chan if not cfg.skip_connections else 0)
 
         def _make_convs():
             gconv0 = GCNConv(n_hid_chan + n_in_chan, n_hid_chan)
-            gconv1 = GCNConv(n_hid_chan, n_hid_chan + (n_in_chan if not cfg.skip_connections else 0))
+            gconv1 = GCNConv()
             return gconv0, gconv1
             
         if not cfg.shared_weights:
@@ -43,10 +44,11 @@ class GCN(PathfindingNN):
         # Remove batch dimension, because GNNs don't allow batches (??) :'(
         # x = x[0]
 
-        # Flatten along width, height, and then batch dimensions.
-        x = x.view(x.shape[1], -1)
-
+        # Move channel dimension to front. Then, flatten along width, height, and then batch dimensions.
         x = x.transpose(1, 0)
+        x = x.reshape(x.shape[0], -1)
+        x = x.transpose(1, 0)
+
         x = self.layers[i*2](x, self.grid_edges).relu()
         x = self.layers[i*2+1](x, self.self_edges).relu()
 

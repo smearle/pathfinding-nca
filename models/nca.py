@@ -30,7 +30,7 @@ class NCA(PathfindingNN):
             conv = conv2d(
                 n_hid_chan + n_in_chan, 
                 # If we're not repeatedly feeding the input maze, replace this with some extra hidden channels.
-                n_hid_chan + (n_in_chan if not cfg.skip_connections else 0),
+                self.n_out_chan,
                 kernel_size=3, 
                 padding=1
             )

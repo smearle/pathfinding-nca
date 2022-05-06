@@ -21,12 +21,9 @@ class MLP(PathfindingNN):
         self.n_layers = cfg.n_layers
         self.n_hid_chan = cfg.n_hid_chan
 
-        # Reserve some channels for concatenating the input maze if using skip connectiions.
-        n_out_chan = cfg.n_hid_chan if cfg.skip_connections else cfg.n_hid_chan + cfg.n_in_chan
-
         self.n_hid_nodes = cfg.n_hid_nodes
         self.n_input_nodes = (cfg.width + 2) * (cfg.height + 2) * (cfg.n_in_chan + cfg.n_hid_chan)
-        self.n_out_nodes = (cfg.width + 2) * (cfg.height + 2) * n_out_chan
+        self.n_out_nodes = (cfg.width + 2) * (cfg.height + 2) * self.n_out_chan
 
         # The size of the maze when flattened
 
@@ -37,7 +34,7 @@ class MLP(PathfindingNN):
                 # nn.Linear(self.n_input_nodes, self.n_out_nodes), nn.ReLU(),
                 nn.Linear(self.n_input_nodes, self.n_hid_nodes), nn.ReLU(),
                 nn.Linear(self.n_hid_nodes, self.n_out_nodes), nn.ReLU(),
-                Reshape(shape=(n_out_chan, cfg.width+2, cfg.height+2)),
+                Reshape(shape=(self.n_out_chan, cfg.width+2, cfg.height+2)),
             )
 
 
