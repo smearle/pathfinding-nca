@@ -107,7 +107,7 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 val_stats = evaluate(model, maze_data_val, cfg.val_batch_size, "validate", cfg)
                 logger.log_val(val_stats)
 
-            if i % cfg.log_interval == 0:
+            if i % cfg.log_interval == 0 or i == cfg.n_updates - 1:
                 log(logger, lr_sched, maze_ims, x, target_paths, render_batch_idx, cfg)
 
 

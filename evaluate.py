@@ -42,7 +42,8 @@ def evaluate(model, maze_data, batch_size, name, cfg):
             x0 = test_mazes_onehot[batch_idx]
             # x0_discrete = test_mazes_discrete[batch_idx]
             x = model.seed(batch_size=batch_size)
-            target_paths_mini_batch = target_paths[batch_idx]
+            target_paths_minibatch = target_paths[batch_idx]
+            path_lengths = target_paths_minibatch.float().sum((1, 2)).cpu().numpy()
             model.reset(x0)
 
             if is_test:
@@ -53,16 +54,17 @@ def evaluate(model, maze_data, batch_size, name, cfg):
                 x = model(x)
 
                 if j == cfg.n_layers - 1:
-                    eval_loss = get_mse_loss(x, target_paths_mini_batch).item()
-                    eval_discrete_loss = get_discrete_loss(x, target_paths_mini_batch).cpu().numpy()
+                    eval_loss = get_mse_loss(x, target_paths_minibatch).item()
+                    eval_discrete_loss = get_discrete_loss(x, target_paths_minibatch).cpu().numpy()
                     eval_pct_complete = np.sum(eval_discrete_loss.reshape(batch_size, -1).sum(1) == 0) / batch_size
                     eval_losses.append(eval_loss)
                     eval_discrete_losses.append(eval_discrete_loss.mean().item())
                     eval_pcts_complete.append(eval_pct_complete)
 
                 if is_test:
-                    eval_discrete_loss = get_discrete_loss(x, target_paths_mini_batch).cpu()
+                    eval_discrete_loss = get_discrete_loss(x, target_paths_minibatch).cpu()
                     completion_times = np.where(eval_discrete_loss.reshape(batch_size, -1).sum(dim=1) == 0, j, completion_times)
+                    completion_times /= path_lengths
                     eval_completion_times.append(np.nanmean(completion_times))
 
                     # fig, ax = plt.subplots(figsize=(10, 10))
