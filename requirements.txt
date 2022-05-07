@@ -3,4 +3,5 @@ matplotlib
 moviepy
 Pillow
 pyyaml
+scienceplots
 torchinfo

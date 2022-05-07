@@ -15,6 +15,10 @@ def evaluate_train(model, cfg):
     pass
 
 
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
 def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str, cfg: ClArgsConfig, 
         is_eval: bool = False):
     """Evaluate the trained model on a test set.
@@ -26,6 +30,11 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
     """
     model.eval()
     assert name in ['train', 'validate', 'test'], "Name of evaluation must be 'train', 'test' or 'validate'."
+    if is_eval and name == 'train':
+        n_params = count_parameters(model)
+        with open(f"{cfg.log_dir}/stats.json", "w") as f:
+            json.dump({"n_params": n_params}, f)
+
     # n_test_mazes = n_test_minibatches * cfg.minibatch_size
     test_mazes_onehot, test_mazes_discrete, target_paths = maze_data.mazes_onehot, maze_data.mazes_discrete, \
         maze_data.target_paths
@@ -38,11 +47,14 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
         n_eval_minibatches = 1
 
     with th.no_grad():
-        eval_losses = []
-        eval_discrete_losses = []
+        losses = []
+        discrete_losses = []
         eval_pcts_complete = []
         if is_eval:
             eval_completion_times = []
+            # What would the loss be if the model output all zeros (sometimes this happens!). Treat this as 0 accuracy, so we 
+            # can better analyzer performance of good models.
+            baseline_losses = []
         i = 0
 
         for i in range(n_eval_minibatches):
@@ -62,11 +74,13 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
                 x = model(x)
 
                 if j == cfg.n_layers - 1:
+                    if is_eval:
+                        baseline_losses.append(get_mse_loss(th.zeros_like(x), target_paths_minibatch).item())
                     eval_loss = get_mse_loss(x, target_paths_minibatch).item()
                     eval_discrete_loss = get_discrete_loss(x, target_paths_minibatch).cpu().numpy()
                     eval_pct_complete = np.sum(eval_discrete_loss.reshape(batch_size, -1).sum(1) == 0) / batch_size
-                    eval_losses.append(eval_loss)
-                    eval_discrete_losses.append(eval_discrete_loss.mean().item())
+                    losses.append(eval_loss)
+                    discrete_losses.append(eval_discrete_loss.mean().item())
                     eval_pcts_complete.append(eval_pct_complete)
 
                 if is_eval:
@@ -88,17 +102,24 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
                     # plt.imshow(imgs)
                     # plt.show()
 
-    eval_accs = 1 - np.array(eval_losses)
-    eval_discrete_accs = 1 - np.array(eval_discrete_losses)
-    mean_eval_accs = np.mean(eval_accs)
-    std_eval_accs = np.std(eval_accs)
-    mean_eval_discrete_accs = np.mean(eval_discrete_accs)
-    std_eval_discrete_accs = np.std(eval_discrete_accs)
-    # print(f'Mean {name} loss: {mean_eval_loss}\nMean {name} discrete loss: {mean_discrete_eval_loss}') 
+    losses = np.array(losses)
+    discrete_losses = np.array(discrete_losses)
+    accs = 1 - losses
+    discrete_accs = 1 - discrete_losses
+    if is_eval:
+        baseline_accs = 1 - np.array(baseline_losses)
+        accs = (accs - baseline_accs) / (1 - baseline_accs)
+        discrete_accs = (discrete_accs - baseline_accs) / (1 - baseline_accs)
+    mean_accs = np.mean(accs)
+    std_accs = np.std(accs)
+    mean_discrete_accs = np.mean(discrete_accs)
+    std_discrete_accs = np.std(discrete_accs)
 
     stats = {
-        'accs': (mean_eval_accs, std_eval_accs),
-        'discrete_accs': (mean_eval_discrete_accs, std_eval_discrete_accs),
+        'accs': (mean_accs, std_accs),
+        'discrete_accs': (mean_discrete_accs, std_discrete_accs),
+        'losses': (np.mean(losses), np.std(losses)),
+        'disc_losses': (np.mean(discrete_losses), np.std(discrete_losses)),
         'pct_complete': (np.mean(eval_pcts_complete), np.std(eval_pcts_complete)),
     }
     if is_eval:

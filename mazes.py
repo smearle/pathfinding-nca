@@ -38,7 +38,7 @@ def main_mazes(cfg):
     # TODO: Render a big grid of all the data.
 
 
-def load_dataset(n_data, device):
+def load_dataset(n_data=None, device='cpu'):
     """Load the dataset of random mazes"""
     with open(train_fname, 'rb') as f:
         maze_data_train = pickle.load(f)
@@ -67,7 +67,9 @@ class Mazes():
             self.mazes_onehot.to(device), self.target_paths.to(device)
         return self
 
-    def get_subset(self, n_data):
+    def get_subset(self, n_data=None):
+        if n_data is None:
+            n_data = len(self.mazes_discrete)
         self.mazes_discrete, self.mazes_onehot, self.target_paths = self.mazes_discrete[:n_data], \
             self.mazes_onehot[:n_data], self.target_paths[:n_data]
 

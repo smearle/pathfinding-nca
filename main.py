@@ -45,8 +45,9 @@ def main_experiment(cfg=None):
     # Set a dummy initial maze state.
     model.reset(torch.zeros(cfg.minibatch_size, cfg.n_in_chan, cfg.width + 2, cfg.width + 2), is_torchinfo_dummy=True)
 
-    dummy_input = model.seed(batch_size=cfg.minibatch_size)
-    torchinfo.summary(model, input_size=dummy_input.shape)
+    if not (cfg.render or cfg.evaluate):
+        dummy_input = model.seed(batch_size=cfg.minibatch_size)
+        torchinfo.summary(model, input_size=dummy_input.shape)
 
     # param_n = sum(p.numel() for p in model.parameters())
     # print('model param count:', param_n)
@@ -129,7 +130,7 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True):
     batch_idx = np.random.choice(pool.shape[0], render_minibatch_size, replace=False)
     x = pool[batch_idx]
     x0 = mazes_onehot[batch_idx]
-    model.reset(x0)
+    model.reset(x0, new_batch_size=True)
 
     if pyplot_animation:
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10,10))
@@ -145,7 +146,7 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True):
             maze_imgs = np.hstack(render_discrete(mazes_discrete[batch_idx], cfg))
             vstackable_ims = []
 
-            # Render some more arbitrary hidden channels
+            # Render the path channel and some other arbitrary hidden channels
             for i in range(3):
                 xi_img = x[:cfg.render_minibatch_size, -i-1].cpu()
                 xi_img = (xi_img - xi_img.min()) / (xi_img.max() - xi_img.min())

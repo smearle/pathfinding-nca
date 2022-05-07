@@ -27,8 +27,6 @@ class Config():
     n_val_data = 64
     val_batch_size = 64
 
-    render_minibatch_size = 8    # how many mazes to render at once
-
     # Number of steps after which we calculate loss and update the network.
     n_layers = 64    
 
@@ -188,6 +186,8 @@ class BatchConfig(ClArgsConfig):
             "experiments that would not have been specified by the batch config file.")
         args.add_argument('-bh', '--batch_hyperparams', type=str, default="batch", help="Name of file "
             "containing hyperparameters over which to run the batch of experiments.")
+        args.add_argument('-st', '--selective_table', action='store_true', help="Render only user-specified rows and "
+            "columns in the latex table when cross-evaluating.")
         super().__init__(args)
 
 

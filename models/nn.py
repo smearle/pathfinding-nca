@@ -36,10 +36,19 @@ class PathfindingNN(ABC, nn.Module):
         return x
 
     def forward(self, x):
+
         # This forward pass will iterate through a single layer (or all layers if passing dummy input via `torchinfo`).
         for _ in range(1 if not self.is_torchinfo_dummy else self.cfg.n_layers):
             if self.cfg.skip_connections or self.n_step == 0:
                 x = self.add_initial_maze(x)
+
+
+            ### DEBUG ###
+            # if self.n_step == 0:
+            #     x[:] = 0.0
+            #     x[0,-1, 0, 0] = 1.0
+
+
             x = self.forward_layer(x, self.n_step)
             self.n_step += 1
 
@@ -51,7 +60,7 @@ class PathfindingNN(ABC, nn.Module):
 
         return x
 
-    def reset(self, initial_maze, is_torchinfo_dummy=False):
+    def reset(self, initial_maze, is_torchinfo_dummy=False, **kwargs):
         """Store the initia maze to concatenate with later activations."""
         self.is_torchinfo_dummy = is_torchinfo_dummy
         self.initial_maze = initial_maze

@@ -105,6 +105,6 @@ class FixedBfsNCA(PathfindingNN):
         batch_dones = x[agent_pos[0], self.age_chan, agent_pos[1], agent_pos[2]] > 0.1
         return batch_dones
 
-    def reset(self, initial_maze, is_torchinfo_dummy=False):
+    def reset(self, initial_maze, is_torchinfo_dummy=False, **kwargs):
         super().reset(initial_maze)
 

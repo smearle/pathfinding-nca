@@ -126,7 +126,7 @@ def main_batch():
     exp_configs = filtered_exp_configs
 
     if batch_cfg.vis_cross_eval:
-        return vis_cross_eval(exp_configs, name=batch_cfg.batch_hyperparams)
+        return vis_cross_eval(exp_configs, batch_cfg)
 
     experiment_names = []
     for exp_cfg in exp_configs:

@@ -40,7 +40,7 @@
 
   "shared_weights": [
     True,
-    False,
+    # False,
   ],
 
   "skip_connections": [
@@ -50,12 +50,12 @@
 
   "cut_conv_corners": [
     True,
-    # False,
+    False,
   ],
 
   "sparse_update": [
     True,
-    False,
+    # False,
   ],
 
 #   "minibatch_size": [

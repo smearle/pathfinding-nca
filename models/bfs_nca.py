@@ -27,7 +27,7 @@ class BfsNCA(NCA):
 
         return super().forward_layer(x, i)
 
-    def reset(self, x0, is_torchinfo_dummy=False):
+    def reset(self, x0, is_torchinfo_dummy=False, **kwargs):
         self.oracle_out = th.zeros(x0.shape[0], self.oracle.n_hid_chan, x0.shape[2], x0.shape[3])
         self.oracle.reset(x0)
         super().reset(x0, is_torchinfo_dummy)

@@ -22,6 +22,15 @@ class GCN(PathfindingNN):
             gconv0 = GCNConv(n_hid_chan + n_in_chan, self.n_out_chan)
 #             gconv0 = GCNConv(n_hid_chan + n_in_chan, n_hid_chan)
 #             gconv1 = GCNConv(n_hid_chan, self.n_out_chan)
+
+
+            ## DEBUG
+            # with th.no_grad():
+            #     lin_weight = list(gconv0.modules())[1].weight
+            #     lin_weight = nn.Parameter(th.zeros_like(lin_weight).fill_(1.0), requires_grad=False)
+            #     gconv0.bias = nn.Parameter(th.zeros_like(gconv0.bias), requires_grad=False)
+
+
             return gconv0  #, gconv1
             
         if not cfg.shared_weights:
@@ -42,18 +51,13 @@ class GCN(PathfindingNN):
         maze's width and height dimensions."""
         batch_size, n_chan, width, height = x.shape
 
-        # Cannot use batches with pyg (apparently...?)
-        # assert batch_size == 1
-
-        # Remove batch dimension, because GNNs don't allow batches (??) :'(
-        # x = x[0]
-
         # Move channel dimension to front. Then, flatten along width, height, and then batch dimensions.
         x = x.transpose(1, 0)
         x = x.reshape(x.shape[0], -1)
         x = x.transpose(1, 0)
 
         x = self.layers[i](x, self.edges).relu()
+
 #         x = self.layers[i*2](x, self.grid_edges).relu()
 #         x = self.layers[i*2+1](x, self.self_edges).relu()
 
@@ -61,20 +65,23 @@ class GCN(PathfindingNN):
         # edge_index = self.grid_edges * th.ones((x.shape[0], *self.grid_edges.shape[1:]))
 
         # Reshape back into (batched) 2D grid.
+        x = x.transpose(1, 0)
         x = x.reshape(batch_size, self.n_out_chan, width, height)
 
         return x
 
-    def reset(self, x0, is_torchinfo_dummy=False):
-        if self.grid_edges is None:
+    def reset(self, x0, is_torchinfo_dummy=False, new_batch_size=False):
+        if self.edges is None or new_batch_size:
             batch_size = x0.shape[0]
             width, height = x0.shape[-2:]
             n_nodes = width * height
-            grid_edges = get_grid_edges(*x0.shape[-2:])
-            self_edges = get_self_edges(*x0.shape[-2:])
+            grid_edges = get_grid_edges(width, height)
+            self_edges = get_self_edges(width, height)
             self.grid_edges = batch_edges(grid_edges, batch_size, n_nodes)
             self.self_edges = batch_edges(self_edges, batch_size, n_nodes)
             self.edges = th.hstack((self.self_edges, self.grid_edges))
+            # self.edges = self.self_edges
+            # self.edges = self.grid_edges
         super().reset(x0, is_torchinfo_dummy)         
 
 
