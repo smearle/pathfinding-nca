@@ -73,7 +73,9 @@ def main_experiment(cfg=None):
                 print("Attempting to start experiment from scratch (not overwriting).")
 
         if cfg.evaluate:
-            return evaluate(model, maze_data_test, cfg.val_batch_size, "test", cfg)
+            evaluate(model, maze_data_train, cfg.val_batch_size, "train", cfg)
+            evaluate(model, maze_data_test, cfg.val_batch_size, "test", cfg)
+            return
 
     if not loaded:
         if cfg.overwrite and os.path.exists(cfg.log_dir):

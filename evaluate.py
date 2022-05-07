@@ -17,7 +17,7 @@ def evaluate(model, maze_data, batch_size, name, cfg):
     """Evaluate the trained model on a test set."""
     model.eval()
     is_test = name == 'test'
-    assert is_test or name == 'validate', "Name of evaluation must be 'test' or 'validate'."
+    assert is_test or name in ['validate', 'train'], "Name of evaluation must be 'test' or 'validate'."
     # n_test_mazes = n_test_minibatches * cfg.minibatch_size
     test_mazes_onehot, test_mazes_discrete, target_paths = maze_data.mazes_onehot, maze_data.mazes_discrete, \
         maze_data.target_paths
@@ -80,22 +80,22 @@ def evaluate(model, maze_data, batch_size, name, cfg):
                     # plt.imshow(imgs)
                     # plt.show()
 
-    mean_eval_loss = np.mean(eval_losses)
-    std_eval_loss = np.std(eval_losses)
-    mean_eval_discrete_loss = np.mean(eval_discrete_losses)
-    std_eval_discrete_loss = np.std(eval_discrete_losses)
+    eval_accs = 1 - np.array(eval_losses)
+    eval_discrete_accs = 1 - np.array(eval_discrete_losses)
+    mean_eval_accs = np.mean(eval_accs)
+    std_eval_accs = np.std(eval_accs)
+    mean_eval_discrete_accs = np.mean(eval_discrete_accs)
+    std_eval_discrete_accs = np.std(eval_discrete_accs)
     # print(f'Mean {name} loss: {mean_eval_loss}\nMean {name} discrete loss: {mean_discrete_eval_loss}') 
 
     stats = {
-        'mean_eval_loss': mean_eval_loss,
-        'std_eval_loss': std_eval_loss,
-        'mean_eval_discrete_loss': mean_eval_discrete_loss,
-        'std_eval_discrete_loss': std_eval_discrete_loss,
-        'mean_eval_pct_complete': np.mean(eval_pcts_complete),
+        'accs': (mean_eval_accs, std_eval_accs),
+        'discrete_accs': (mean_eval_discrete_accs, std_eval_discrete_accs),
+        'pct_complete': (np.mean(eval_pcts_complete), np.std(eval_pcts_complete)),
     }
     if is_test:
         stats.update({
-            'mean_completion_time': np.nanmean(eval_completion_times),
+            'completion_time': (np.nanmean(eval_completion_times), np.nanstd(eval_completion_times)),
         })
         # Dump stats to a json file
         with open(f'{cfg.log_dir}/{name}_stats.json', 'w') as f:

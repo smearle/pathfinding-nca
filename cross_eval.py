@@ -13,6 +13,29 @@ import pandas as pd
 EVAL_DIR = 'runs_eval'
 
 
+def bold_extreme_values(data, data_max=-1, col_name=None):
+
+    # TODO: get standard deviation in a smart way.
+    data, err = data
+    if data == data_max:
+        bold = True
+    else: bold = False
+
+    # Other preprocessing here
+    if col_name != "completion time":
+        data *= 100
+        err *= 100
+
+    data = '{:.2f}'.format(data)
+    err = '{:.2f}'.format(err)
+    
+    if bold:
+        data = '\\textbf{' + str(data) + '} ± ' + str(err)
+    else:
+        data = f'{data} ± {err}'
+    return data
+
+
 def vis_cross_eval(exp_cfgs: List[ClArgsConfig]):
     """
     Visualize the results of a set of experiments.
@@ -54,6 +77,14 @@ def vis_cross_eval(exp_cfgs: List[ClArgsConfig]):
     col_headers = [c.replace('_', ' ') for c in col_headers]
     df = pd.DataFrame(data_rows, columns=col_headers, index=row_indices)
     df.sort_index(inplace=True)
+    df.to_csv(os.path.join(EVAL_DIR, 'cross_eval.csv'))
+
+    for k in col_headers:
+        if k in df:
+            df[k] = df[k].apply(
+                lambda data: bold_extreme_values(data, data_max=max([d[0] for d in df[k]]), col_name=k)
+            )
+
     # df.to_latex(os.path.join(EVAL_DIR, 'cross_eval.tex'), multirow=True)
     pandas_to_latex(df, os.path.join(EVAL_DIR, 'cross_eval.tex'), multirow=True, index=True, vertical_bars=True,
                      columns=col_headers)
