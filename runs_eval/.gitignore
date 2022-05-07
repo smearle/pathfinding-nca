@@ -1,4 +1,4 @@
 *
 !.gitignore
 !tables.tex
-!cross_eval.pkl
+!*cross_eval.pkl
