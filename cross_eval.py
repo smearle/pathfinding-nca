@@ -1,9 +1,11 @@
 import json
 import os
 from pdb import set_trace as TT
+import pickle
 import re
 from typing import List
 
+import matplotlib.pyplot as plt
 import yaml
 from config import ClArgsConfig
 
@@ -79,10 +81,16 @@ def vis_cross_eval(exp_cfgs: List[ClArgsConfig]):
     df.sort_index(inplace=True)
     df.to_csv(os.path.join(EVAL_DIR, 'cross_eval.csv'))
 
+    # Save dataframe using pickle
+    with open(os.path.join(EVAL_DIR, 'cross_eval.pkl'), 'wb') as f:
+        pickle.dump(df, f)
+
     for k in col_headers:
         if k in df:
             df[k] = df[k].apply(
-                lambda data: bold_extreme_values(data, data_max=max([d[0] for d in df[k]]), col_name=k)
+                lambda data: bold_extreme_values(data, 
+                                data_max=(max if k != 'completion time' else min)([d[0] for d in df[k]]), 
+                                col_name=k)
             )
 
     # df.to_latex(os.path.join(EVAL_DIR, 'cross_eval.tex'), multirow=True)
@@ -90,6 +98,22 @@ def vis_cross_eval(exp_cfgs: List[ClArgsConfig]):
                      columns=col_headers)
     proj_dir = os.curdir
     os.system(f'cd {EVAL_DIR}; pdflatex tables.tex; cd {proj_dir}')
+
+
+def plot_column(df, row_name, col_name):
+    # Get all `row_name` row names
+    xs = df.index.get_level_values(row_name).unique()
+    # Get all `col_name` values
+    # Drop row names and convert values to numpy array
+    ys_errs = df[col_name].values
+    ys, errs = zip(*ys_errs)
+    # Plot as a histogram with error bars
+    plt.errorbar(xs, ys, yerr=errs)
+    plt.xlabel(row_name)
+    plt.ylabel(col_name)
+    plt.title(f'{col_name} by {row_name}')
+    # Save
+    plt.savefig(os.path.join(EVAL_DIR, f'{row_name}_{col_name}.png'))
     
 
 def pandas_to_latex(df_table, latex_file, vertical_bars=False, right_align_first_column=True, header=True, index=False,
@@ -164,3 +188,9 @@ def pandas_to_latex(df_table, latex_file, vertical_bars=False, right_align_first
 
     with open(latex_file, 'w') as f:
         f.write(latex)
+
+
+if __name__ == '__main__':
+    # Load dataframe using pickle
+    df = pd.read_pickle(os.path.join(EVAL_DIR, 'cross_eval.pkl'))
+    plot_column(df, 'n hid chan', 'pct complete')

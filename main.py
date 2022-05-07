@@ -73,8 +73,8 @@ def main_experiment(cfg=None):
                 print("Attempting to start experiment from scratch (not overwriting).")
 
         if cfg.evaluate:
-            evaluate(model, maze_data_train, cfg.val_batch_size, "train", cfg)
-            evaluate(model, maze_data_test, cfg.val_batch_size, "test", cfg)
+            evaluate(model, maze_data_train, cfg.val_batch_size, "train", cfg, is_eval=True)
+            evaluate(model, maze_data_test, cfg.val_batch_size, "test", cfg, is_eval=True)
             return
 
     if not loaded:

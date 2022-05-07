@@ -2,7 +2,9 @@ import json
 import numpy as np
 from pdb import set_trace as TT
 import torch as th
-from mazes import render_discrete
+from config import ClArgsConfig
+from mazes import Mazes, render_discrete
+from models.nn import PathfindingNN
 
 from utils import get_discrete_loss, get_mse_loss, to_path
             
@@ -13,18 +15,24 @@ def evaluate_train(model, cfg):
     pass
 
 
-def evaluate(model, maze_data, batch_size, name, cfg):
-    """Evaluate the trained model on a test set."""
+def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str, cfg: ClArgsConfig, 
+        is_eval: bool = False):
+    """Evaluate the trained model on a test set.
+
+    Args:
+        model (PathfindingNN): The model to evaluate. 
+        is_eval (bool): Whether we are evaluating after training, in which case we collect more stats. (Otherwise, we 
+            are validating during training, and compute less expensive metrics.)
+    """
     model.eval()
-    is_test = name == 'test'
-    assert is_test or name in ['validate', 'train'], "Name of evaluation must be 'test' or 'validate'."
+    assert name in ['train', 'validate', 'test'], "Name of evaluation must be 'train', 'test' or 'validate'."
     # n_test_mazes = n_test_minibatches * cfg.minibatch_size
     test_mazes_onehot, test_mazes_discrete, target_paths = maze_data.mazes_onehot, maze_data.mazes_discrete, \
         maze_data.target_paths
     batch_idxs = np.arange(0, test_mazes_onehot.shape[0])
     np.random.shuffle(batch_idxs)
 
-    if is_test:
+    if is_eval:
         n_eval_minibatches = test_mazes_onehot.shape[0] // batch_size
     else:
         n_eval_minibatches = 1
@@ -33,7 +41,7 @@ def evaluate(model, maze_data, batch_size, name, cfg):
         eval_losses = []
         eval_discrete_losses = []
         eval_pcts_complete = []
-        if is_test:
+        if is_eval:
             eval_completion_times = []
         i = 0
 
@@ -46,7 +54,7 @@ def evaluate(model, maze_data, batch_size, name, cfg):
             path_lengths = target_paths_minibatch.float().sum((1, 2)).cpu().numpy()
             model.reset(x0)
 
-            if is_test:
+            if is_eval:
                 completion_times = np.empty(batch_size)
                 completion_times.fill(np.nan)
 
@@ -61,7 +69,7 @@ def evaluate(model, maze_data, batch_size, name, cfg):
                     eval_discrete_losses.append(eval_discrete_loss.mean().item())
                     eval_pcts_complete.append(eval_pct_complete)
 
-                if is_test:
+                if is_eval:
                     eval_discrete_loss = get_discrete_loss(x, target_paths_minibatch).cpu()
                     completion_times = np.where(eval_discrete_loss.reshape(batch_size, -1).sum(dim=1) == 0, j, completion_times)
                     completion_times /= path_lengths
@@ -93,7 +101,7 @@ def evaluate(model, maze_data, batch_size, name, cfg):
         'discrete_accs': (mean_eval_discrete_accs, std_eval_discrete_accs),
         'pct_complete': (np.mean(eval_pcts_complete), np.std(eval_pcts_complete)),
     }
-    if is_test:
+    if is_eval:
         stats.update({
             'completion_time': (np.nanmean(eval_completion_times), np.nanstd(eval_completion_times)),
         })
