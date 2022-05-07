@@ -140,12 +140,23 @@ def plot_column(df, row_name, col_name):
     ys_errs = df[col_name].values
     ys, errs = zip(*ys_errs)
     # Plot as a histogram with error bars
-    plt.errorbar(xs, ys, yerr=errs)
-    plt.xlabel(row_name)
-    plt.ylabel(col_name)
-    plt.title(f'{col_name} by {row_name}')
+    from matplotlib import rc
+    import matplotlib as mpl
+    mpl.rcParams.update(mpl.rcParamsDefault)
+    plt.style.use(['science','no-latex'])
+    plt.rcParams.update({
+    "font.family": "serif",   # specify font family here
+    "font.serif": ["Times"],  # specify font here
+    "font.size":11}) 
+
+    #rc('text', usetex=True)
+    #rc('font', family='serif')
+    plt.errorbar(xs[0:len(xs)-1], ys[0:len(ys)-1], yerr=errs[0:len(errs)-1],linewidth=2)
+    plt.xlabel(r'Number of hidden channels', color="black", size=10)
+    plt.ylabel(r'Percentage', color="black", size=10)
+    plt.title(r'Path-finding percentage mean and variance', color="black", size=10)
     # Save
-    plt.savefig(os.path.join(EVAL_DIR, f'{row_name}_{col_name}.png'))
+    plt.savefig(os.path.join(EVAL_DIR, f'{row_name}_{col_name}.jpg'), dpi=2000)
     
 
 def pandas_to_latex(df_table, latex_file, vertical_bars=False, right_align_first_column=True, header=True, index=False,
