@@ -24,7 +24,7 @@ def bold_extreme_values(data, data_max=-1, col_name=None):
     else: bold = False
 
     # Other preprocessing here
-    if col_name != "completion time":
+    if col_name[1] != "completion time":
         data *= 100
         err *= 100
 
@@ -38,7 +38,7 @@ def bold_extreme_values(data, data_max=-1, col_name=None):
     return data
 
 
-def vis_cross_eval(exp_cfgs: List[ClArgsConfig]):
+def vis_cross_eval(exp_cfgs: List[ClArgsConfig], name: str):
     """
     Visualize the results of a set of experiments.
 
@@ -50,13 +50,18 @@ def vis_cross_eval(exp_cfgs: List[ClArgsConfig]):
     for exp_cfg in exp_cfgs:
         try:
             with open(exp_cfg.log_dir + '/test_stats.json', 'r') as f:
-                batch_exp_stats.append(json.load(f))
-                filtered_exp_cfgs.append(exp_cfg)
+                exp_test_stats = json.load(f)
+                exp_test_stats = {f'TEST_{k}': v for k, v in exp_test_stats.items()}
+            with (open(exp_cfg.log_dir + '/train_stats.json', 'r')) as f:
+                exp_train_stats = json.load(f)
+                exp_train_stats = {f'TRAIN_{k}': v for k, v in exp_train_stats.items()}
+            exp_stats = {**exp_train_stats, **exp_test_stats}
+            batch_exp_stats.append(exp_stats)
+            filtered_exp_cfgs.append(exp_cfg)
         except FileNotFoundError as e:
             print(f"Stats not found. Error:\n {e}\n Skipping experiment stats.")
     
     batch_exp_cfgs = filtered_exp_cfgs
-    exp_names = [cfg.exp_name for cfg in batch_exp_cfgs]
     
     # Assuming all stats have the same set of evaluated metrics.
     col_headers = list(batch_exp_stats[0].keys())
@@ -66,10 +71,19 @@ def vis_cross_eval(exp_cfgs: List[ClArgsConfig]):
         data_rows.append([exp_stats[k] if k in exp_stats else None for k in col_headers])
 
     # Hierarchical rows, separating experiments according to relevant hyperparameters
-    ignored_hyperparams = set({
-        # 'minibatch_size',
-    })
-    hyperparams = [h for h in list(yaml.safe_load(open('configs/batch.yaml', 'r')).keys()) if h not in ignored_hyperparams]
+    hyperparams = [
+        "model",
+        "n_layers",
+        "loss_interval",
+        "n_hid_chan",
+        "shared_weights",
+        "skip_connections",
+        "cut_conv_corners",
+        "sparse_update",
+        "n_data",
+        "learning_rate",
+    ]
+    # hyperparams = [h for h in list(yaml.safe_load(open('configs/batch.yaml', 'r')).keys()) if h not in ignored_hyperparams]
     row_tpls = []
     for exp_cfg in batch_exp_cfgs:
         row_tpls.append([getattr(exp_cfg, h) for h in hyperparams])
@@ -77,25 +91,43 @@ def vis_cross_eval(exp_cfgs: List[ClArgsConfig]):
     row_indices = pd.MultiIndex.from_tuples(row_tpls, names=hyperparams)
 
     col_headers = [c.replace('_', ' ') for c in col_headers]
-    df = pd.DataFrame(data_rows, columns=col_headers, index=row_indices)
+    col_tpls = []
+    for c in col_headers:
+        col_tpl = ('test' if 'TEST' in c else 'train', c.replace('TEST ', '').replace('TRAIN ', ''))
+        col_tpls.append(col_tpl)
+    col_indices = pd.MultiIndex.from_tuples(col_tpls)  #, names=['type', 'metric'])
+
+    df = pd.DataFrame(data_rows, columns=col_indices, index=row_indices)
     df.sort_index(inplace=True)
-    df.to_csv(os.path.join(EVAL_DIR, 'cross_eval.csv'))
+    df.to_csv(os.path.join(EVAL_DIR, f'{name}_cross_eval.csv'))
 
     # Save dataframe using pickle
-    with open(os.path.join(EVAL_DIR, 'cross_eval.pkl'), 'wb') as f:
+    with open(os.path.join(EVAL_DIR, f'{name}_cross_eval.pkl'), 'wb') as f:
         pickle.dump(df, f)
 
-    for k in col_headers:
+    for k in col_indices:
         if k in df:
+            print(k[1])
             df[k] = df[k].apply(
                 lambda data: bold_extreme_values(data, 
-                                data_max=(max if k != 'completion time' else min)([d[0] for d in df[k]]), 
+                                data_max=(max if k[1] != 'completion time' else min)([d[0] for d in df[k]]), 
                                 col_name=k)
             )
 
     # df.to_latex(os.path.join(EVAL_DIR, 'cross_eval.tex'), multirow=True)
-    pandas_to_latex(df, os.path.join(EVAL_DIR, 'cross_eval.tex'), multirow=True, index=True, vertical_bars=True,
-                     columns=col_headers)
+    pandas_to_latex(
+        df, 
+        os.path.join(EVAL_DIR, f'{name}_cross_eval.tex'), 
+        multirow=True, 
+        index=True, 
+        header=True,
+        vertical_bars=True,
+        columns=col_indices, 
+        multicolumn=True, 
+        multicolumn_format='c|',
+        right_align_first_column=False,
+        bold_rows=True,
+        )
     proj_dir = os.curdir
     os.system(f'cd {EVAL_DIR}; pdflatex tables.tex; cd {proj_dir}')
 
@@ -192,5 +224,5 @@ def pandas_to_latex(df_table, latex_file, vertical_bars=False, right_align_first
 
 if __name__ == '__main__':
     # Load dataframe using pickle
-    df = pd.read_pickle(os.path.join(EVAL_DIR, 'cross_eval.pkl'))
-    plot_column(df, 'n hid chan', 'pct complete')
+    df = pd.read_pickle(os.path.join(EVAL_DIR, 'n_hid_chan_cross_eval.pkl'))
+    plot_column(df, 'n hid chan', ('test', 'pct complete'))

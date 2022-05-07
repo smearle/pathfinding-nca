@@ -56,7 +56,7 @@ def main_batch():
     gen_new_data = batch_cfg.gen_new_data
     job_time = 48
     
-    with open(os.path.join('configs', 'batch.yaml')) as f:
+    with open(os.path.join('configs', f'{batch_cfg.batch_hyperparams}.yaml')) as f:
         batch_hyperparams = yaml.safe_load(f)
 
     # Generate dataset of mazes if necessary.
@@ -68,6 +68,7 @@ def main_batch():
 
     if batch_cfg.load_all:
         # Create an experiment config for each log folder present in the `runs` directory.
+        overwrite_args = set({'load', 'evaluate', 'render'})
         exp_dirs = []
         exp_configs = []
         for (dirpath, dirnames, filenames) in os.walk('runs'):
@@ -81,7 +82,7 @@ def main_batch():
                 print("Skipping experiment.")
                 continue
             load_config = json.load(open(cfg_path))
-            [setattr(exp_config, k, v) for k, v in load_config.items()]
+            [setattr(exp_config, k, v) for k, v in load_config.items() if k not in overwrite_args]
 
             if batch_cfg.filter_by_config:
                 # Exclude experiments that would not have been launched by the batch config.
@@ -93,8 +94,6 @@ def main_batch():
                 if invalid_cfg:
                     continue
 
-            setattr(exp_config, 'load', True)
-            setattr(exp_config, 'evaluate', True)
             exp_configs.append(exp_config)
 
     else:
@@ -127,7 +126,7 @@ def main_batch():
     exp_configs = filtered_exp_configs
 
     if batch_cfg.vis_cross_eval:
-        return vis_cross_eval(exp_configs)
+        return vis_cross_eval(exp_configs, name=batch_cfg.batch_hyperparams)
 
     experiment_names = []
     for exp_cfg in exp_configs:

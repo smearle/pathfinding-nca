@@ -186,6 +186,8 @@ class BatchConfig(ClArgsConfig):
             " instead of attempting to load all those specified in the batch config file.")
         args.add_argument('-fc', '--filter_by_config', action='store_true', help="If loading all, filter out "
             "experiments that would not have been specified by the batch config file.")
+        args.add_argument('-bh', '--batch_hyperparams', type=str, default="batch", help="Name of file "
+            "containing hyperparameters over which to run the batch of experiments.")
         super().__init__(args)
 
 
