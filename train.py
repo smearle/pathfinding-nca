@@ -66,7 +66,7 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
             if cfg.sparse_update:
                 x = th.utils.checkpoint.checkpoint_sequential([model]*cfg.loss_interval, min(16, cfg.loss_interval), x)
             else:
-                for _ in range(cfg.n_layers):
+                for _ in range(cfg.loss_interval):
                     x = model(x)
 
             loss += get_mse_loss(x, target_paths_mini_batch)

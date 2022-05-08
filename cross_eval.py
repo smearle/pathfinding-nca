@@ -67,6 +67,7 @@ names_to_cols = {
         'TEST_completion_time',
     ],
     'models': [
+        'n_params',
         'TRAIN_accs',
         'TRAIN_pct_complete',
         'TEST_accs',
