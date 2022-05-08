@@ -60,6 +60,13 @@ names_to_cols = {
         'TEST_completion_time',
     ]
 }
+hyperparam_renaming = {
+    'n hid chan': 'n. hid chan',
+}
+col_renaming = {
+    'n params': 'n. params',
+    'pct complete': 'pct. complete',
+}
 
 
 def vis_cross_eval(exp_cfgs: List[ClArgsConfig], batch_cfg: BatchConfig):
@@ -114,6 +121,7 @@ def vis_cross_eval(exp_cfgs: List[ClArgsConfig], batch_cfg: BatchConfig):
         for exp_cfg in batch_exp_cfgs:
             row_tpls.append([getattr(exp_cfg, h) for h in hyperparams])
         hyperparams = [h.replace('_', ' ') for h in hyperparams]
+        hyperparams = [hyperparam_renaming[h] if h in hyperparam_renaming else h for h in hyperparams]
         row_indices = pd.MultiIndex.from_tuples(row_tpls, names=hyperparams)
 
         col_headers = [c.replace('_', ' ') for c in col_headers]
@@ -127,6 +135,7 @@ def vis_cross_eval(exp_cfgs: List[ClArgsConfig], batch_cfg: BatchConfig):
                 col_tpls.append(('model', c))
             # col_tpl = ('test' if 'TEST' in c else 'train', c.replace('TEST ', '').replace('TRAIN ', ''))
             # col_tpls.append(col_tpl)
+        col_tpls = [(c[0], col_renaming[c[1]] if c[1] in col_renaming else c[1]) for c in col_tpls]
         col_indices = pd.MultiIndex.from_tuples(col_tpls)  #, names=['type', 'metric'])
 
         df = pd.DataFrame(data_rows, columns=col_indices, index=row_indices)
@@ -181,7 +190,7 @@ def preprocess_values(data, col_name=None):
     "Preprocessing values in dataframe (output floats)."
 
     # hack
-    if not isinstance(data, tuple):
+    if isinstance(data, int) or isinstance(data, float):
         return data
 
     # Assume (mean, std)
@@ -197,7 +206,7 @@ def bold_extreme_values(data, data_max=-1, col_name=None):
     "Process dataframe values from floats into strings. Bold extreme (best) values."
 
     # hack
-    if col_name[1] == "n params":
+    if col_name[1] == "n. params":
         return '{:,}'.format(data)
 
     else:
