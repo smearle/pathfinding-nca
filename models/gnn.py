@@ -25,10 +25,11 @@ class GCN(PathfindingNN):
 
 
             ## DEBUG
-            # with th.no_grad():
-            #     lin_weight = list(gconv0.modules())[1].weight
-            #     lin_weight = nn.Parameter(th.zeros_like(lin_weight).fill_(1.0), requires_grad=False)
-            #     gconv0.bias = nn.Parameter(th.zeros_like(gconv0.bias), requires_grad=False)
+            with th.no_grad():
+                lin_weight = list(gconv0.modules())[1].weight
+                lin_weight = nn.Parameter(th.rand_like(lin_weight), requires_grad=False)
+                list(gconv0.modules())[1].weight = lin_weight
+                gconv0.bias = nn.Parameter(th.zeros_like(gconv0.bias), requires_grad=False)
 
 
             return gconv0  #, gconv1

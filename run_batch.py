@@ -87,6 +87,13 @@ def main_batch():
             if batch_cfg.filter_by_config:
                 # Exclude experiments that would not have been launched by the batch config.
                 invalid_cfg = False
+
+                # Ad hoc filtering
+                # if batch_cfg.batch_hyperparams == "weight_sharing":
+                    # if exp_config.shared_weights is True and exp_config.sparse_weights is False:
+                        # invalid_cfg = True
+                        # continue
+
                 for k, v in vars(exp_config).items():
                     if k in batch_hyperparams and v not in batch_hyperparams[k]:
                         invalid_cfg = True

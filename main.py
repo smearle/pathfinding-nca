@@ -2,12 +2,14 @@
 #%tensorflow_version 2.x
 
 import json
+import math
 import os
 from pdb import set_trace as TT
 import shutil
 import sys
 from matplotlib import animation
 
+import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
@@ -53,7 +55,8 @@ def main_experiment(cfg=None):
     # print('model param count:', param_n)
     opt = torch.optim.Adam(model.parameters(), cfg.learning_rate)
     try:
-        maze_data_train, maze_data_val, maze_data_test = load_dataset(cfg.n_data, cfg.device)
+        maze_data_train, maze_data_val, maze_data_test = load_dataset(cfg.n_data,
+            'cpu' if not torch.cuda.is_available() else cfg.device)
     except FileNotFoundError as e:
         print("No maze data files found. Run `python mazes.py` to generate the dataset.")
         raise
@@ -116,72 +119,117 @@ def main_experiment(cfg=None):
     # The set of initial mazes (padded with 0s, channel-wise, to act as the initial state of the CA).
 
     if cfg.render:
-        render_trained(model, maze_data_train, cfg)
+        with torch.no_grad():
+            render_trained(model, maze_data_train, cfg)
     else:
         train(model, opt, maze_data_train, maze_data_val, target_paths, logger, cfg)
+
+
+RENDER_TYPE = 1
+N_RENDER_CHANS = None
+N_RENDER_EPISODES = 1
+CV2_WAIT_KEY_TIME = 0
 
 
 def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True):
     """Generate a video showing the behavior of the trained NCA on mazes from its training distribution.
     """
     mazes_onehot, mazes_discrete = maze_data.mazes_onehot, maze_data.mazes_discrete
-    pool = model.seed(batch_size=mazes_onehot.shape[0])
-    render_minibatch_size = min(cfg.render_minibatch_size, mazes_onehot.shape[0])
-    batch_idx = np.random.choice(pool.shape[0], render_minibatch_size, replace=False)
-    x = pool[batch_idx]
-    x0 = mazes_onehot[batch_idx]
-    model.reset(x0, new_batch_size=True)
-
-    if pyplot_animation:
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10,10))
+    if N_RENDER_CHANS is None:
+        n_render_chans = model.n_out_chan
 
 
-        def get_imgs(x, x0, oracle_out=None):
-            # x_img = to_path(x[:cfg.render_minibatch_size]).cpu()
-            # x_img = (x_img - x_img.min()) / (x_img.max() - x_img.min())
-            # x_img = np.hstack(x_img.detach())
-            # solved_maze_ims = [render_discrete(x0i.argmax(0)[None,...]) for x0i in x0]
-            # solved_mazes_im = np.hstack(np.vstack(solved_maze_ims))
-            # vstackable_ims = [x_img]
-            maze_imgs = np.hstack(render_discrete(mazes_discrete[batch_idx], cfg))
-            vstackable_ims = []
+    def reset():
+        pool = model.seed(batch_size=mazes_onehot.shape[0])
+        render_minibatch_size = min(cfg.render_minibatch_size, mazes_onehot.shape[0])
+        batch_idx = np.random.choice(pool.shape[0], render_minibatch_size, replace=False)
+        x = pool[batch_idx]
+        x0 = mazes_onehot[batch_idx]
+        model.reset(x0, new_batch_size=True)
+        maze_imgs = np.hstack(render_discrete(mazes_discrete[batch_idx], cfg))
 
-            # Render the path channel and some other arbitrary hidden channels
-            for i in range(3):
-                xi_img = x[:cfg.render_minibatch_size, -i-1].cpu()
-                xi_img = (xi_img - xi_img.min()) / (xi_img.max() - xi_img.min())
-                xi_img = np.hstack(xi_img.detach())
-                vstackable_ims.append(xi_img)
+        return x, maze_imgs
 
-            if oracle_out is not None:
-                # Additionally render the evolution of the oracle model's age channel.
-                img = oracle_out[:cfg.render_minibatch_size, -1, :, :, None]
-                img = (img - img.min()) / (img.max() - img.min())
-                img = np.hstack(img.cpu().detach())
-                vstackable_ims.append(np.tile(img, (1, 1, 3)))
-            bw_imgs = np.vstack(vstackable_ims)
 
-            return maze_imgs, bw_imgs
+    def get_imgs(x, oracle_out=None):
+        # x_img = to_path(x[:cfg.render_minibatch_size]).cpu()
+        # x_img = (x_img - x_img.min()) / (x_img.max() - x_img.min())
+        # x_img = np.hstack(x_img.detach())
+        # solved_maze_ims = [render_discrete(x0i.argmax(0)[None,...]) for x0i in x0]
+        # solved_mazes_im = np.hstack(np.vstack(solved_maze_ims))
+        # vstackable_ims = [x_img]
+        stackable_ims = []
 
-        maze_imgs, bw_imgs = get_imgs(x, x0)
-        global im1, im2
-        im1 = ax1.imshow(maze_imgs)
-        im2 = ax2.imshow(bw_imgs)
-        plt.tight_layout()
+        # Render the path channel and some other arbitrary hidden channels
+        for i in range(n_render_chans):
+            xi_img = x[:cfg.render_minibatch_size, -i-1].cpu()
+            xi_img = (xi_img - xi_img.min()) / (xi_img.max() - xi_img.min())
+            xi_img = np.hstack(xi_img.detach())
+            stackable_ims.append(xi_img)
 
-        # def init():
-        #     im1 = ax1.imshow(maze_imgs)
-        #     im2 = ax2.imshow(bw_imgs)
+        if oracle_out is not None:
+            # Additionally render the evolution of the oracle model's age channel.
+            img = oracle_out[:cfg.render_minibatch_size, -1, :, :, None]
+            img = (img - img.min()) / (img.max() - img.min())
+            img = np.hstack(img.cpu().detach())
+            stackable_ims.append(np.tile(img, (1, 1, 3)))
+        
+        n_cols = math.ceil(math.sqrt(n_render_chans))
+        bw_imgs = [np.hstack([np.hstack((im, np.zeros((im.shape[0], 1)))) for im in stackable_ims[i:i+n_cols]]) \
+            for i in range(0, len(stackable_ims), n_cols)]
+        bw_imgs = np.vstack([np.vstack((im, np.zeros((1, im.shape[1])))) for im in bw_imgs])
 
-        #     return im1, im2
+        return bw_imgs
 
-        xs = []
-        oracle_outs = []
+    model_has_oracle = model == "BfsNCA"
 
-        with torch.no_grad():
-            xs.append(x)
-            oracle_outs.append(model.oracle_out) if cfg.model == "BfsNCA" else None
+    # Render live and indefinitely using cv2.
+    if RENDER_TYPE == 0:
+        # Create large window
+        cv2.namedWindow('maze', cv2.WINDOW_NORMAL)
+        cv2.namedWindow('model', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('maze', 1920, 1080)
+
+        while True:
+            x, maze_imgs = reset()
+            oracle_out = model.oracle_out if model_has_oracle else None
+            cv2.imshow('maze', maze_imgs)
+            cv2.imshow('model', get_imgs(x, oracle_out=oracle_out))
+            cv2.waitKey(CV2_WAIT_KEY_TIME)
             for i in range(cfg.n_layers):
+                x = model.forward(x)
+                oracle_out = model.oracle_out if model_has_oracle else None
+                cv2.imshow('model', get_imgs(x, oracle_out=oracle_out))
+                cv2.waitKey(CV2_WAIT_KEY_TIME)
+            
+
+    # Save a video with pyplot.
+    elif RENDER_TYPE == 1:
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10,10), gridspec_kw={'width_ratios': [1, 10]})
+        
+
+        for i in range(N_RENDER_EPISODES):
+            x, maze_imgs = reset()
+            bw_imgs = get_imgs(x)
+            global im1, im2
+            im1 = ax1.imshow(maze_imgs)
+            # Set second subplot to be much larger
+            im2 = ax2.imshow(bw_imgs)
+            plt.tight_layout()
+
+            # def init():
+            #     im1 = ax1.imshow(maze_imgs)
+            #     im2 = ax2.imshow(bw_imgs)
+
+            #     return im1, im2
+
+            xs = []
+            oracle_outs = []
+
+            xs.append(x)
+            oracle_outs.append(model.oracle_out) if model_has_oracle else None
+
+            for j in range(cfg.n_layers):
                 x = model(x)
                 xs.append(x)
                 oracle_outs.append(model.oracle_out) if oracle_outs else None
@@ -191,8 +239,9 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True):
         def animate(i):
             xi = xs[i]
             oracle_out = oracle_outs[i] if oracle_outs else None
-            maze_imgs, bw_imgs = get_imgs(xi, x0, oracle_out=oracle_out)
-            # ax1.imshow(maze_imgs)
+            bw_imgs = get_imgs(xi, oracle_out=oracle_out)
+            if i % cfg.n_layers == 0:
+                ax1.imshow(maze_imgs)
             # im1.set_array(bw_imgs)
             ax2.imshow(bw_imgs)
             # im2.set_array(bw_imgs)

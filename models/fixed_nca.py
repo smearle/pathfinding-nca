@@ -92,7 +92,6 @@ class FixedBfsNCA(PathfindingNN):
         # x[:, :self.n_in_chan] += input
 
         y = self.conv_1(x)
-        TT()
         return x
 
     def get_solution_length(self, input):

@@ -44,9 +44,9 @@ class PathfindingNN(ABC, nn.Module):
 
 
             ### DEBUG ###
-            # if self.n_step == 0:
-            #     x[:] = 0.0
-            #     x[0,-1, 0, 0] = 1.0
+            if self.n_step == 0:
+                x[:] = 0.0
+                x[0,-1, 0, 0] = 1.0
 
 
             x = self.forward_layer(x, self.n_step)

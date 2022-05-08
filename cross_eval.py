@@ -52,7 +52,7 @@ names_to_hyperparams = {
     ]
 }
 names_to_cols = {
-    'weight_sharing': [
+    'default': [
         'n_params',
         'TRAIN_pct_complete',
         'TRAIN_completion_time',
@@ -70,76 +70,85 @@ def vis_cross_eval(exp_cfgs: List[ClArgsConfig], batch_cfg: BatchConfig):
         exp_cfgs (list): A list of experiment configs.
     """
     name = batch_cfg.batch_hyperparams
-    batch_exp_stats = []
-    filtered_exp_cfgs = []
-    for exp_cfg in exp_cfgs:
-        try:
-            with open(exp_cfg.log_dir + '/stats.json', 'r') as f:
-                exp_general_stats = json.load(f)
-            with open(exp_cfg.log_dir + '/test_stats.json', 'r') as f:
-                exp_test_stats = json.load(f)
-                exp_test_stats = {f'TEST_{k}': v for k, v in exp_test_stats.items()}
-            with (open(exp_cfg.log_dir + '/train_stats.json', 'r')) as f:
-                exp_train_stats = json.load(f)
-                exp_train_stats = {f'TRAIN_{k}': v for k, v in exp_train_stats.items()}
-            exp_stats = {**exp_general_stats, **exp_train_stats, **exp_test_stats}
-            batch_exp_stats.append(exp_stats)
-            filtered_exp_cfgs.append(exp_cfg)
-        except FileNotFoundError as e:
-            print(f"Stats not found. Error:\n {e}\n Skipping experiment stats.")
-    
-    batch_exp_cfgs = filtered_exp_cfgs
-    
-    if batch_cfg.selective_table and name in names_to_cols:
-        col_headers = names_to_cols[name]
-    else:
-        # Assuming all stats have the same set of evaluated metrics.
-        col_headers = list(batch_exp_stats[0].keys())
-
-    data_rows = []
-    for exp_stats in batch_exp_stats:
-        data_rows.append([exp_stats[k] if k in exp_stats else None for k in col_headers])
-
-    if batch_cfg.selective_table and name in names_to_hyperparams:
-        hyperparams = names_to_hyperparams[name]
-    else:
-        hyperparams = names_to_hyperparams['batch']
-    # Hierarchical rows, separating experiments according to relevant hyperparameters
-    # hyperparams = [h for h in list(yaml.safe_load(open('configs/batch.yaml', 'r')).keys()) if h not in ignored_hyperparams]
-    row_tpls = []
-    for exp_cfg in batch_exp_cfgs:
-        row_tpls.append([getattr(exp_cfg, h) for h in hyperparams])
-    hyperparams = [h.replace('_', ' ') for h in hyperparams]
-    row_indices = pd.MultiIndex.from_tuples(row_tpls, names=hyperparams)
-
-    col_headers = [c.replace('_', ' ') for c in col_headers]
-    col_tpls = []
-    for c in col_headers:
-        if 'TEST' in c:
-            col_tpls.append(('test', c.replace('TEST ', '')))
-        elif 'TRAIN' in c:
-            col_tpls.append(('train', c.replace('TRAIN ', '')))
+    if not batch_cfg.load_pickle:
+        batch_exp_stats = []
+        filtered_exp_cfgs = []
+        for exp_cfg in exp_cfgs:
+            try:
+                with open(exp_cfg.log_dir + '/stats.json', 'r') as f:
+                    exp_general_stats = json.load(f)
+                with open(exp_cfg.log_dir + '/test_stats.json', 'r') as f:
+                    exp_test_stats = json.load(f)
+                    exp_test_stats = {f'TEST_{k}': v for k, v in exp_test_stats.items()}
+                with (open(exp_cfg.log_dir + '/train_stats.json', 'r')) as f:
+                    exp_train_stats = json.load(f)
+                    exp_train_stats = {f'TRAIN_{k}': v for k, v in exp_train_stats.items()}
+                exp_stats = {**exp_general_stats, **exp_train_stats, **exp_test_stats}
+                batch_exp_stats.append(exp_stats)
+                filtered_exp_cfgs.append(exp_cfg)
+            except FileNotFoundError as e:
+                print(f"Stats not found. Error:\n {e}\n Skipping experiment stats.")
+        
+        batch_exp_cfgs = filtered_exp_cfgs
+        
+        if batch_cfg.selective_table:
+            if name in names_to_cols:
+                col_headers = names_to_cols[name]
+            else:
+                col_headers = names_to_cols['default']
         else:
-            col_tpls.append(('model', c))
-        # col_tpl = ('test' if 'TEST' in c else 'train', c.replace('TEST ', '').replace('TRAIN ', ''))
-        # col_tpls.append(col_tpl)
-    col_indices = pd.MultiIndex.from_tuples(col_tpls)  #, names=['type', 'metric'])
+            # Assuming all stats have the same set of evaluated metrics.
+            col_headers = list(batch_exp_stats[0].keys())
 
-    df = pd.DataFrame(data_rows, columns=col_indices, index=row_indices)
-    df.sort_index(inplace=True)
+        data_rows = []
+        for exp_stats in batch_exp_stats:
+            data_rows.append([exp_stats[k] if k in exp_stats else None for k in col_headers])
 
-    for k in col_indices:
-        if k in df:
-            print(k[1])
-            df[k] = df[k].apply(
-                lambda data: preprocess_values(data, 
-                                col_name=k)
-            )
-    df.to_csv(os.path.join(EVAL_DIR, f'{name}_cross_eval.csv'))
+        if batch_cfg.selective_table and name in names_to_hyperparams:
+            hyperparams = names_to_hyperparams[name]
+        else:
+            hyperparams = names_to_hyperparams['batch']
+        # Hierarchical rows, separating experiments according to relevant hyperparameters
+        # hyperparams = [h for h in list(yaml.safe_load(open('configs/batch.yaml', 'r')).keys()) if h not in ignored_hyperparams]
+        row_tpls = []
+        for exp_cfg in batch_exp_cfgs:
+            row_tpls.append([getattr(exp_cfg, h) for h in hyperparams])
+        hyperparams = [h.replace('_', ' ') for h in hyperparams]
+        row_indices = pd.MultiIndex.from_tuples(row_tpls, names=hyperparams)
 
-    # Save dataframe using pickle
-    with open(os.path.join(EVAL_DIR, f'{name}_cross_eval.pkl'), 'wb') as f:
-        pickle.dump(df, f)
+        col_headers = [c.replace('_', ' ') for c in col_headers]
+        col_tpls = []
+        for c in col_headers:
+            if 'TEST' in c:
+                col_tpls.append(('test', c.replace('TEST ', '')))
+            elif 'TRAIN' in c:
+                col_tpls.append(('train', c.replace('TRAIN ', '')))
+            else:
+                col_tpls.append(('model', c))
+            # col_tpl = ('test' if 'TEST' in c else 'train', c.replace('TEST ', '').replace('TRAIN ', ''))
+            # col_tpls.append(col_tpl)
+        col_indices = pd.MultiIndex.from_tuples(col_tpls)  #, names=['type', 'metric'])
+
+        df = pd.DataFrame(data_rows, columns=col_indices, index=row_indices)
+        df.sort_index(inplace=True)
+
+        for k in col_indices:
+            if k in df:
+                print(k[1])
+                df[k] = df[k].apply(
+                    lambda data: preprocess_values(data, 
+                                    col_name=k)
+                )
+        df.to_csv(os.path.join(EVAL_DIR, f'{name}_cross_eval.csv'))
+
+        # Save dataframe using pickle
+        with open(os.path.join(EVAL_DIR, f'{name}_cross_eval.pkl'), 'wb') as f:
+            pickle.dump(df, f)
+
+    else: 
+        with open(os.path.join(EVAL_DIR, f'{batch_cfg.batch_hyperparams}_cross_eval.pkl'), 'rb') as f:
+            df = pickle.load(f)
+        col_indices = df.columns
 
     for k in col_indices:
         if k in df:
@@ -172,7 +181,7 @@ def preprocess_values(data, col_name=None):
     "Preprocessing values in dataframe (output floats)."
 
     # hack
-    if isinstance(data, int):
+    if not isinstance(data, tuple):
         return data
 
     # Assume (mean, std)

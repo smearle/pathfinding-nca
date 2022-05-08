@@ -54,8 +54,8 @@
   ],
 
   "sparse_update": [
-    True,
-    # False,
+    # True,
+    False,
   ],
 
 #   "minibatch_size": [

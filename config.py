@@ -54,7 +54,7 @@ class Config():
     minibatch_size = 32 
 
     # Size of minibatch for rendering images and animations.
-    render_minibatch_size = 8
+    render_minibatch_size = 1
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -188,6 +188,8 @@ class BatchConfig(ClArgsConfig):
             "containing hyperparameters over which to run the batch of experiments.")
         args.add_argument('-st', '--selective_table', action='store_true', help="Render only user-specified rows and "
             "columns in the latex table when cross-evaluating.")
+        args.add_argument('-lp', '--load_pickle', action='store_true', help="When cross-evaluating, load pickle with "
+            "data from previous evaluation.")
         super().__init__(args)
 
 

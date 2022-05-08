@@ -4,6 +4,7 @@ from pdb import set_trace as TT
 import torch as th
 from config import ClArgsConfig
 from mazes import Mazes, render_discrete
+from models.gnn import GCN
 from models.nn import PathfindingNN
 
 from utils import get_discrete_loss, get_mse_loss, to_path
@@ -15,8 +16,17 @@ def evaluate_train(model, cfg):
     pass
 
 
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+def count_parameters(model: PathfindingNN, cfg: ClArgsConfig):
+    n_params = 0
+    for name, p in model.named_parameters():
+        if not isinstance(model, GCN) and cfg.cut_conv_corners and "weight" in name:
+            # Don't count the corners. (Assume 3x3 convolutional kernels).
+            assert p.shape[-2:] == (3, 3)
+            n_ps = p.numel() * 5/9
+            assert n_ps % 1 == 0
+            n_params += n_ps
+
+    return n_params
 
 
 def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str, cfg: ClArgsConfig, 
@@ -31,7 +41,7 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
     model.eval()
     assert name in ['train', 'validate', 'test'], "Name of evaluation must be 'train', 'test' or 'validate'."
     if is_eval and name == 'train':
-        n_params = count_parameters(model)
+        n_params = count_parameters(model, cfg)
         with open(f"{cfg.log_dir}/stats.json", "w") as f:
             json.dump({"n_params": n_params}, f)
 
