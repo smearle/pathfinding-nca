@@ -24,12 +24,14 @@ class GCN(PathfindingNN):
 #             gconv1 = GCNConv(n_hid_chan, self.n_out_chan)
 
 
-            ## DEBUG
-            with th.no_grad():
-                lin_weight = list(gconv0.modules())[1].weight
-                lin_weight = nn.Parameter(th.rand_like(lin_weight), requires_grad=False)
-                list(gconv0.modules())[1].weight = lin_weight
-                gconv0.bias = nn.Parameter(th.zeros_like(gconv0.bias), requires_grad=False)
+            # DEBUG
+            # for p in self.parameters():
+            #     p[:] = 0.0
+            # with th.no_grad():
+            #     lin_weight = list(gconv0.modules())[1].weight
+            #     lin_weight = nn.Parameter(th.rand_like(lin_weight), requires_grad=False)
+            #     list(gconv0.modules())[1].weight = lin_weight
+            #     gconv0.bias = nn.Parameter(th.zeros_like(gconv0.bias), requires_grad=False)
 
 
             return gconv0  #, gconv1
@@ -50,6 +52,12 @@ class GCN(PathfindingNN):
         
         This involves concatenating with the underlying maze-state (in `super.forward()`), and flattening along the 
         maze's width and height dimensions."""
+
+        ### DEBUG ###
+        # if self.n_step == 0:
+        #     x[:] = 0.0
+        #     x[0,-1, 0, 0] = 1.0
+
         batch_size, n_chan, width, height = x.shape
 
         # Move channel dimension to front. Then, flatten along width, height, and then batch dimensions.
@@ -57,7 +65,7 @@ class GCN(PathfindingNN):
         x = x.reshape(x.shape[0], -1)
         x = x.transpose(1, 0)
 
-        x = self.layers[i](x, self.edges).relu()
+        x = self.layers[i](x, self.grid_edges).relu()
 
 #         x = self.layers[i*2](x, self.grid_edges).relu()
 #         x = self.layers[i*2+1](x, self.self_edges).relu()
@@ -67,7 +75,8 @@ class GCN(PathfindingNN):
 
         # Reshape back into (batched) 2D grid.
         x = x.transpose(1, 0)
-        x = x.reshape(batch_size, self.n_out_chan, width, height)
+        x = x.reshape(self.n_out_chan, batch_size, width, height)
+        x = x.transpose(1, 0)
 
         return x
 

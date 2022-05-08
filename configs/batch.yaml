@@ -7,26 +7,26 @@
     # "BfsNCA",
   ],
 
-#   "n_layers": [
+  # "n_layers": [
 #     # 4,
 #     # 8,
 #     # 16,
 #     # 32,
-#     64,
-#     # 96,
-#   ],
+    64,
+    # 96,
+  # ],
 
 #   # How often to calculate the loss.
 #   "loss_interval": [
-#     null,
+    null,
 #     4,
 #     8,
 #     16,
 #     32,
-#     64,
+    # 64,
 #   ],
 
-#   "n_hid_chan": [
+  "n_hid_chan": [
 #     # 6,
 #     # 8,
 #     # 10,
@@ -34,49 +34,49 @@
 #     # 24,
 #     # 32,
 #     # 48,
-#     96,
-#     # 128,
+    # 96,
+    128,
 #     # 256,
-#   ],
+  ],
 
-#   "shared_weights": [
-#     True,
+  "shared_weights": [
+    True,
 #     # False,
-#   ],
+  ],
 
-#   "skip_connections": [
-#     True,
+  "skip_connections": [
+    True,
 #     # False,
-#   ],
+  ],
 
-#   "cut_conv_corners": [
-#     True,
+  "cut_conv_corners": [
+    True,
 #     # False,
-#   ],
+  ],
 
 #   # Whether to enable the (bug/fix) that limits the gradients accumulated to the last few layers of the network. 
 #   # Presumably only valid when using shared weights for all layers. Faster, but (persumably) less stable.
-#   "sparse_update": [
+  "sparse_update": [
 #     True,
-#     # False,
-#   ],
+    False,
+  ],
 
 # #   "minibatch_size": [
 # #     32,
 # #   ],
 
-# "n_data": [
+"n_data": [
 #   # 256,
 #   # 512,
 #   # 1024,
-#   2048,
+  2048,
 #   # 4096,
-#   # 8192,
-# ],
+  # 8192,
+],
 
 # "learning_rate": [
 #   # 0.0005,
-#   0.0001,
+  0.0001,
 #   # 0.00005,
 #   # 0.00001,
 # ],

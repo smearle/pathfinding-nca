@@ -68,7 +68,7 @@ def main_batch():
 
     if batch_cfg.load_all:
         # Create an experiment config for each log folder present in the `runs` directory.
-        overwrite_args = set({'load', 'evaluate', 'render'})
+        overwrite_args = set({'load', 'evaluate', 'render', 'render_minibatch_size'})
         exp_dirs = []
         exp_configs = []
         for (dirpath, dirnames, filenames) in os.walk('runs'):

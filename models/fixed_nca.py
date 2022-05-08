@@ -11,7 +11,7 @@ adjs_to_acts = {adj: i for i, adj in enumerate(adjs)}
 
 
 class FixedBfsNCA(PathfindingNN):
-    n_hid_chan = 3
+    n_hid_chan = 2
 
     def __init__(self, cfg):
         """A Neural Cellular Automata model for pathfinding over grid-based mazes.
@@ -61,10 +61,11 @@ class FixedBfsNCA(PathfindingNN):
             self.path_chan = path_chan = age_chan + 1
             # self.conv_1.weight[]
                 
-    def forward(self, x0):
-        x = self.add_initial_maze(x0)
+    def forward(self, x):
         with th.no_grad():
+            x = self.add_initial_maze(x)
             x = self.hid_forward(x)
+            self.n_step += 1
 
         return x
 
@@ -73,11 +74,11 @@ class FixedBfsNCA(PathfindingNN):
         # agent_pos = (input.shape[2] // 2, input.shape[3] // 2)
         trg_pos = th.where(x[:, self.trg_chan, ...] == 1)
         if trg_pos[0].shape[0] == 0:
-            trg_pos = th.zeros(x.shape[0], 3, dtype=th.int64)
+            trg_pos = th.zeros(n_batches, 3, dtype=th.int64)
             trg_pos = tuple([trg_pos[:, i] for i in range(3)])
         # trg_pos = (trg_pos[1].item(), trg_pos[2].item())
         batch_dones = self.get_dones(x, trg_pos)
-        if not batch_dones.all():
+        if not batch_dones.all().item():
             x1 = self.flood(x)
             batch_cont = batch_dones == False
             x[batch_cont] = x1[batch_cont]
@@ -91,7 +92,7 @@ class FixedBfsNCA(PathfindingNN):
         x[:, self.flood_chan] = th.clamp(x[:, self.flood_chan], 0., 1.)
         # x[:, :self.n_in_chan] += input
 
-        y = self.conv_1(x)
+        # y = self.conv_1(x)
         return x
 
     def get_solution_length(self, input):

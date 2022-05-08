@@ -12,7 +12,7 @@ from matplotlib import animation
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-import torch
+import torch as th
 import torchinfo
 
 from config import ClArgsConfig
@@ -29,9 +29,9 @@ np.set_printoptions(threshold=sys.maxsize)
 
 def main_experiment(cfg=None):
     os.system('nvidia-smi -L')
-    if torch.cuda.is_available():
+    if th.cuda.is_available():
             print('Using GPU/CUDA.')
-            torch.set_default_tensor_type('torch.cuda.FloatTensor')
+            th.set_default_tensor_type('torch.cuda.FloatTensor')
     else:
             print('Not using GPU/CUDA, using CPU.')
         
@@ -45,7 +45,7 @@ def main_experiment(cfg=None):
     # Setup training
     model = model_cls(cfg)
     # Set a dummy initial maze state.
-    model.reset(torch.zeros(cfg.minibatch_size, cfg.n_in_chan, cfg.width + 2, cfg.width + 2), is_torchinfo_dummy=True)
+    model.reset(th.zeros(cfg.minibatch_size, cfg.n_in_chan, cfg.width + 2, cfg.width + 2), is_torchinfo_dummy=True)
 
     if not (cfg.render or cfg.evaluate):
         dummy_input = model.seed(batch_size=cfg.minibatch_size)
@@ -53,10 +53,10 @@ def main_experiment(cfg=None):
 
     # param_n = sum(p.numel() for p in model.parameters())
     # print('model param count:', param_n)
-    opt = torch.optim.Adam(model.parameters(), cfg.learning_rate)
+    opt = th.optim.Adam(model.parameters(), cfg.learning_rate)
     try:
         maze_data_train, maze_data_val, maze_data_test = load_dataset(cfg.n_data,
-            'cpu' if not torch.cuda.is_available() else cfg.device)
+            'cpu' if not th.cuda.is_available() else cfg.device)
     except FileNotFoundError as e:
         print("No maze data files found. Run `python mazes.py` to generate the dataset.")
         raise
@@ -106,7 +106,7 @@ def main_experiment(cfg=None):
         path_chan = 4
         assert path_chan == mazes_discrete.max() + 1
 # solved_mazes = mazes_discrete.clone()
-# solved_mazes[torch.where(target_paths == 1)] = path_chan
+# solved_mazes[th.where(target_paths == 1)] = path_chan
 # fig, ax = plt.subplots(figsize=(20, 5))
 # plt.imshow(np.hstack(solved_maze_ims[:cfg.render_minibatch_size]))
 
@@ -119,39 +119,48 @@ def main_experiment(cfg=None):
     # The set of initial mazes (padded with 0s, channel-wise, to act as the initial state of the CA).
 
     if cfg.render:
-        with torch.no_grad():
+        with th.no_grad():
             render_trained(model, maze_data_train, cfg)
     else:
         train(model, opt, maze_data_train, maze_data_val, target_paths, logger, cfg)
 
 
-RENDER_TYPE = 1
+RENDER_TYPE = 0
 N_RENDER_CHANS = None
-N_RENDER_EPISODES = 1
+N_RENDER_EPISODES = 10
 CV2_WAIT_KEY_TIME = 0
 
 
 def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True):
     """Generate a video showing the behavior of the trained NCA on mazes from its training distribution.
     """
-    mazes_onehot, mazes_discrete = maze_data.mazes_onehot, maze_data.mazes_discrete
+    mazes_onehot, mazes_discrete, target_paths = maze_data.mazes_onehot, maze_data.mazes_discrete, maze_data.target_paths
     if N_RENDER_CHANS is None:
         n_render_chans = model.n_out_chan
+    else:
+        n_render_chans = min(N_RENDER_CHANS, model.n_out_chan)
 
+    render_minibatch_size = min(cfg.render_minibatch_size, mazes_onehot.shape[0])
+    path_lengths = target_paths.sum((1, 2))
+    path_chan = mazes_discrete[0].max() + 1
+    mazes_discrete = th.where((mazes_discrete == cfg.empty_chan) & (target_paths == 1), path_chan, mazes_discrete)
+    batch_idxs = path_lengths.sort(descending=True)[1]
+    # batch_idx = np.random.choice(mazes_onehot.shape[0], render_minibatch_size, replace=False)
+    bi = 0
 
-    def reset():
+    def reset(bi):
+        batch_idx = batch_idxs[th.arange(render_minibatch_size) + bi]
         pool = model.seed(batch_size=mazes_onehot.shape[0])
-        render_minibatch_size = min(cfg.render_minibatch_size, mazes_onehot.shape[0])
-        batch_idx = np.random.choice(pool.shape[0], render_minibatch_size, replace=False)
         x = pool[batch_idx]
         x0 = mazes_onehot[batch_idx]
         model.reset(x0, new_batch_size=True)
         maze_imgs = np.hstack(render_discrete(mazes_discrete[batch_idx], cfg))
+        bi = (bi + render_minibatch_size) % mazes_onehot.shape[0]
 
-        return x, maze_imgs
+        return x, maze_imgs, bi
 
 
-    def get_imgs(x, oracle_out=None):
+    def get_imgs(x, oracle_out=None, maze_imgs=None):
         # x_img = to_path(x[:cfg.render_minibatch_size]).cpu()
         # x_img = (x_img - x_img.min()) / (x_img.max() - x_img.min())
         # x_img = np.hstack(x_img.detach())
@@ -174,47 +183,92 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True):
             img = np.hstack(img.cpu().detach())
             stackable_ims.append(np.tile(img, (1, 1, 3)))
         
-        n_cols = math.ceil(math.sqrt(n_render_chans))
-        bw_imgs = [np.hstack([np.hstack((im, np.zeros((im.shape[0], 1)))) for im in stackable_ims[i:i+n_cols]]) \
-            for i in range(0, len(stackable_ims), n_cols)]
-        bw_imgs = np.vstack([np.vstack((im, np.zeros((1, im.shape[1])))) for im in bw_imgs])
+        if n_render_chans > 3:
+            n_cols = math.ceil(math.sqrt(n_render_chans + (1 if maze_imgs is not None else 0)))
+        else:
+            n_cols = n_render_chans + (1 if maze_imgs is not None else 0)
 
-        return bw_imgs
+        # Give b/w images a third channel, ade maze as first tile
+        if maze_imgs is not None:
+            stackable_ims = [maze_imgs] + [np.tile(im[...,None], (1, 1, 3)) for im in stackable_ims]
+            vert_bar = np.zeros((stackable_ims[-1].shape[0], 1, 3))
+            # hor_bar = np.zeros((1, stackable_ims[-1].shape[0], 3))
+        else:
+            vert_bar = np.zeros((stackable_ims[0].shape[0], 1))
+            # hor_bar = np.zeros((1, stackable_ims[0].shape[0]))
+
+        ims = [np.concatenate([np.concatenate((im, vert_bar), axis=1) for im in stackable_ims[i:i+n_cols]], axis=1) \
+            for i in range(0, len(stackable_ims), n_cols)]
+
+        # Pad the last row with empty squares
+        if len(ims) > 1:
+            last_row = np.zeros((ims[-2].shape[0], *ims[-2].shape[1:]))
+            last_row[:, :ims[-1].shape[1]] = ims[-1]
+            ims[-1] = last_row
+
+        hor_bar = np.zeros((1, *ims[0].shape[1:]))
+        ims = np.concatenate([hor_bar] + [np.concatenate((row_im, hor_bar), axis=0) for row_im in ims], axis=0)
+
+        width = stackable_ims[0].shape[0]
+        height = stackable_ims[0].shape[1]
+        
+        # Highlight the path channel (assuming it is the second tile in our grid of rendered channels).
+        if maze_imgs is not None:
+            ims[:width+1, height, 2] = 1
+            ims[:width+1, 2*height+1, 2] = 1
+            ims[0, height:2*height+2, 2] = 1
+            ims[width+1, height:2*height+2, 2] = 1
+
+        return ims
 
     model_has_oracle = model == "BfsNCA"
 
     # Render live and indefinitely using cv2.
     if RENDER_TYPE == 0:
         # Create large window
-        cv2.namedWindow('maze', cv2.WINDOW_NORMAL)
-        cv2.namedWindow('model', cv2.WINDOW_NORMAL)
-        cv2.resizeWindow('maze', 1920, 1080)
+        # cv2.namedWindow('maze', cv2.WINDOW_NORMAL)
+        # cv2.namedWindow('model', cv2.WINDOW_NORMAL)
+        render_dir = os.path.join(cfg.log_dir, "render")
+        if os.path.exists(render_dir):
+            shutil.rmtree(render_dir)
+        os.mkdir(render_dir)
+        cv2.resizeWindow('pathfinding', 2000, 2000)
+        frame_i = 0
 
-        while True:
-            x, maze_imgs = reset()
+        for ep_i in range(N_RENDER_EPISODES):
+            x, maze_imgs, bi = reset(bi)
             oracle_out = model.oracle_out if model_has_oracle else None
-            cv2.imshow('maze', maze_imgs)
-            cv2.imshow('model', get_imgs(x, oracle_out=oracle_out))
+            ims = get_imgs(x, oracle_out=oracle_out, maze_imgs=maze_imgs)
+            cv2.imshow('pathfinding', ims)
+            # Save image as png
+            cv2.imwrite(os.path.join(render_dir, f"render_{frame_i}.png"), ims)
+
+            # cv2.imshow('maze', maze_imgs)
+            # cv2.imshow('model', get_imgs(x, oracle_out=oracle_out))
             cv2.waitKey(CV2_WAIT_KEY_TIME)
             for i in range(cfg.n_layers):
+                frame_i += 1
                 x = model.forward(x)
                 oracle_out = model.oracle_out if model_has_oracle else None
-                cv2.imshow('model', get_imgs(x, oracle_out=oracle_out))
+                # cv2.imshow('model', get_imgs(x, oracle_out=oracle_out))
+                ims = get_imgs(x, oracle_out=oracle_out, maze_imgs=maze_imgs)
+                cv2.imshow('pathfinding', ims)
+                cv2.imwrite(os.path.join(render_dir, f"render_{frame_i}.png"), ims*255)
                 cv2.waitKey(CV2_WAIT_KEY_TIME)
             
 
     # Save a video with pyplot.
     elif RENDER_TYPE == 1:
+        plt.axis('off')
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10,10), gridspec_kw={'width_ratios': [1, 10]})
         
 
         for i in range(N_RENDER_EPISODES):
-            x, maze_imgs = reset()
+            x, maze_imgs, bi = reset(bi)
             bw_imgs = get_imgs(x)
             global im1, im2
-            im1 = ax1.imshow(maze_imgs)
-            # Set second subplot to be much larger
-            im2 = ax2.imshow(bw_imgs)
+            mat1 = ax1.matshow(maze_imgs)
+            mat2 = ax2.matshow(bw_imgs)
             plt.tight_layout()
 
             # def init():
@@ -241,14 +295,14 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True):
             oracle_out = oracle_outs[i] if oracle_outs else None
             bw_imgs = get_imgs(xi, oracle_out=oracle_out)
             if i % cfg.n_layers == 0:
-                ax1.imshow(maze_imgs)
-            # im1.set_array(bw_imgs)
-            ax2.imshow(bw_imgs)
-            # im2.set_array(bw_imgs)
+                # ax1.imshow(maze_imgs)
+                mat1.set_array(bw_imgs)
+            # ax2.imshow(bw_imgs)
+            mat2.set_array(bw_imgs)
             # ax1.figure.canvas.draw()
             # ax2.figure.canvas.draw()
 
-            return im2,
+            return mat1, mat2,
 
 
         anim = animation.FuncAnimation(

@@ -144,7 +144,9 @@ class ClArgsConfig(Config, ImmutableConfig):
         self.log_dir = os.path.join("runs", self.exp_name)
 
     def validate(self):
-        self.n_hid_chan = 2 if self.model == "FixedBfsNCA" else self.n_hid_chan
+        if self.model == "FixedBfsNCA":
+            self.n_hid_chan = 2
+            self.skip_connections = True
         self.load = True if self.render else self.load
         # self.minibatch_size = 1 if self.model == "GCN" else self.minibatch_size
         # self.val_batch_size = 1 if self.model == "GCN" else self.val_batch_size

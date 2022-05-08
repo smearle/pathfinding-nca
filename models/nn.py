@@ -26,6 +26,7 @@ class PathfindingNN(ABC, nn.Module):
 
 
     def add_initial_maze(self, x):
+        # FIXME: skip/initial maze and x should be in the same order each time.
         if self.cfg.skip_connections:
             # Concatenate the underlying state of the maze with the input along the channel dimension.
             x = th.cat([self.initial_maze, x], dim=1)
@@ -41,13 +42,6 @@ class PathfindingNN(ABC, nn.Module):
         for _ in range(1 if not self.is_torchinfo_dummy else self.cfg.n_layers):
             if self.cfg.skip_connections or self.n_step == 0:
                 x = self.add_initial_maze(x)
-
-
-            ### DEBUG ###
-            if self.n_step == 0:
-                x[:] = 0.0
-                x[0,-1, 0, 0] = 1.0
-
 
             x = self.forward_layer(x, self.n_step)
             self.n_step += 1
