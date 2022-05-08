@@ -107,7 +107,7 @@ class ClArgsConfig(Config, ImmutableConfig):
             if k.startswith('_'):
                 continue
             if type(v) is bool:
-                args.add_argument('--' + k, action=argparse.BooleanOptionalAction)
+                args.add_argument('--' + k, action=argparse.BooleanOptionalAction, default=False)
                 continue
             if type(v) is None: 
                 typ = int
