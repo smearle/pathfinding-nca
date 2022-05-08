@@ -24,7 +24,11 @@ def count_parameters(model: PathfindingNN, cfg: ClArgsConfig):
             assert p.shape[-2:] == (3, 3)
             n_ps = p.numel() * 5/9
             assert n_ps % 1 == 0
-            n_params += n_ps
+            n_params += int(n_ps)
+        else:
+            n_params += p.numel()
+        # TODO: support networks involving some hand-coded, non-learning sub-networks
+        assert p.requires_grad
 
     return n_params
 

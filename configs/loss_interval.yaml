@@ -17,14 +17,14 @@
   ],
 
   # How often to calculate the loss.
-  "loss_interval": [
-    null,
-    4,
-    8,
-    16,
-    32,
-    64,
-  ],
+  # "loss_interval": [
+  #   null,
+  #   4,
+  #   8,
+  #   16,
+  #   32,
+  #   64,
+  # ],
 
   "n_hid_chan": [
     # 6,

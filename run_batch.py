@@ -95,6 +95,8 @@ def main_batch():
                         # continue
 
                 for k, v in vars(exp_config).items():
+                    if k == 'loss_interval' and v == exp_config.n_layers:
+                        continue
                     if k in batch_hyperparams and v not in batch_hyperparams[k]:
                         invalid_cfg = True
                         break

@@ -1,8 +1,8 @@
 {
   "model": [
-    # "NCA",
+    "NCA",
     # "GCN",
-    "MLP",
+    # "MLP",
     # "FixedBfsNCA",
     # "BfsNCA",
   ],

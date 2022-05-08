@@ -49,6 +49,7 @@ names_to_hyperparams = {
     ],
     'models': [
         'model',
+        'n_layers',
     ]
 }
 names_to_cols = {
@@ -58,10 +59,23 @@ names_to_cols = {
         'TRAIN_completion_time',
         'TEST_pct_complete',
         'TEST_completion_time',
-    ]
+    ],
+    'loss_interval': [
+        'TRAIN_pct_complete',
+        'TRAIN_completion_time',
+        'TEST_pct_complete',
+        'TEST_completion_time',
+    ],
+    'models': [
+        'TRAIN_accs',
+        'TRAIN_pct_complete',
+        'TEST_accs',
+        'TEST_pct_complete',
+    ],
 }
 hyperparam_renaming = {
     'n hid chan': 'n. hid chan',
+    'cut conv corners': 'cut corners',
 }
 col_renaming = {
     'n params': 'n. params',
@@ -164,7 +178,8 @@ def vis_cross_eval(exp_cfgs: List[ClArgsConfig], batch_cfg: BatchConfig):
             print(k[1])
             df[k] = df[k].apply(
                 lambda data: bold_extreme_values(data, 
-                                data_max=(max if k[1] != 'completion time' else min)([(d[0] if isinstance(d, tuple) else d) for d in df[k]]), 
+                                data_max=(max if ('completion time' not in k[1] and 'losses' not in k[1]) else min)\
+                                    ([(d[0] if isinstance(d, tuple) else d) for d in df[k]]), 
                                 col_name=k)
             )
 
@@ -310,7 +325,7 @@ def pandas_to_latex(df_table, latex_file, vertical_bars=False, right_align_first
 
 plot_label_map = {
     'completion time': 'Completion Time',
-    'n hid chan': 'Number of hidden channels',
+    'n. hid chan': 'Number of hidden channels',
     'loss interval': 'Loss interval',
 }
 
@@ -336,9 +351,9 @@ def plot_column(df, row_name, col_name):
 
     #rc('text', usetex=True)
     #rc('font', family='serif')
-    plt.errorbar(xs[0:len(xs)-1], ys_train[0:len(ys_train)-1], yerr=errs_train[0:len(errs_train)-1],linewidth=2, 
+    plt.errorbar(xs, ys_train, yerr=errs_train,linewidth=2, 
         label=r'train')
-    plt.errorbar(xs[0:len(xs)-1], ys_test[0:len(ys_test)-1], yerr=errs_test[0:len(errs_test)-1],linewidth=2,
+    plt.errorbar(xs, ys_test, yerr=errs_test,linewidth=2,
         label=r'test')
     plt.xlabel(rf'{plot_label_map[row_name]}', color="black", size=10)
     plt.ylabel(r'Percentage', color="black", size=10)
@@ -361,7 +376,9 @@ if __name__ == '__main__':
 
     # Load dataframe using pickle
     df = pd.read_pickle(os.path.join(EVAL_DIR, 'n_hid_chan_cross_eval.pkl'))
-    plot_column(df, 'n hid chan', 'pct complete')
+    plot_column(df, 'n. hid chan', 'pct. complete')
+    plot_column(df, 'n. hid chan', 'completion time')
 
     df = pd.read_pickle(os.path.join(EVAL_DIR, 'loss_interval_cross_eval.pkl'))
-    plot_column(df, 'loss interval', 'pct complete')
+    plot_column(df, 'loss interval', 'pct. complete')
+    plot_column(df, 'loss interval', 'completion time')
