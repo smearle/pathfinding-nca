@@ -143,6 +143,7 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
         # Dump stats to a json file
         with open(f'{cfg.log_dir}/{name}_stats.json', 'w') as f:
             json.dump(stats, f, indent=4)
+        print('{name} stats:')
         print(json.dumps(stats, indent=4))
     model.train()
 

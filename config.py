@@ -1,5 +1,6 @@
 import argparse
 import os
+from pathlib import Path
 from pdb import set_trace as TT
 
 import torch
@@ -84,6 +85,9 @@ class Config():
     cut_conv_corners = False
 
     evaluate = False
+    load = False
+    render = False
+    overwrite = False
 
 
 class ClArgsConfig(Config, ImmutableConfig):
@@ -98,27 +102,27 @@ class ClArgsConfig(Config, ImmutableConfig):
         # Get command-line arguments.
         if args is None:
             args = argparse.ArgumentParser()
-        args.add_argument('--load', action='store_true')
-        args.add_argument('--render', action='store_true')
-        args.add_argument('--overwrite', action='store_true')
+        # args.add_argument('--load', action='store_true')
+        # args.add_argument('--render', action='store_true')
+        # args.add_argument('--overwrite', action='store_true')
 
         # Include all parameters in the Config class as command-line arguments.
-        for k, v in vars(self).items():
-            if k.startswith('_'):
-                continue
-            if type(v) is bool:
-                args.add_argument('--' + k, action=argparse.BooleanOptionalAction, default=False)
-                continue
-            if type(v) is None: 
-                typ = int
-            else:
-                typ = type(v)
-            args.add_argument(f'--{k}', type=typ, default=v)
+        # for k, v in vars(self).items():
+        #     if k.startswith('_'):
+        #         continue
+        #     if type(v) is bool:
+        #         args.add_argument('--' + k, action=argparse.BooleanOptionalAction, default=False)
+        #         continue
+        #     if type(v) is None: 
+        #         type = int
+        #     else:
+        #         type = type(v)
+        #     args.add_argument(f'--{k}', type=type, default=v)
 
-        args = args.parse_args()
+        # args = args.parse_args()
 
-        # Command-line arguments will overwrite default config attributes.
-        [setattr(self, k, v) for k, v in vars(args).items()]
+        # # Command-line arguments will overwrite default config attributes.
+        # [setattr(self, k, v) for k, v in vars(args).items()]
 
         # Immutable config settings are not available as command-line arguments.
         [setattr(self, k, getattr(immutable_cfg, k)) for k in dir(immutable_cfg) if not k.startswith('_')]
@@ -141,7 +145,7 @@ class ClArgsConfig(Config, ImmutableConfig):
             f"_{self.exp_name}",
 
         ])
-        self.log_dir = os.path.join("runs", self.exp_name)
+        self.log_dir = os.path.join(Path(__file__).parent, "runs", self.exp_name)
 
     def validate(self):
         if self.model == "FixedBfsNCA":
@@ -173,25 +177,35 @@ class ClArgsConfig(Config, ImmutableConfig):
 
 class BatchConfig(ClArgsConfig):
     """A class for batch configurations. This is used for parallel SLURM jobs, or a sequence of local jobs."""
+    slurm = False
+    vis_cross_eval = False
+    gen_new_data = False
+    load_all = False
+    filter_by_config = False
+    batch_hyperparams = False
+    selective_table = False
+    load_pickle = False
+
     def __init__(self):
-        args = argparse.ArgumentParser()
+        # args = argparse.ArgumentParser()
+
         # These arguments apply only to the batch of experiments, and will not be considered by individual experiments 
-        # themselves.
-        args.add_argument('--slurm', action='store_true', help='Submit jobs to run in parallel on SLURM.')
-        args.add_argument('-vce', '--vis_cross_eval', action='store_true', help='Visualize results of batch of '\
-            'experiments in a table.')
-        args.add_argument('--gen_new_data', action='store_true', help="Generate new data on which to run the batch"
-                            " of experiments.")
-        args.add_argument('-la', '--load_all', action='store_true', help="Load all experiments present in the folder,"
-            " instead of attempting to load all those specified in the batch config file.")
-        args.add_argument('-fc', '--filter_by_config', action='store_true', help="If loading all, filter out "
-            "experiments that would not have been specified by the batch config file.")
-        args.add_argument('-bh', '--batch_hyperparams', type=str, default="batch", help="Name of file "
-            "containing hyperparameters over which to run the batch of experiments.")
-        args.add_argument('-st', '--selective_table', action='store_true', help="Render only user-specified rows and "
-            "columns in the latex table when cross-evaluating.")
-        args.add_argument('-lp', '--load_pickle', action='store_true', help="When cross-evaluating, load pickle with "
-            "data from previous evaluation.")
-        super().__init__(args)
+        # # themselves.
+        # args.add_argument('--slurm', action='store_true', help='Submit jobs to run in parallel on SLURM.')
+        # args.add_argument('-vce', '--vis_cross_eval', action='store_true', help='Visualize results of batch of '\
+        #     'experiments in a table.')
+        # args.add_argument('--gen_new_data', action='store_true', help="Generate new data on which to run the batch"
+        #                     " of experiments.")
+        # args.add_argument('-la', '--load_all', action='store_true', help="Load all experiments present in the folder,"
+        #     " instead of attempting to load all those specified in the batch config file.")
+        # args.add_argument('-fc', '--filter_by_config', action='store_true', help="If loading all, filter out "
+        #     "experiments that would not have been specified by the batch config file.")
+        # args.add_argument('-bh', '--batch_hyperparams', type=str, default="batch", help="Name of file "
+        #     "containing hyperparameters over which to run the batch of experiments.")
+        # args.add_argument('-st', '--selective_table', action='store_true', help="Render only user-specified rows and "
+        #     "columns in the latex table when cross-evaluating.")
+        # args.add_argument('-lp', '--load_pickle', action='store_true', help="When cross-evaluating, load pickle with "
+        #     "data from previous evaluation.")
+        super().__init__(args=False)
 
 

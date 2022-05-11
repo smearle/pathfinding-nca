@@ -1,7 +1,11 @@
-numpy
+hydra-core
 matplotlib
 moviepy
+numpy
+opencv-python
 Pillow
 pyyaml
 scienceplots
+tensorboard
 torchinfo
+wandb

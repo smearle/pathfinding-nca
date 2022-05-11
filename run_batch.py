@@ -6,6 +6,8 @@ directory.
 import argparse
 from collections import namedtuple
 import copy
+import hydra
+from omegaconf import DictConfig, OmegaConf
 from itertools import product
 import json
 import os
@@ -51,16 +53,15 @@ def dump_config(exp_name, exp_config):
         json.dump(exp_config, f, indent=4)
 
 
-def main_batch():
-    batch_cfg = BatchConfig()
-    gen_new_data = batch_cfg.gen_new_data
+@hydra.main(config_path="configs", config_name="batch")
+def main_batch(batch_dict_cfg: DictConfig):
+    batch_cfg: BatchConfig = BatchConfig()
+    [setattr(batch_cfg, k, v) for k, v in batch_dict_cfg.items() if k != 'batch_hyperparams']
     job_time = 48
-    
-    with open(os.path.join('configs', f'{batch_cfg.batch_hyperparams}.yaml')) as f:
-        batch_hyperparams = yaml.safe_load(f)
+    batch_hyperparams = batch_dict_cfg.batch_hyperparams
 
     # Generate dataset of mazes if necessary.
-    if gen_new_data:
+    if batch_cfg.gen_new_data:
         if 'n_data' in batch_hyperparams:
             setattr(batch_cfg, 'n_data', max(batch_hyperparams['n_data']))
         main_mazes(batch_cfg)

@@ -14,6 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch as th
 import torchinfo
+import wandb
 
 from config import ClArgsConfig
 from evaluate import evaluate
@@ -24,10 +25,11 @@ from train import train
 from utils import Logger, VideoWriter, get_discrete_loss, get_mse_loss, to_path, load
 
 
+wandb.login()
 np.set_printoptions(threshold=sys.maxsize)
 
 
-def main_experiment(cfg=None):
+def main_experiment(cfg: ClArgsConfig=None):
     os.system('nvidia-smi -L')
     if th.cuda.is_available():
             print('Using GPU/CUDA.')
@@ -38,6 +40,10 @@ def main_experiment(cfg=None):
     if cfg is None:
         cfg = ClArgsConfig()
         cfg.set_exp_name()
+
+    hyperparam_cfg = {k: v for k, v in vars(cfg).items() if k not in set({'log_dir', 'exp_name'})}
+    wandb.init(project='pathfinding-nca', name=cfg.exp_name, config=hyperparam_cfg)
+
     model_cls = globals()[cfg.model]
 
     print(f"Running experiment with config:\n {json.dumps(vars(cfg), indent=4)}")
@@ -228,6 +234,7 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True):
         # Create large window
         # cv2.namedWindow('maze', cv2.WINDOW_NORMAL)
         # cv2.namedWindow('model', cv2.WINDOW_NORMAL)
+        cv2.namedWindow('pathfinding', cv2.WINDOW_NORMAL)
         render_dir = os.path.join(cfg.log_dir, "render")
         if os.path.exists(render_dir):
             shutil.rmtree(render_dir)

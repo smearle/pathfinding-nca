@@ -4,5 +4,6 @@ load: False
 overwrite: False
 render: False
 render_minibatch_size: 8
+n_updates: 10000,
 defaults:
   - batch_hyperparams: all

@@ -2,13 +2,14 @@ import os
 from pdb import set_trace as TT
 import pickle
 import numpy as np
+from pathlib import Path
 import torch
 
 from config import ClArgsConfig
 
 
 path_chan = 4
-maze_data_fname = os.path.join("data", "maze_data")
+maze_data_fname = os.path.join(Path(__file__).parent, os.path.join("data", "maze_data"))
 train_fname = f"{maze_data_fname}_train.pk"
 val_fname = f"{maze_data_fname}_val.pk"
 test_fname = f"{maze_data_fname}_test.pk"

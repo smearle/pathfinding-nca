@@ -1,22 +1,26 @@
 from pdb import set_trace as TT
 import pickle
+
 from matplotlib import pyplot as plt
 import numpy as np
 from timeit import default_timer as timer
 import torch as th
+from torch.utils.tensorboard import SummaryWriter
 import torchvision.models as models
 from tqdm import tqdm
+import wandb
+
 from config import ClArgsConfig
 from evaluate import evaluate
 from mazes import Mazes, render_discrete
 from models.gnn import GCN
 from models.nn import PathfindingNN
-
 from utils import get_discrete_loss, get_mse_loss, Logger, to_path, save
 
 
 def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_data_val: Mazes, 
         target_paths: th.Tensor, logger: Logger, cfg: ClArgsConfig):
+    # tb_writer = SummaryWriter(log_dir=cfg.log_dir)
     mazes_onehot, maze_ims = maze_data.mazes_onehot, maze_data.maze_ims
     minibatch_size = min(cfg.minibatch_size, cfg.n_data)
     lr_sched = th.optim.lr_scheduler.MultiStepLR(opt, [10000], 0.1)
@@ -97,6 +101,8 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 opt.step()
                 opt.zero_grad()
             # lr_sched.step()
+            # tb_writer.add_scalar("training/loss", loss.item(), i)
+            wandb.log({"training/loss": loss.item()})
             logger.log(loss=loss.item(), discrete_loss=discrete_loss.item())
                     
             if i % cfg.save_interval == 0 or i == cfg.n_updates - 1:
@@ -106,15 +112,32 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
             if i % cfg.eval_interval == 0:
                 val_stats = evaluate(model, maze_data_val, cfg.val_batch_size, "validate", cfg)
                 logger.log_val(val_stats)
+                for k, v in val_stats.items():
+                    # tb_writer.add_scalar(f"validation/mean_{k}", v[0], i)
+                    # tb_writer.add_scalar(f"validation/std_{k}", v[1], i)
+                    wandb.log({f"validation/mean_{k}": v[0]})
+                    wandb.log({f"validation/std_{k}": v[1]})
 
             if i % cfg.log_interval == 0 or i == cfg.n_updates - 1:
-                log(logger, lr_sched, maze_ims, x, target_paths, render_batch_idx, cfg)
+                log(logger, lr_sched, cfg)
+            
+            if i == cfg.n_updates - 1:
+                render_paths = to_path(x[:cfg.render_minibatch_size]).cpu()
+                vis_train(logger, maze_ims, x, target_paths, render_batch_idx, cfg)
 
 
-def log(logger, lr_sched, maze_ims, x, target_paths, render_batch_idx, cfg):
+def log(logger, lr_sched, cfg):
+    fps = cfg.n_layers * cfg.minibatch_size * cfg.log_interval / (timer() - logger.last_time)
+    print('step_n:', len(logger.loss_log),
+        ' loss: {:.6e}'.format(logger.loss_log[-1]),
+        ' fps: {:.2f}'.format(fps), 
+        ' lr:', lr_sched.get_last_lr(), # end=''
+        )
+
+def vis_train(logger, maze_ims, render_paths, target_paths, render_batch_idx, cfg):
     fig, ax = plt.subplots(2, 4, figsize=(20, 10))
     plt.subplot(411)
-        # smooth_loss_log = smooth(logger.loss_log, 10)
+    # smooth_loss_log = smooth(logger.loss_log, 10)
     loss_log = np.array(logger.loss_log)
     discrete_loss_log = logger.discrete_loss_log
     discrete_loss_log = np.where(np.array(discrete_loss_log) == 0, 1e-8, discrete_loss_log)
@@ -130,9 +153,11 @@ def log(logger, lr_sched, maze_ims, x, target_paths, render_batch_idx, cfg):
     plt.ylim(np.min(np.hstack((loss_log, discrete_loss_log))), 
              np.max(np.hstack((loss_log, discrete_loss_log, [v[0] for v in list(val_loss.values())]))))
         # imgs = to_rgb(x).permute([0, 2, 3, 1]).cpu()
-    render_paths = to_path(x[:cfg.render_minibatch_size]).cpu()
         # imshow(np.hstack(imgs))
     plt.subplot(412)
+    # Remove ticks and labels.
+    plt.xticks([])
+    plt.yticks([])
     plt.imshow(np.hstack(maze_ims[render_batch_idx].cpu()))
     plt.subplot(413)
     plt.imshow(np.hstack(render_paths))    #, vmin=-1.0, vmax=1.0)
@@ -143,12 +168,6 @@ def log(logger, lr_sched, maze_ims, x, target_paths, render_batch_idx, cfg):
         # print(f'path activation min: {render_paths.min()}, max: {render_paths.max()}')
     plt.savefig(f'{cfg.log_dir}/training_progress.png')
     plt.close()
-    fps = cfg.n_layers * cfg.minibatch_size * cfg.log_interval / (timer() - logger.last_time)
-    print('step_n:', len(logger.loss_log),
-        ' loss: {:.6e}'.format(logger.loss_log[-1]),
-        ' fps: {:.2f}'.format(fps), 
-        ' lr:', lr_sched.get_last_lr(), # end=''
-        )
     logger.last_time = timer()
 
 
