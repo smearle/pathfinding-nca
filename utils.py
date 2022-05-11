@@ -44,17 +44,18 @@ def save(ca, opt, maze_data, logger, cfg):
         pickle.dump(logger, f)
 
 
-def load(ca, opt, cfg):
+def load(model, opt, cfg):
     if not torch.cuda.is_available():
         map_location = torch.device('cpu')
     else:
         map_location = None
-    ca.load_state_dict(torch.load(f'{cfg.log_dir}/{ca_state_fname}', map_location=map_location))
+    model.load_state_dict(torch.load(f'{cfg.log_dir}/{ca_state_fname}', map_location=map_location))
     opt.load_state_dict(torch.load(f'{cfg.log_dir}/{opt_state_fname}', map_location=map_location))
     logger = pickle.load(open(f'{cfg.log_dir}/{logger_fname}', 'rb'))
     print(f'Loaded CA and optimizer state dict, maze archive, and logger from {cfg.log_dir}.')
 
-    return ca, opt, logger
+
+    return model, opt, logger
 
 
 def to_path(x):

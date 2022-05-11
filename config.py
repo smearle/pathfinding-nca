@@ -19,14 +19,16 @@ class Config():
     exp_name = "0"
 
     # How many mazes on which to train at a time
-    n_data = 256
+    n_data = 8192
 
     # The width (and height, mazes are square for now) of the maze.
     width, height = 16, 16
 
     # Size of validation dataset
-    n_val_data = 64
+    n_val_data = 8192
     val_batch_size = 64
+
+    n_test_data = 8192
 
     # Number of steps after which we calculate loss and update the network.
     n_layers = 64    

@@ -10,6 +10,9 @@ from torch_geometric.nn import GCNConv
 from models.nn import PathfindingNN
 
 
+np.set_printoptions(threshold=np.inf, linewidth=np.inf)
+
+
 class GCN(PathfindingNN):
     def __init__(self, cfg):
         super().__init__(cfg)
@@ -24,16 +27,6 @@ class GCN(PathfindingNN):
 #             gconv1 = GCNConv(n_hid_chan, self.n_out_chan)
 
 
-            # DEBUG
-            # for p in self.parameters():
-            #     p[:] = 0.0
-            # with th.no_grad():
-            #     lin_weight = list(gconv0.modules())[1].weight
-            #     lin_weight = nn.Parameter(th.rand_like(lin_weight), requires_grad=False)
-            #     list(gconv0.modules())[1].weight = lin_weight
-            #     gconv0.bias = nn.Parameter(th.zeros_like(gconv0.bias), requires_grad=False)
-
-
             return gconv0  #, gconv1
             
         if not cfg.shared_weights:
@@ -46,6 +39,7 @@ class GCN(PathfindingNN):
         
 #         self.layers = nn.ModuleList([l for lt in layers for l in lt])
         self.layers = nn.ModuleList(layers)
+
 
     def forward_layer(self, x: Tensor, i: int) -> Tensor:
         """Take in a batched 2D maze, then preprocess for consumption by a graph neural network.
@@ -86,13 +80,21 @@ class GCN(PathfindingNN):
             width, height = x0.shape[-2:]
             n_nodes = width * height
             grid_edges = get_grid_edges(width, height)
-            self_edges = get_self_edges(width, height)
+            # self_edges = get_self_edges(width, height)
             self.grid_edges = batch_edges(grid_edges, batch_size, n_nodes)
-            self.self_edges = batch_edges(self_edges, batch_size, n_nodes)
-            self.edges = th.hstack((self.self_edges, self.grid_edges))
+            # self.self_edges = batch_edges(self_edges, batch_size, n_nodes)
+            # self.edges = th.hstack((self.self_edges, self.grid_edges))
             # self.edges = self.self_edges
             # self.edges = self.grid_edges
         super().reset(x0, is_torchinfo_dummy)         
+
+
+        ### DEBUG ###
+        # for name, p in self.named_parameters():
+        #     if "weight" in name:
+        #         p.data.fill_(1.0)
+        #     else:
+        #         p.data.zero_()
 
 
 def get_grid_edges(width, height):

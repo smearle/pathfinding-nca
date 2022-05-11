@@ -25,8 +25,8 @@ from train import train
 from utils import Logger, VideoWriter, get_discrete_loss, get_mse_loss, to_path, load
 
 
-wandb.login()
-np.set_printoptions(threshold=sys.maxsize)
+WANDB = False
+np.set_printoptions(threshold=sys.maxsize, linewidth=np.inf)
 
 
 def main_experiment(cfg: ClArgsConfig=None):
@@ -41,8 +41,15 @@ def main_experiment(cfg: ClArgsConfig=None):
         cfg = ClArgsConfig()
         cfg.set_exp_name()
 
-    hyperparam_cfg = {k: v for k, v in vars(cfg).items() if k not in set({'log_dir', 'exp_name'})}
-    wandb.init(project='pathfinding-nca', name=cfg.exp_name, config=hyperparam_cfg)
+    if WANDB:
+        hyperparam_cfg = {k: v for k, v in vars(cfg).items() if k not in set({'log_dir', 'exp_name'})}
+        wandb.init(
+            project='pathfinding-nca', 
+            # name=cfg.exp_name, 
+            id=cfg.exp_name,
+            config=hyperparam_cfg,
+            resume="allow" if cfg.load else None,
+        )
 
     model_cls = globals()[cfg.model]
 
@@ -134,12 +141,13 @@ def main_experiment(cfg: ClArgsConfig=None):
 RENDER_TYPE = 0
 N_RENDER_CHANS = None
 N_RENDER_EPISODES = 10
-CV2_WAIT_KEY_TIME = 0
+CV2_WAIT_KEY_TIME = 1
 
 
 def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True):
     """Generate a video showing the behavior of the trained NCA on mazes from its training distribution.
     """
+    model.eval()
     mazes_onehot, mazes_discrete, target_paths = maze_data.mazes_onehot, maze_data.mazes_discrete, maze_data.target_paths
     if N_RENDER_CHANS is None:
         n_render_chans = model.n_out_chan
@@ -256,6 +264,7 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True):
             for i in range(cfg.n_layers):
                 frame_i += 1
                 x = model.forward(x)
+                TT()
                 oracle_out = model.oracle_out if model_has_oracle else None
                 # cv2.imshow('model', get_imgs(x, oracle_out=oracle_out))
                 ims = get_imgs(x, oracle_out=oracle_out, maze_imgs=maze_imgs)
@@ -291,7 +300,7 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True):
             oracle_outs.append(model.oracle_out) if model_has_oracle else None
 
             for j in range(cfg.n_layers):
-                x = model(x)
+                x = model.forward(x)
                 xs.append(x)
                 oracle_outs.append(model.oracle_out) if oracle_outs else None
 

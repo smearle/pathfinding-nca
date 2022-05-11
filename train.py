@@ -85,14 +85,10 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
 
                 loss.backward()
 
-                # DEBUG: gradient only collected for certain "chunks" of the network as a result of gradient checkpointing.
-                # for name, p in model.named_parameters():
-                    # print(name, "Grad is None?", p.grad is None)
-
                 # for p in model.parameters():
                 for name, p in model.named_parameters():
                     if p.grad is None:
-                        assert cfg.model == "BfsNCA"
+                        assert cfg.model == "BfsNCA", f"Gradient of parameter {name} should not be None."
                         continue
                     if not isinstance(model, GCN) and cfg.cut_conv_corners and "weight" in name:
                         # Zero out all the corners

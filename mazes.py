@@ -3,6 +3,7 @@ from pdb import set_trace as TT
 import pickle
 import numpy as np
 from pathlib import Path
+import scipy
 import torch
 
 from config import ClArgsConfig
@@ -15,7 +16,7 @@ val_fname = f"{maze_data_fname}_val.pk"
 test_fname = f"{maze_data_fname}_test.pk"
 
 
-def main_mazes(cfg):
+def main_mazes(cfg: ClArgsConfig):
     """Generate random mazes for training/testing."""
     if np.any([os.path.exists(fname) for fname in [train_fname, val_fname, test_fname]]):
         overwrite = input("File already exists. Overwrite? (y/n) ")
@@ -24,15 +25,15 @@ def main_mazes(cfg):
         
         print('Overwriting existing dataset...')
 
-    maze_data = Mazes(cfg)
+    maze_data = Mazes(cfg.n_data, cfg)
     with open(train_fname, 'wb') as f:
         pickle.dump(maze_data, f)
 
-    maze_data = Mazes(cfg)
+    maze_data = Mazes(cfg.n_val_data, cfg)
     with open(val_fname, 'wb') as f:
         pickle.dump(maze_data, f)
 
-    maze_data = Mazes(cfg)
+    maze_data = Mazes(cfg.n_test_data, cfg)
     with open(test_fname, 'wb') as f:
         pickle.dump(maze_data, f)
 
@@ -56,9 +57,9 @@ def load_dataset(n_data=None, device='cpu'):
 
 
 class Mazes():
-    def __init__(self, cfg):
+    def __init__(self, n_data, cfg):
         width, height = cfg.width, cfg.height
-        self.mazes_discrete, self.mazes_onehot, self.target_paths = gen_rand_mazes(cfg)
+        self.mazes_discrete, self.mazes_onehot, self.target_paths = gen_rand_mazes(n_data, cfg)
         self.maze_ims = torch.Tensor(np.array(
             [render_discrete(maze_discrete[None,], cfg)[0] for maze_discrete in self.mazes_discrete]
         ))
@@ -141,12 +142,49 @@ adj_coords_2d = np.array([
 ])
 
 
-def bfs(arr, passable=0, impassable=1, src=2, trg=3):
-    width = arr.shape[0]
-    assert width == arr.shape[1]
+
+# Algorithm 
+def floyd_2d(arr, passable=0, impassable=1):
+    width, height = arr.shape
+    size = width * height
+    dist = np.empty((size, size))
+    dist.fill(np.inf)
+    # ret = scipy.sparse.csgraph.floyd_warshall(dist)
+    paths = [[[] for _ in range(size)] for _ in range(size)]
+    for i in range(size):
+        x, y = i // width, i % width
+        neighbs = [(x - 1, y), (x, y-1), (x+1, y), (x, y+1)]
+        neighbs = [x * width + y for x, y in neighbs]
+        for j in neighbs:
+            if not 0 <= j < size:
+                continue
+            dist[i, j] = 1
+            paths[i][j] = [j]
+
+    # Adding vertices individually
+    for r in range(size):
+        for p in range(size):
+            for q in range(size):
+                dist[p][q] = min(dist[p][q], dist[p][r] + dist[r][q])
+                if dist[p][q] < dist[p][r] + dist[r][q]:
+                    continue
+                else:
+                    paths[p][q] = paths[p][r] + paths[r][q]
+
+    src = np.argwhere(dist)
+    TT()
+
+
+def bfs_grid(arr, passable=0, impassable=1, src=2, trg=3):
     srcs = np.argwhere(arr == src)
     assert srcs.shape[0] == 1
     src = tuple(srcs[0])
+    return bfs(arr, src, trg, passable, impassable)
+
+
+def bfs(arr, src: tuple[int], trg: tuple[int], passable=0, impassable=1):
+    width = arr.shape[0]
+    assert width == arr.shape[1]
     frontier = [src]
     back_paths = {}
     visited = set({})
@@ -169,17 +207,18 @@ def bfs(arr, passable=0, impassable=1, src=2, trg=3):
     return []
 
 
-def gen_rand_mazes(cfg):
+def gen_rand_mazes(n_data, cfg):
     # Generate new random mazes until we get enough solvable ones.
     n_data = cfg.n_data
     solvable_mazes_onehot = []
     solvable_mazes_discrete = []
     target_paths = []
+    target_diameters = []
     i = 0
     while len(solvable_mazes_onehot) < n_data:
         rand_maze_onehot = generate_random_maze(cfg)
         rand_maze_discrete = rand_maze_onehot.argmax(axis=1)
-        sol = bfs(rand_maze_discrete[0].cpu().numpy())
+        sol = bfs_grid(rand_maze_discrete[0].cpu().numpy())
         if sol:
             solvable_mazes_onehot.append(rand_maze_onehot)
             solvable_mazes_discrete.append(rand_maze_discrete)
@@ -187,6 +226,9 @@ def gen_rand_mazes(cfg):
             for x, y in sol:
                     target_path[0, x, y] = 1
             target_paths.append(target_path)
+            target_diameter = torch.zeros_like(rand_maze_discrete)
+            diam = floyd_2d(rand_maze_discrete[0].cpu().numpy())
+            TT()
         i += 1
     # print(f'Solution length: {len(sol)}')
     print(f'Generated {i} random mazes to produce {n_data} solvable mazes.')
@@ -195,5 +237,9 @@ def gen_rand_mazes(cfg):
 
 
 if __name__ == "__main__":
+    # Number of vertices
+    nV = 4
+    INF = 999
+
     cfg = ClArgsConfig()
     main_mazes(cfg)
