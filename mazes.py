@@ -1,10 +1,13 @@
 import os
+from pathlib import Path
 from pdb import set_trace as TT
 import pickle
+
+import networkx as nx
 import numpy as np
-from pathlib import Path
 import scipy
 import torch
+from tqdm import tqdm
 
 from config import ClArgsConfig
 
@@ -142,6 +145,24 @@ adj_coords_2d = np.array([
 ])
 
 
+def get_graph(arr, passable=0, impassable=1):
+    graph = nx.Graph()
+    width, height = arr.shape
+    size = width * height
+    graph.add_nodes_from(range(size))
+    # ret = scipy.sparse.csgraph.floyd_warshall(dist)
+    for u in range(size):
+        ux, uy = u // width, u % width
+        if arr[ux, uy] ==impassable:
+            continue
+        neighbs_xy = [(ux - 1, uy), (ux, uy-1), (ux+1, uy), (ux, uy+1)]
+        neighbs = [x * width + y for x, y in neighbs_xy]
+        for v, (vx, vy) in zip(neighbs, neighbs_xy):
+            if not 0 <= v < size or arr[vx, vy] == impassable:
+                continue
+            graph.add_edge(u, v)
+    return graph
+
 
 # Algorithm 
 def floyd_2d(arr, passable=0, impassable=1):
@@ -207,6 +228,18 @@ def bfs(arr, src: tuple[int], trg: tuple[int], passable=0, impassable=1):
     return []
 
 
+def diameter(arr, passable=0, impassable=1):
+    width, height = arr.shape
+    graph = get_graph(arr, passable, impassable)
+    shortest_paths = dict(nx.all_pairs_shortest_path(graph))
+    max_path = []
+    for u, path in shortest_paths.items():
+        if len(path) > len(max_path):
+            max_path = path
+    max_path = [(u // width, u % width) for u in max_path]
+    return max_path
+
+
 def gen_rand_mazes(n_data, cfg):
     # Generate new random mazes until we get enough solvable ones.
     n_data = cfg.n_data
@@ -215,25 +248,31 @@ def gen_rand_mazes(n_data, cfg):
     target_paths = []
     target_diameters = []
     i = 0
-    while len(solvable_mazes_onehot) < n_data:
-        rand_maze_onehot = generate_random_maze(cfg)
-        rand_maze_discrete = rand_maze_onehot.argmax(axis=1)
-        sol = bfs_grid(rand_maze_discrete[0].cpu().numpy())
-        if sol:
-            solvable_mazes_onehot.append(rand_maze_onehot)
-            solvable_mazes_discrete.append(rand_maze_discrete)
-            target_path = torch.zeros_like(rand_maze_discrete)
-            for x, y in sol:
-                    target_path[0, x, y] = 1
-            target_paths.append(target_path)
-            target_diameter = torch.zeros_like(rand_maze_discrete)
-            diam = floyd_2d(rand_maze_discrete[0].cpu().numpy())
-            TT()
+    for i in tqdm(range(n_data)):
+    # while len(solvable_mazes_onehot) < n_data:
+        sol = None
+        while not sol:
+            rand_maze_onehot = generate_random_maze(cfg)
+            rand_maze_discrete = rand_maze_onehot.argmax(axis=1)
+            sol = bfs_grid(rand_maze_discrete[0].cpu().numpy())
+        # print(f'Adding maze {i}.')
+        solvable_mazes_onehot.append(rand_maze_onehot)
+        solvable_mazes_discrete.append(rand_maze_discrete)
+        target_path = torch.zeros_like(rand_maze_discrete)
+        for x, y in sol:
+                target_path[0, x, y] = 1
+        target_paths.append(target_path)
+        target_diameter = torch.zeros_like(rand_maze_discrete)
+        diam = diameter(rand_maze_discrete[0].cpu().numpy())
+        for x, y in diam:
+            target_diameter[0, x, y] = 1
+        target_diameters.append(target_diameter)
         i += 1
     # print(f'Solution length: {len(sol)}')
     print(f'Generated {i} random mazes to produce {n_data} solvable mazes.')
 
-    return torch.vstack(solvable_mazes_discrete), torch.vstack(solvable_mazes_onehot), torch.vstack(target_paths)
+    return torch.vstack(solvable_mazes_discrete), torch.vstack(solvable_mazes_onehot), torch.vstack(target_paths), \
+        torch.vstack(target_diameters)
 
 
 if __name__ == "__main__":

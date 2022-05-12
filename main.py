@@ -141,7 +141,7 @@ def main_experiment(cfg: ClArgsConfig=None):
 RENDER_TYPE = 0
 N_RENDER_CHANS = None
 N_RENDER_EPISODES = 10
-CV2_WAIT_KEY_TIME = 1
+CV2_WAIT_KEY_TIME = 0
 
 
 def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True):
@@ -264,7 +264,6 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True):
             for i in range(cfg.n_layers):
                 frame_i += 1
                 x = model.forward(x)
-                TT()
                 oracle_out = model.oracle_out if model_has_oracle else None
                 # cv2.imshow('model', get_imgs(x, oracle_out=oracle_out))
                 ims = get_imgs(x, oracle_out=oracle_out, maze_imgs=maze_imgs)

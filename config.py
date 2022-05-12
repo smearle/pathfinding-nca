@@ -151,7 +151,7 @@ class ClArgsConfig(Config, ImmutableConfig):
 
     def validate(self):
         if self.model == "FixedBfsNCA":
-            self.n_hid_chan = 2
+            self.n_hid_chan = 7
             self.skip_connections = True
         self.load = True if self.render else self.load
         # self.minibatch_size = 1 if self.model == "GCN" else self.minibatch_size

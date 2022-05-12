@@ -1,4 +1,6 @@
+from importlib.resources import path
 from pdb import set_trace as TT
+from numpy import require
 
 import torch as th
 from torch import nn
@@ -6,12 +8,13 @@ from torch import nn
 from models.nn import PathfindingNN
 
 
-adjs = [(0, 1), (1, 0), (1, 1), (1, 2), (2, 1)]
-adjs_to_acts = {adj: i for i, adj in enumerate(adjs)}
+th.set_printoptions(linewidth=200)
 
 
 class FixedBfsNCA(PathfindingNN):
-    n_hid_chan = 2
+    adjs = [(0, 1), (1, 0), (1, 2), (2, 1)]
+    # source and age for activation map; path channel and 4 directional path activation channels for path extraction
+    n_hid_chan = 2 + 1 + len(adjs)
 
     def __init__(self, cfg):
         """A Neural Cellular Automata model for pathfinding over grid-based mazes.
@@ -28,25 +31,21 @@ class FixedBfsNCA(PathfindingNN):
         # self.n_hid_chan = cfg.n_hid_chan
         assert self.n_in_chan == 4
         self.conv_0 = nn.Conv2d(self.n_in_chan + self.n_hid_chan, self.n_in_chan + self.n_hid_chan, 
-            3, 1, padding=1, bias=False)
-        self.conv_1 = nn.ConvTranspose2d(self.n_in_chan + self.n_hid_chan, self.n_in_chan + self.n_hid_chan,
-            3, 1, padding=1, bias=False)
+            3, 1, padding=1, bias=True)
         with th.no_grad():
             # input: (empty, wall, src, trg)
             # weight: (out_chan, in_chan, w, h)
-
-            # ... and copies the source to a flood tile
             self.flood_chan = flood_chan = self.n_in_chan
-            # self.conv_0.weight[flood_chan, self.src_chan, 0, 0] = 1
 
-            # this convolution handles the flood
+            # This convolution handles the flood and path extraction.
             self.conv_0.weight = nn.Parameter(th.zeros_like(self.conv_0.weight), requires_grad=False)
+            self.conv_0.bias = nn.Parameter(th.zeros_like(self.conv_0.bias), requires_grad=False)
 
             # the first n_in_chans channels will hold the actual map (via additive skip connections)
 
             # the next channel will contain the (binary) flood, with activation flowing from the source and flooded tiles...
-            for adj in adjs:
-                self.conv_0.weight[flood_chan, self.src_chan, adj[0], adj[1]] = 1.
+            self.conv_0.weight[flood_chan, self.src_chan, 1, 1] = 1.
+            for adj in self.adjs + [(1, 1)]:
                 self.conv_0.weight[flood_chan, flood_chan, adj[0], adj[1]] = 1.
 
             # ...but stopping at walls.
@@ -59,7 +58,18 @@ class FixedBfsNCA(PathfindingNN):
 
             # in the final channel, we will extract the optimal path(s)
             self.path_chan = path_chan = age_chan + 1
-            # self.conv_1.weight[]
+
+            # The transposed convolution will be begin illuminating path channels along the shortest path once the flood
+            # meets the target.
+            self.conv_0.weight[path_chan, flood_chan, 1, 1] = 1.
+            self.conv_0.weight[path_chan, self.trg_chan, 1, 1] = 1.
+            self.conv_0.bias[path_chan] = -1.
+
+            # It then spreads path channel to neighboring cells with greater age values.
+            for i, adj in enumerate(self.adjs):
+                self.conv_0.weight[path_chan + i + 1, path_chan, adj[0], adj[1]] = 1
+                self.conv_0.weight[path_chan + i + 1, age_chan, adj[0], adj[1]] = 2
+                self.conv_0.weight[path_chan + i + 1, age_chan, 1, 1] = -2
                 
     def forward(self, x):
         with th.no_grad():
@@ -77,32 +87,30 @@ class FixedBfsNCA(PathfindingNN):
             trg_pos = th.zeros(n_batches, 3, dtype=th.int64)
             trg_pos = tuple([trg_pos[:, i] for i in range(3)])
         # trg_pos = (trg_pos[1].item(), trg_pos[2].item())
-        batch_dones = self.get_dones(x, trg_pos)
-        if not batch_dones.all().item():
-            x1 = self.flood(x)
-            batch_cont = batch_dones == False
-            x[batch_cont] = x1[batch_cont]
-            self.batch_dones = batch_dones = self.get_dones(x, trg_pos)
+        # batch_dones = self.get_dones(x, trg_pos)
+        # if not batch_dones.all().item():
+        x = self.flood(x)
+        # batch_cont = batch_dones == False
+        # x[batch_cont] = x1[batch_cont]
+        # self.batch_dones = batch_dones = self.get_dones(x, trg_pos)
         
         # Exclude the initial maze from the input (included for convenience)
         return x[:, self.n_in_chan:]
             
     def flood(self, x):
+        x0 = x.clone()  # for debugging
         x = self.conv_0(x)
         x[:, self.flood_chan] = th.clamp(x[:, self.flood_chan], 0., 1.)
-        # x[:, :self.n_in_chan] += input
-
-        # y = self.conv_1(x)
+        # Are the directional path activation channels equal to -1?
+        path_activs = x[:, self.path_chan + 1: self.path_chan + 1 + len(self.adjs)] == -1.0
+        path_activs = th.max(path_activs, dim=1)[0]
+        # If any one of them is, then make the path channel at that cell equal to 1.
+        x[:, self.path_chan] += path_activs.float()
+        x[:, self.path_chan] = th.clamp(x[:, self.path_chan], 0., 1.)
         return x
 
-    def get_solution_length(self, input):
-        x = self.hid_forward(input)
-        if not self.batch_dones.all():
-            return 0
-        return self.i
-
-    def get_dones(self, x, agent_pos):
-        batch_dones = x[agent_pos[0], self.age_chan, agent_pos[1], agent_pos[2]] > 0.1
+    def get_dones(self, x, trg_pos):
+        batch_dones = x[trg_pos[0], self.age_chan, trg_pos[1], trg_pos[2]] > 0.1
         return batch_dones
 
     def reset(self, initial_maze, is_torchinfo_dummy=False, **kwargs):
