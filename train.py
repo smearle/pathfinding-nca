@@ -124,6 +124,8 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 render_paths = np.hstack(to_path(x[:cfg.render_minibatch_size]).cpu())
                 render_maze_ims = np.hstack(maze_ims[render_batch_idx].cpu())
                 target_path_ims = np.hstack(target_paths[render_batch_idx].cpu())
+                if cfg.manual_log:
+                    vis_train(logger, render_maze_ims, render_paths, target_path_ims, render_batch_idx, cfg)
                 images = np.vstack((
                     render_maze_ims*255, 
                     np.tile(render_paths[...,None], (1, 1, 3))*255, 

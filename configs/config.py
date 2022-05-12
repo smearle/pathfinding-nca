@@ -19,7 +19,7 @@ class Config():
     empty_chan, wall_chan, src_chan, trg_chan = 0, 1, 2, 3  # immutable
 
     # The number of channels in the one-hot encodings of the training mazes.
-    n_in_chan = 4  # immutable
+    n_in_chan = 4  # cannot be controlled by user
 
     # The name of the experiment.
     exp_name: str = "0"
@@ -50,7 +50,7 @@ class Config():
     n_hid_nodes: int = 256
 
     # How often to print results to the console.
-    log_interval: int = 500
+    log_interval: int = 1000
 
     # How often to save the model and optimizer to disk.
     save_interval: int = 2000
@@ -93,11 +93,16 @@ class Config():
     # Whether to zero out weights and gradients so as to ignore the corners of each 3x3 patch when using convolutions.
     cut_conv_corners: bool = False
 
+    task: str = "pathfinding"
     evaluate: bool = False
     load: bool = False
     render: bool = False
     overwrite: bool = False
     wandb: bool = True
+
+    # Update our own image of loss curves and model outputs in the training directory (in addition to writing them to 
+    # tensorboard and/or wandb).
+    manual_log: bool = False
 
     def set_exp_name(self):
         self.validate()
@@ -120,9 +125,15 @@ class Config():
         self.log_dir = os.path.join(Path(__file__).parent.parent, "runs", self.exp_name)
 
     def validate(self):
+        if self.task == "diameter":
+            self.n_in_chan = 2
         if self.model == "FixedBfsNCA":
+            assert self.task != "diameter", "No hand-coded model implemented for diameter task."
+            self.path_chan = self.n_in_chan + 1  # wait why is this??
             self.n_hid_chan = 7
             self.skip_connections = True
+        else:
+            self.path_chan = self.n_in_chan
         self.load = True if self.render else self.load
         # self.minibatch_size = 1 if self.model == "GCN" else self.minibatch_size
         # self.val_batch_size = 1 if self.model == "GCN" else self.val_batch_size
@@ -154,6 +165,22 @@ class HyperSweepConfig():
         # "GCN",
         "NCA",
     ])
+    task: List[Any] = field(default_factory=lambda: [
+        # "pathfinding",
+        "diameter",
+    ])
+    n_hid_chan: List[Any] = field(default_factory=lambda: [
+        # 4,
+        # 8,
+        96,
+        128,
+        256,
+    ])
+    n_layers: List[Any] = field(default_factory=lambda: [
+        64,
+        96,
+        128,
+    ])
     
 
 @dataclass
@@ -161,7 +188,6 @@ class ModelSweep(HyperSweepConfig):
     model: List[Any] = field(default_factory=lambda: [
         "GCN"
     ])
-
     n_hid_chan: List[Any] = field(default_factory=lambda: [
         4,
         8,

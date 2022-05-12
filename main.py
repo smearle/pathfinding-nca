@@ -60,8 +60,7 @@ def main_experiment(cfg: Config=None):
     # print('model param count:', param_n)
     opt = th.optim.Adam(model.parameters(), cfg.learning_rate)
     try:
-        maze_data_train, maze_data_val, maze_data_test = load_dataset(cfg.n_data,
-            'cpu' if not th.cuda.is_available() else cfg.device)
+        maze_data_train, maze_data_val, maze_data_test = load_dataset(cfg)
     except FileNotFoundError as e:
         print("No maze data files found. Run `python mazes.py` to generate the dataset.")
         raise
@@ -118,11 +117,8 @@ def main_experiment(cfg: Config=None):
 # fig, ax = plt.subplots(figsize=(20, 5))
 # plt.imshow(np.hstack(maze_ims[:cfg.render_minibatch_size]))
 
-    if cfg.model == "FixedBfsNCA":
-        path_chan = 5
-    else:
-        path_chan = 4
-        assert path_chan == mazes_discrete.max() + 1
+    assert cfg.path_chan == mazes_discrete.max() + 1  # Wait we don't even use this??
+
 # solved_mazes = mazes_discrete.clone()
 # solved_mazes[th.where(target_paths == 1)] = path_chan
 # fig, ax = plt.subplots(figsize=(20, 5))
