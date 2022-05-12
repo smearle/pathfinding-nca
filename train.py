@@ -20,7 +20,7 @@ from utils import get_discrete_loss, get_mse_loss, Logger, to_path, save
 
 def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_data_val: Mazes, 
         target_paths: th.Tensor, logger: Logger, cfg: Config):
-    # tb_writer = SummaryWriter(log_dir=cfg.log_dir)
+    tb_writer = SummaryWriter(log_dir=cfg.log_dir)
     mazes_onehot, maze_ims = maze_data.mazes_onehot, maze_data.maze_ims
     minibatch_size = min(cfg.minibatch_size, cfg.n_data)
     lr_sched = th.optim.lr_scheduler.MultiStepLR(opt, [10000], 0.1)
@@ -97,8 +97,9 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 opt.step()
                 opt.zero_grad()
             # lr_sched.step()
-            # tb_writer.add_scalar("training/loss", loss.item(), i)
-            wandb.log({"training/loss": loss.item()})
+            tb_writer.add_scalar("training/loss", loss.item(), i)
+            if cfg.wandb:
+                wandb.log({"training/loss": loss.item()})
             logger.log(loss=loss.item(), discrete_loss=discrete_loss.item())
                     
             if i % cfg.save_interval == 0 or i == cfg.n_updates - 1:
@@ -109,17 +110,18 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 val_stats = evaluate(model, maze_data_val, cfg.val_batch_size, "validate", cfg)
                 logger.log_val(val_stats)
                 for k, v in val_stats.items():
-                    # tb_writer.add_scalar(f"validation/mean_{k}", v[0], i)
-                    # tb_writer.add_scalar(f"validation/std_{k}", v[1], i)
-                    wandb.log({f"validation/mean_{k}": v[0]})
-                    wandb.log({f"validation/std_{k}": v[1]})
+                    tb_writer.add_scalar(f"validation/mean_{k}", v[0], i)
+                    tb_writer.add_scalar(f"validation/std_{k}", v[1], i)
+                    if cfg.wandb:
+                        wandb.log({f"validation/mean_{k}": v[0]})
+                        wandb.log({f"validation/std_{k}": v[1]})
 
             if i % cfg.log_interval == 0 or i == cfg.n_updates - 1:
                 log(logger, lr_sched, cfg)
             
             if i == cfg.n_updates - 1:
                 render_paths = to_path(x[:cfg.render_minibatch_size]).cpu()
-                vis_train(logger, maze_ims, x, target_paths, render_batch_idx, cfg)
+                vis_train(logger, maze_ims, render_paths, target_paths, render_batch_idx, cfg)
 
 
 def log(logger, lr_sched, cfg):
