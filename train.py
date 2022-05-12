@@ -1,7 +1,8 @@
 from pdb import set_trace as TT
 import pickle
+import PIL
 
-from matplotlib import pyplot as plt
+from matplotlib import image, pyplot as plt
 import numpy as np
 from timeit import default_timer as timer
 import torch as th
@@ -119,9 +120,23 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
             if i % cfg.log_interval == 0 or i == cfg.n_updates - 1:
                 log(logger, lr_sched, cfg)
             
+            if i % cfg.log_interval == 0 or i == cfg.n_updates - 1:
+                render_paths = np.hstack(to_path(x[:cfg.render_minibatch_size]).cpu())
+                render_maze_ims = np.hstack(maze_ims[render_batch_idx].cpu())
+                target_path_ims = np.hstack(target_paths[render_batch_idx].cpu())
+                images = np.vstack((
+                    render_maze_ims*255, 
+                    np.tile(render_paths[...,None], (1, 1, 3))*255, 
+                    np.tile(target_path_ims[...,None], (1, 1, 3))*255,
+                    )) 
+                tb_images = images.astype(np.uint8).transpose(2,0,1)
+                tb_writer.add_image("examples", np.array(tb_images))
+                if cfg.wandb:
+                    images = wandb.Image(images, caption="Top: Input, Middle: Output, Bottom: Target")
+                    wandb.log({"examples": images})
+
             if i == cfg.n_updates - 1:
-                render_paths = to_path(x[:cfg.render_minibatch_size]).cpu()
-                vis_train(logger, maze_ims, render_paths, target_paths, render_batch_idx, cfg)
+                vis_train(logger, render_maze_ims, render_paths, target_path_ims, render_batch_idx, cfg)
 
 
 def log(logger, lr_sched, cfg):
@@ -132,7 +147,7 @@ def log(logger, lr_sched, cfg):
         ' lr:', lr_sched.get_last_lr(), # end=''
         )
 
-def vis_train(logger, maze_ims, render_paths, target_paths, render_batch_idx, cfg):
+def vis_train(logger, render_maze_ims, render_path_ims, target_path_ims, render_batch_idx, cfg):
     fig, ax = plt.subplots(2, 4, figsize=(20, 10))
     plt.subplot(411)
     # smooth_loss_log = smooth(logger.loss_log, 10)
@@ -156,11 +171,11 @@ def vis_train(logger, maze_ims, render_paths, target_paths, render_batch_idx, cf
     # Remove ticks and labels.
     plt.xticks([])
     plt.yticks([])
-    plt.imshow(np.hstack(maze_ims[render_batch_idx].cpu()))
+    plt.imshow(render_maze_ims)
     plt.subplot(413)
-    plt.imshow(np.hstack(render_paths))    #, vmin=-1.0, vmax=1.0)
+    plt.imshow(render_path_ims)    #, vmin=-1.0, vmax=1.0)
     plt.subplot(414)
-    plt.imshow(np.hstack(target_paths[render_batch_idx].cpu()))
+    plt.imshow(target_path_ims)
         # plt.imshow(np.hstack(x[...,-2:-1,:,:].permute([0,2,3,1]).cpu()))
         # plt.imshow(np.hstack(ca.x0[...,0:1,:,:].permute([0,2,3,1]).cpu()))
         # print(f'path activation min: {render_paths.min()}, max: {render_paths.max()}')

@@ -56,7 +56,7 @@ def dump_config(exp_name, exp_config):
 @hydra.main(config_path=None, config_name="batch_config")
 def main_batch(batch_dict_cfg: DictConfig):
     batch_cfg: BatchConfig = BatchConfig()
-    [setattr(batch_cfg, k, v) for k, v in batch_dict_cfg.items() if k != 'batch_hyperparams']
+    [setattr(batch_cfg, k, v) for k, v in batch_dict_cfg.items() if k != 'sweep']
     job_time = 48
     batch_hyperparams = batch_dict_cfg.sweep
 

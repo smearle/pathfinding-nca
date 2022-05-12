@@ -151,7 +151,8 @@ class Config():
 class HyperSweepConfig():
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
     model: List[Any] = field(default_factory=lambda: [
-        "GCN",
+        # "GCN",
+        "NCA",
     ])
     
 
@@ -173,7 +174,7 @@ class ModelSweep(HyperSweepConfig):
 @dataclass
 class BatchConfig(Config):
     """A class for batch configurations. This is used for parallel SLURM jobs, or a sequence of local jobs."""
-    sweep: HyperSweepConfig = ModelSweep()
+    sweep: HyperSweepConfig = HyperSweepConfig()
     # batch_hyperparams: HyperSweepConfig = HyperSweepConfig()
     slurm: bool = False
     vis_cross_eval: bool = False
@@ -182,7 +183,7 @@ class BatchConfig(Config):
     filter_by_config: bool = False
     selective_table: bool = False
     load_pickle: bool = False
-    n_updates: int = 1000
+    n_updates: int = 100000
 
 
 cs = ConfigStore.instance()
