@@ -10,7 +10,7 @@ import torchvision.models as models
 from tqdm import tqdm
 import wandb
 
-from config import ClArgsConfig
+from configs.config import Config
 from evaluate import evaluate
 from mazes import Mazes, render_discrete
 from models.gnn import GCN
@@ -19,7 +19,7 @@ from utils import get_discrete_loss, get_mse_loss, Logger, to_path, save
 
 
 def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_data_val: Mazes, 
-        target_paths: th.Tensor, logger: Logger, cfg: ClArgsConfig):
+        target_paths: th.Tensor, logger: Logger, cfg: Config):
     # tb_writer = SummaryWriter(log_dir=cfg.log_dir)
     mazes_onehot, maze_ims = maze_data.mazes_onehot, maze_data.maze_ims
     minibatch_size = min(cfg.minibatch_size, cfg.n_data)

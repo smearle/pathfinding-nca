@@ -1,6 +1,7 @@
 hydra-core
 matplotlib
 moviepy
+networkx
 numpy
 opencv-python
 Pillow

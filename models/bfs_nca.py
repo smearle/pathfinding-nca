@@ -4,7 +4,7 @@ from pdb import set_trace as TT
 
 import torch as th
 from torch import nn
-from config import ClArgsConfig
+from configs.config import Config
 
 from models.fixed_nca import FixedBfsNCA
 from models.nca import NCA
@@ -12,7 +12,7 @@ from models.nn import PathfindingNN
 
 
 class BfsNCA(NCA):
-    def __init__(self, cfg: ClArgsConfig):
+    def __init__(self, cfg: Config):
         """A hybrid model with some learned parameters, and some hand-coded parameters that implement a deterministic
         path-finding algorithm."""
         super().__init__(cfg)

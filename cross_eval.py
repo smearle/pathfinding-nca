@@ -7,7 +7,7 @@ from typing import List
 
 import matplotlib.pyplot as plt
 import yaml
-from config import BatchConfig, ClArgsConfig
+from configs.config import BatchConfig, Config
 
 import pandas as pd
 
@@ -84,7 +84,7 @@ col_renaming = {
 }
 
 
-def vis_cross_eval(exp_cfgs: List[ClArgsConfig], batch_cfg: BatchConfig):
+def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig):
     """
     Visualize the results of a set of experiments.
 

@@ -2,7 +2,7 @@ import json
 import numpy as np
 from pdb import set_trace as TT
 import torch as th
-from config import ClArgsConfig
+from configs.config import Config
 from mazes import Mazes, render_discrete
 from models.gnn import GCN
 from models.nn import PathfindingNN
@@ -16,7 +16,7 @@ def evaluate_train(model, cfg):
     pass
 
 
-def count_parameters(model: PathfindingNN, cfg: ClArgsConfig):
+def count_parameters(model: PathfindingNN, cfg: Config):
     n_params = 0
     for name, p in model.named_parameters():
         if not isinstance(model, GCN) and cfg.cut_conv_corners and "weight" in name:
@@ -33,7 +33,7 @@ def count_parameters(model: PathfindingNN, cfg: ClArgsConfig):
     return n_params
 
 
-def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str, cfg: ClArgsConfig, 
+def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str, cfg: Config, 
         is_eval: bool = False):
     """Evaluate the trained model on a test set.
 

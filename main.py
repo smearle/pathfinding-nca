@@ -16,7 +16,7 @@ import torch as th
 import torchinfo
 import wandb
 
-from config import ClArgsConfig
+from configs.config import Config
 from evaluate import evaluate
 from mazes import load_dataset, Mazes, render_discrete
 from models import BfsNCA, FixedBfsNCA, GCN, MLP, NCA
@@ -25,11 +25,11 @@ from train import train
 from utils import Logger, VideoWriter, get_discrete_loss, get_mse_loss, to_path, load
 
 
-WANDB = False
+WANDB = True
 np.set_printoptions(threshold=sys.maxsize, linewidth=np.inf)
 
 
-def main_experiment(cfg: ClArgsConfig=None):
+def main_experiment(cfg: Config=None):
     os.system('nvidia-smi -L')
     if th.cuda.is_available():
             print('Using GPU/CUDA.')
@@ -38,7 +38,7 @@ def main_experiment(cfg: ClArgsConfig=None):
             print('Not using GPU/CUDA, using CPU.')
         
     if cfg is None:
-        cfg = ClArgsConfig()
+        cfg = Config()
         cfg.set_exp_name()
 
     if WANDB:
@@ -53,7 +53,7 @@ def main_experiment(cfg: ClArgsConfig=None):
 
     model_cls = globals()[cfg.model]
 
-    print(f"Running experiment with config:\n {json.dumps(vars(cfg), indent=4)}")
+    # print(f"Running experiment with config:\n {json.dumps(vars(cfg), indent=4)}")
     
     # Setup training
     model = model_cls(cfg)
@@ -105,7 +105,7 @@ def main_experiment(cfg: ClArgsConfig=None):
             "to load or overwrite it.")
 
     # Save a dictionary of the config to a json for future reference.
-    json.dump(cfg.__dict__, open(f'{cfg.log_dir}/config.json', 'w'))
+    # json.dump(cfg.__dict__, open(f'{cfg.log_dir}/config.json', 'w'))
 
     mazes_onehot, mazes_discrete, maze_ims, target_paths = \
         (maze_data_train.mazes_onehot, maze_data_train.mazes_discrete, maze_data_train.maze_ims, maze_data_train.target_paths)

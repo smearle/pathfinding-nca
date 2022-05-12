@@ -9,7 +9,7 @@ import scipy
 import torch
 from tqdm import tqdm
 
-from config import ClArgsConfig
+from configs.config import Config
 
 
 path_chan = 4
@@ -19,7 +19,7 @@ val_fname = f"{maze_data_fname}_val.pk"
 test_fname = f"{maze_data_fname}_test.pk"
 
 
-def main_mazes(cfg: ClArgsConfig):
+def main_mazes(cfg: Config):
     """Generate random mazes for training/testing."""
     if np.any([os.path.exists(fname) for fname in [train_fname, val_fname, test_fname]]):
         overwrite = input("File already exists. Overwrite? (y/n) ")
@@ -280,5 +280,5 @@ if __name__ == "__main__":
     nV = 4
     INF = 999
 
-    cfg = ClArgsConfig()
+    cfg = Config()
     main_mazes(cfg)

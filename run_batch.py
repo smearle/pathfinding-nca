@@ -16,7 +16,7 @@ import re
 import traceback
 import yaml
 
-from config import BatchConfig
+from configs.config import BatchConfig
 from cross_eval import vis_cross_eval
 from main import main_experiment
 from mazes import Mazes, main_mazes  # Weirdly need this to be able to load dataset of mazes.
@@ -53,12 +53,12 @@ def dump_config(exp_name, exp_config):
         json.dump(exp_config, f, indent=4)
 
 
-@hydra.main(config_path="configs", config_name="batch")
+@hydra.main(config_path=None, config_name="batch_config")
 def main_batch(batch_dict_cfg: DictConfig):
     batch_cfg: BatchConfig = BatchConfig()
     [setattr(batch_cfg, k, v) for k, v in batch_dict_cfg.items() if k != 'batch_hyperparams']
     job_time = 48
-    batch_hyperparams = batch_dict_cfg.batch_hyperparams
+    batch_hyperparams = batch_dict_cfg.sweep
 
     # Generate dataset of mazes if necessary.
     if batch_cfg.gen_new_data:

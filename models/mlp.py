@@ -3,13 +3,13 @@ from pdb import set_trace as TT
 import torch
 from torch import nn
 import torch.nn.functional as F
-from config import ClArgsConfig
+from configs.config import Config
 
 from models.nn import PathfindingNN
 
 
 class MLP(PathfindingNN):
-    def __init__(self, cfg: ClArgsConfig):
+    def __init__(self, cfg: Config):
         """A Multilayer Perceptron for pathfinding over grid-based mazes.
         
         Args:

@@ -4,11 +4,11 @@ from pdb import set_trace as TT
 import torch as th
 from torch import nn
 
-from config import ClArgsConfig
+from configs.config import Config
 
 
 class PathfindingNN(ABC, nn.Module):
-    def __init__(self, cfg: ClArgsConfig):
+    def __init__(self, cfg: Config):
         """A Neural Network for pathfinding.
         
         The underlying state of the maze is given through `reset()`, then concatenated with the input at all subsequent

@@ -3,13 +3,13 @@ from pdb import set_trace as TT
 
 import torch as th
 from torch import nn
-from config import ClArgsConfig
+from configs.config import Config
 
 from models.nn import PathfindingNN
 
 
 class NCA(PathfindingNN):
-    def __init__(self, cfg: ClArgsConfig):
+    def __init__(self, cfg: Config):
         """A Neural Cellular Automata model for pathfinding over grid-based mazes.
         
         Args:

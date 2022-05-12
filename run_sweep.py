@@ -9,14 +9,23 @@ import yaml
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import wandb
+from configs.config import BatchConfig, Config
 
 from main import main_experiment
 
+# TODO: The problem here is that we need to call `.set_exp_name()` (and `validate()`) on our configs before sending them
+#   to wandb. Probably some way to do this...?
 
-@hydra.main(config_path="configs", config_name="batch")
-def main_sweep(sweep_cfg: DictConfig):
-    hyperparam_dict = yaml.load(open(os.path.join(Path(__file__).parent, 'configs/batch_hyperparams/all.yaml'), 'r'), 
-                                Loader=yaml.FullLoader)
+@hydra.main(config_path=None, config_name="batch_config")
+def main_sweep(sweep_cfg: BatchConfig):
+    dummy_exp_cfg = Config()
+    hyperparam_dict = {k: {'values': v} for k, v in dict(sweep_cfg.sweep).items()}
+    for k, v in sweep_cfg.items():
+        if not hasattr(dummy_exp_cfg, k) and k not in hyperparam_dict:
+            continue
+        # setattr(hyperparam_dict, k, v)
+        hyperparam_dict[k] = {'values': [v]}
+        
     sweep_config = {
         'parameters': hyperparam_dict,
         'method': 'random',
