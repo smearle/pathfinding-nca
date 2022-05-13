@@ -35,8 +35,8 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
     if cfg.wandb:
         wandb.log({'n_params': n_params})
 
-    if cfg.env_generation is not None:
-        env_gen_cfg: EnvGeneration = cfg.env_generation
+    env_gen_cfg: EnvGeneration = cfg.env_generation
+    if env_gen_cfg is not None:
         if not cfg.load:
             env_losses = th.empty((cfg.n_data))
             env_losses.fill_(-np.inf)
@@ -56,15 +56,8 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
 
             model.reset(x0)
 
-        x = hid_states[batch_idx]
-
-        # step_n = np.random.randint(32, 96)
-
         # TODO: move initial auxiliary state to model? Probably a better way...
-        # Ad hoc:
-        # if cfg.model == "MLP":
-            # assert not cfg.shared_weights    # TODO
-            # x = x0    # tehe
+        x = hid_states[batch_idx]
 
         # else:
         # FYI: this is from the differentiating NCA textures notebook. Weird checkpointing behavior indeed! See the
@@ -99,10 +92,11 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
             loss = loss + batch_errs.mean()
 
             if cfg.env_generation:
-                env_losses[batch_idx] = batch_errs.detach()
+                env_losses[batch_idx] += batch_errs.detach()
         
         loss = loss / n_subepisodes
-        env_losses[batch_idx] = env_losses[batch_idx] / n_subepisodes
+        if cfg.env_generation:
+            env_losses[batch_idx] = env_losses[batch_idx] / n_subepisodes
         discrete_loss = get_discrete_loss(x, target_paths_mini_batch).float().mean()
 
         with th.no_grad():

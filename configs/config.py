@@ -222,6 +222,46 @@ class ModelSweep(HyperSweepConfig):
 
 
 @dataclass
+class LossIntervalSweep(HyperSweepConfig):
+    model: List[Any] = field(default_factory=lambda: [
+        "NCA"
+    ])
+    task: List[Any] = field(default_factory=lambda: [
+        "pathfinding",
+        # "diameter",
+    ])
+    env_generation: List[Any] = field(default_factory=lambda: [
+        None,
+        # EnvGeneration(),
+    ])
+    n_layers: List[Any] = field(default_factory=lambda: [
+#         4,
+#         8,
+#         16,
+#         24,
+#         32,
+        64,
+        # 96,
+    ])
+    n_hid_chan: List[Any] = field(default_factory=lambda: [
+#         4,
+#         8,
+        # 16,
+        # 32,
+        96,
+        # 128,
+        # 256,
+    ])
+    loss_interval: List[Any] = field(default_factory=lambda: [
+        4,
+        8,
+        16,
+        32,
+        64,
+    ])
+
+
+@dataclass
 class BatchConfig(Config):
     """A class for batch configurations. This is used for parallel SLURM jobs, or a sequence of local jobs."""
     sweep: HyperSweepConfig = HyperSweepConfig()
@@ -241,4 +281,5 @@ cs.store(name="config", node=Config)
 cs.store(name="batch_config", node=BatchConfig)
 cs.store(group="sweep", name="default", node=HyperSweepConfig)
 cs.store(group="sweep", name="models", node=ModelSweep)
+cs.store(group="sweep", name="loss_interval", node=LossIntervalSweep)
 
