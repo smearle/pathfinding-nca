@@ -197,6 +197,38 @@ class HyperSweepConfig():
     
 
 @dataclass
+class HidChanSweep(HyperSweepConfig):
+    """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
+    model: List[Any] = field(default_factory=lambda: [
+        # "GCN",
+        "NCA",
+    ])
+    task: List[Any] = field(default_factory=lambda: [
+        "pathfinding",
+        # "diameter",
+    ])
+    n_hid_chan: List[Any] = field(default_factory=lambda: [
+        # 4,
+        # 8,
+        16,
+        38,
+        48,
+        96,
+        128,
+        256,
+    ])
+    n_layers: List[Any] = field(default_factory=lambda: [
+        64,
+        # 96,
+        # 128,
+    ])
+    env_generation: List[Any] = field(default_factory=lambda: [
+        None,
+        # EnvGeneration(),
+    ])
+
+
+@dataclass
 class ModelSweep(HyperSweepConfig):
     model: List[Any] = field(default_factory=lambda: [
         "GCN"
@@ -282,4 +314,5 @@ cs.store(name="batch_config", node=BatchConfig)
 cs.store(group="sweep", name="default", node=HyperSweepConfig)
 cs.store(group="sweep", name="models", node=ModelSweep)
 cs.store(group="sweep", name="loss_interval", node=LossIntervalSweep)
+cs.store(group="sweep", name="n_hid_chan", node=HidChanSweep)
 

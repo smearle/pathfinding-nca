@@ -33,7 +33,8 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
     print(f'Number of learnable model parameters: {n_params}')
     tb_writer.add_scalar('model/n_params', n_params, 0)
     if cfg.wandb:
-        wandb.log({'n_params': n_params})
+        if logger.n_step == 0:
+            wandb.log({'n_params': n_params})
 
     env_gen_cfg: EnvGeneration = cfg.env_generation
     if env_gen_cfg is not None:
