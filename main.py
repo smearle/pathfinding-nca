@@ -5,6 +5,7 @@ import json
 import math
 import os
 from pdb import set_trace as TT
+import pickle
 import shutil
 import sys
 from matplotlib import animation
@@ -71,6 +72,9 @@ def main_experiment(cfg: Config=None):
     if cfg.load:
         try:
             model, opt, logger = load(model, opt, cfg)
+            if cfg.env_generation:
+                print("Loading environment generation data.")
+                maze_data_train = pickle.load(open(f"{cfg.log_dir}/evo_mazes.pkl", "rb"))
             loaded = True
         except FileNotFoundError as e:
             print("Failed to load, with error:\n", e)

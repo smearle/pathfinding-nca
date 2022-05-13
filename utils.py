@@ -37,7 +37,7 @@ opt_state_fname = 'opt_state_dict.pt'
 logger_fname = 'logger.pk'
 
 
-def save(ca, opt, maze_data, logger, cfg):
+def save(ca, opt, logger, cfg):
     torch.save(ca.state_dict(), f'{cfg.log_dir}/{ca_state_fname}')
     torch.save(opt.state_dict(), f'{cfg.log_dir}/{opt_state_fname}')
     with open(f'{cfg.log_dir}/{logger_fname}', 'wb') as f:

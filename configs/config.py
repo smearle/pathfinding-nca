@@ -64,14 +64,11 @@ class Config():
     minibatch_size: int= 32 
 
     # Size of minibatch for rendering images and animations.
-    render_minibatch_size: int = 1
+    render_minibatch_size: int = 8
 
     device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     learning_rate: float= 1e-4
-
-    # Train on new random mazes. If None, train only on the initial set of generated mazes. 
-    gen_new_data_interval: Optional[bool] = None
 
     # Which model to load/train.
     model: str = "NCA"
@@ -104,23 +101,27 @@ class Config():
     # tensorboard and/or wandb).
     manual_log: bool = False
 
+    # A regime for generating environments in parallel with training with the aim of increasing the model's generality.
+    env_generation: Any = None
+
     def set_exp_name(self):
         self.validate()
         # TODO: create distinct `full_exp_name` attribute where we'll write this thing, so we don't overwrite the user-
         # supplied `exp_name`.
         self.exp_name = ''.join([
             f"{self.model}",
-            f"_shared-{('T' if self.shared_weights else 'F')}",
-            f"_skip-{('T' if self.skip_connections else 'F')}",
+            ("_diameter" if self.task == "diameter" else ""),
+            ("_evoData" if self.env_generation is not None else ""),
+            ("_noShared" if not self.shared_weights else ""),
+            ("_noSkip" if not self.skip_connections else ""),
             f"_{self.n_hid_chan}-hid",
+            f"_{self.n_layers}-layer",
             f"_lr-{'{:.0e}'.format(self.learning_rate)}",
             f"_{self.n_data}-data",
-            f"_{self.n_layers}-layer",
             (f"_{self.loss_interval}-loss" if self.loss_interval != self.n_layers else ''),
-            f"_cutCorners-{('T' if self.cut_conv_corners else 'F')}",
-            f"_sparseUpdate-{('T' if self.sparse_update else 'F')}",
+            ("_cutCorners" if self.cut_conv_corners and self.model == "NCA" else ""),
+            ('_sparseUpdate' if self.sparse_update else ''),
             f"_{self.exp_name}",
-
         ])
         self.log_dir = os.path.join(Path(__file__).parent.parent, "runs", self.exp_name)
 
@@ -158,6 +159,14 @@ class Config():
             assert 32 % self.minibatch_size == 0, "minibatch_size should divide 32."
             self.n_updates = self.n_updates * 32 // self.minibatch_size
 
+
+@dataclass
+class EnvGeneration:
+    # How many updates to perform on the path-finding model to perform before generating new environments.
+    gen_interval: int = 500
+    evo_batch_size: int = 64
+
+
 @dataclass
 class HyperSweepConfig():
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
@@ -173,13 +182,17 @@ class HyperSweepConfig():
         # 4,
         # 8,
         96,
-        128,
-        256,
+        # 128,
+        # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
         64,
-        96,
-        128,
+        # 96,
+        # 128,
+    ])
+    env_generation: List[Any] = field(default_factory=lambda: [
+        # None,
+        EnvGeneration(),
     ])
     
 
@@ -188,12 +201,23 @@ class ModelSweep(HyperSweepConfig):
     model: List[Any] = field(default_factory=lambda: [
         "GCN"
     ])
+    n_layers: List[Any] = field(default_factory=lambda: [
+#         4,
+#         8,
+#         16,
+#         24,
+#         32,
+        64,
+        96,
+    ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
-        4,
-        8,
-        # 96,
-        # 128,
-        # 256,
+#         4,
+#         8,
+        16,
+        32,
+        96,
+        128,
+        256,
     ])
 
 

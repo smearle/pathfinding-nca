@@ -61,12 +61,16 @@ def load_dataset(cfg: Config):
 
 
 class Mazes():
-    def __init__(self, n_data, cfg: Config):
-        width, height = cfg.width, cfg.height
-        self.mazes_discrete, self.mazes_onehot, self.target_paths, self.target_diameters = gen_rand_mazes(n_data, cfg)
-        self.maze_ims = th.Tensor(np.array(
-            [render_discrete(maze_discrete[None,], cfg)[0] for maze_discrete in self.mazes_discrete]
-        ))
+    def __init__(self, cfg: Config, evo_mazes={}):
+        if len(evo_mazes) == 0:
+            width, height = cfg.width, cfg.height
+            self.mazes_discrete, self.mazes_onehot, self.target_paths, self.target_diameters = gen_rand_mazes(cfg.n_data, cfg)
+            self.maze_ims = th.Tensor(np.array(
+                [render_discrete(maze_discrete[None,], cfg)[0] for maze_discrete in self.mazes_discrete]
+            ))
+        else:
+            for k, v in evo_mazes.items():
+                self.__setattr__(k, v)
     
     def to(self, device):
         self.mazes_discrete, self.mazes_onehot, self.target_paths = self.mazes_discrete.to(device), \
