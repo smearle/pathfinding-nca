@@ -170,6 +170,7 @@ class EnvGeneration:
 @dataclass
 class HyperSweepConfig():
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
+    name: str = 'batch'
     model: List[Any] = field(default_factory=lambda: [
         # "GCN",
         "NCA",
@@ -181,24 +182,26 @@ class HyperSweepConfig():
     n_hid_chan: List[Any] = field(default_factory=lambda: [
         # 4,
         # 8,
-        96,
-        # 128,
+        # 96,
+        128,
         # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
+        48,
         64,
-        # 96,
+        96,
         # 128,
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
-        # None,
-        EnvGeneration(),
+        None,
+        # EnvGeneration(),
     ])
     
 
 @dataclass
 class HidChanSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
+    name: str = 'n_hid_chan'
     model: List[Any] = field(default_factory=lambda: [
         # "GCN",
         "NCA",
@@ -230,34 +233,47 @@ class HidChanSweep(HyperSweepConfig):
 
 @dataclass
 class ModelSweep(HyperSweepConfig):
+    name: str = 'models'
     model: List[Any] = field(default_factory=lambda: [
         # "GCN"
         "FixedBfsNCA",
     ])
+    task: List[Any] = field(default_factory=lambda: [
+        "pathfinding",
+        # "diameter",
+    ])
+    shared_weights: List[bool] = field(default_factory=lambda: [
+        True,
+        # False
+    ])
     n_layers: List[Any] = field(default_factory=lambda: [
-#         4,
-#         8,
-#         16,
-#         24,
-#         32,
-        # 64,
-        # 96,
-        128,
+        # 4,
+        # 8,
+        # 16,
+        24,
+        32,
+        64,
+        96,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
-#         4,
-        7,
-#         8,
+        # 4,
+        # 8,
         # 16,
         # 32,
         # 96,
         # 128,
-        # 256,
+        256,
+        # 512,
+    ])
+    env_generation: List[Any] = field(default_factory=lambda: [
+        None,
+        # EnvGeneration(),
     ])
 
 
 @dataclass
 class LossIntervalSweep(HyperSweepConfig):
+    name: str = 'loss_interval'
     model: List[Any] = field(default_factory=lambda: [
         "NCA"
     ])
@@ -293,6 +309,10 @@ class LossIntervalSweep(HyperSweepConfig):
         16,
         32,
         64,
+    ])
+    shared_weights: List[bool] = field(default_factory=lambda: [
+        False,
+        True,
     ])
 
 

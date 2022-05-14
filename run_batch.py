@@ -6,6 +6,7 @@ directory.
 import argparse
 from collections import namedtuple
 import copy
+from pathlib import Path
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from itertools import product
@@ -21,6 +22,9 @@ from cross_eval import vis_cross_eval
 from main import main_experiment
 from mazes import Mazes, main_mazes  # Weirdly need this to be able to load dataset of mazes.
 # from cross_eval import vis_cross_eval
+
+
+PAR_DIR = Path(__file__).parent
 
 
 def submit_slurm_job(sbatch_file, experiment_name, job_time, job_cpus, job_gpus, job_mem):
@@ -54,9 +58,10 @@ def dump_config(exp_name, exp_config):
 
 
 @hydra.main(config_path=None, config_name="batch_config")
-def main_batch(batch_dict_cfg: DictConfig):
+def main_batch(batch_dict_cfg: BatchConfig):
     batch_cfg: BatchConfig = BatchConfig()
     [setattr(batch_cfg, k, v) for k, v in batch_dict_cfg.items() if k != 'sweep']
+    batch_cfg.sweep_name = batch_dict_cfg.sweep.name
     job_time = 48
     batch_hyperparams = batch_dict_cfg.sweep
 
@@ -111,6 +116,8 @@ def main_batch(batch_dict_cfg: DictConfig):
         # Create an experiment config for each combination of hyperparameters.
         exp_configs = [copy.deepcopy(batch_cfg)]
         for key, hyperparams in batch_hyperparams.items():
+            if key == 'name': 
+                continue
             old_exp_configs = exp_configs
             new_exp_configs = []
             for hyperparam in hyperparams:

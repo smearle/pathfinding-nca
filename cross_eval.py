@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 from pdb import set_trace as TT
 import pickle
 import re
@@ -14,7 +15,7 @@ import pandas as pd
 from mazes import load_dataset
 
 
-EVAL_DIR = 'runs_eval'
+EVAL_DIR = os.path.join(Path(__file__).parent, 'runs_eval')
 
 names_to_hyperparams = {
     'batch': [
@@ -35,6 +36,7 @@ names_to_hyperparams = {
     ],
     'loss_interval': [
         'model',
+        'shared_weights',
         'loss_interval',
     ],
     'weight_sharing': [
@@ -91,7 +93,7 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig):
     Args:
         exp_cfgs (list): A list of experiment configs.
     """
-    name = batch_cfg.batch_hyperparams
+    name = batch_cfg.sweep_name
     if not batch_cfg.load_pickle:
         batch_exp_stats = []
         filtered_exp_cfgs = []
