@@ -11,15 +11,16 @@ import sys
 from matplotlib import animation
 
 import cv2
-import numpy as np
+import hydra
 import matplotlib.pyplot as plt
-from omegaconf import OmegaConf
+import numpy as np
+from omegaconf import DictConfig, OmegaConf
 import torch as th
 import torchinfo
 import wandb
 import yaml
 
-from configs.config import Config
+from configs.config import BatchConfig, Config
 from evaluate import evaluate
 from mazes import load_dataset, Mazes, render_discrete
 from models import BfsNCA, FixedBfsNCA, GCN, MLP, NCA
@@ -96,8 +97,8 @@ def main_experiment(cfg: Config=None):
             os.mkdir(cfg.log_dir)
             logger = Logger()
         except FileExistsError as e:
-            raise FileExistsError(f"Experiment log folder {cfg.log_dir} already exists. Use `--load` or `--overwrite` command line arguments "\
-            "to load or overwrite it.")
+            raise FileExistsError(f"Experiment log folder {cfg.log_dir} already exists. Use `load=True` or "
+            "`overwrite=True` command line arguments to load or overwrite it.")
 
     if cfg.wandb:
         hyperparam_cfg = {k: v for k, v in vars(cfg).items() if k not in set({'log_dir', 'exp_name'})}

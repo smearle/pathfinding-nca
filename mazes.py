@@ -3,24 +3,31 @@ from pathlib import Path
 from pdb import set_trace as TT
 import pickle
 
+import hydra
 import networkx as nx
 import numpy as np
 import scipy
 import torch as th
 from tqdm import tqdm
 
-from configs.config import Config
+from configs.config import BatchConfig, Config
 
 
-path_chan = 4
 maze_data_fname = os.path.join(Path(__file__).parent, os.path.join("data", "maze_data"))
-train_fname = f"{maze_data_fname}_train.pk"
-val_fname = f"{maze_data_fname}_val.pk"
-test_fname = f"{maze_data_fname}_test.pk"
+path_chan = 4
 
 
-def main_mazes(cfg: Config):
+def get_maze_name_suffix(cfg: Config):
+    maze_name_suffix = '' if cfg.width == cfg.height == 16 else f'_{cfg.width}x{cfg.height}'
+    return maze_name_suffix
+
+
+def main_mazes(cfg: Config=None):
     """Generate random mazes for training/testing."""
+    maze_fname = maze_data_fname + get_maze_name_suffix(cfg)
+    train_fname = f"{maze_fname}_train.pk"
+    val_fname = f"{maze_fname}_val.pk"
+    test_fname = f"{maze_fname}_test.pk"
     if np.any([os.path.exists(fname) for fname in [train_fname, val_fname, test_fname]]):
         overwrite = input("File already exists. Overwrite? (y/n) ")
         if overwrite != 'y':
@@ -28,15 +35,15 @@ def main_mazes(cfg: Config):
         
         print('Overwriting existing dataset...')
 
-    maze_data = Mazes(cfg.n_data, cfg)
+    maze_data = Mazes(cfg)
     with open(train_fname, 'wb') as f:
         pickle.dump(maze_data, f)
 
-    maze_data = Mazes(cfg.n_val_data, cfg)
+    maze_data = Mazes(cfg)
     with open(val_fname, 'wb') as f:
         pickle.dump(maze_data, f)
 
-    maze_data = Mazes(cfg.n_test_data, cfg)
+    maze_data = Mazes(cfg)
     with open(test_fname, 'wb') as f:
         pickle.dump(maze_data, f)
 
@@ -45,6 +52,11 @@ def main_mazes(cfg: Config):
 
 def load_dataset(cfg: Config):
     """Load the dataset of random mazes"""
+    maze_fname = maze_data_fname + get_maze_name_suffix(cfg)
+    train_fname = f"{maze_fname}_train.pk"
+    val_fname = f"{maze_fname}_val.pk"
+    test_fname = f"{maze_fname}_test.pk"
+
     with open(train_fname, 'rb') as f:
         maze_data_train: Mazes = pickle.load(f)
     maze_data_train.get_subset(cfg)
@@ -181,38 +193,6 @@ def get_graph(arr, passable=0, impassable=1):
     return graph
 
 
-# Algorithm 
-def floyd_2d(arr, passable=0, impassable=1):
-    width, height = arr.shape
-    size = width * height
-    dist = np.empty((size, size))
-    dist.fill(np.inf)
-    # ret = scipy.sparse.csgraph.floyd_warshall(dist)
-    paths = [[[] for _ in range(size)] for _ in range(size)]
-    for i in range(size):
-        x, y = i // width, i % width
-        neighbs = [(x - 1, y), (x, y-1), (x+1, y), (x, y+1)]
-        neighbs = [x * width + y for x, y in neighbs]
-        for j in neighbs:
-            if not 0 <= j < size:
-                continue
-            dist[i, j] = 1
-            paths[i][j] = [j]
-
-    # Adding vertices individually
-    for r in range(size):
-        for p in range(size):
-            for q in range(size):
-                dist[p][q] = min(dist[p][q], dist[p][r] + dist[r][q])
-                if dist[p][q] < dist[p][r] + dist[r][q]:
-                    continue
-                else:
-                    paths[p][q] = paths[p][r] + paths[r][q]
-
-    src = np.argwhere(dist)
-    raise Exception
-
-
 def bfs_grid(arr, passable=0, impassable=1, src=2, trg=3):
     srcs = np.argwhere(arr == src)
     assert srcs.shape[0] == 1
@@ -298,9 +278,5 @@ def gen_rand_mazes(n_data, cfg):
 
 
 if __name__ == "__main__":
-    # Number of vertices
-    nV = 4
-    INF = 999
 
-    cfg = Config()
-    main_mazes(cfg)
+    main_mazes()

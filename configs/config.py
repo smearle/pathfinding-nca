@@ -130,11 +130,11 @@ class Config():
             self.n_in_chan = 2
         if self.model == "FixedBfsNCA":
             assert self.task != "diameter", "No hand-coded model implemented for diameter task."
-            self.path_chan = self.n_in_chan + 1  # wait why is this??
+            # self.path_chan = self.n_in_chan + 1  # wait why is this??
             self.n_hid_chan = 7
             self.skip_connections = True
-        else:
-            self.path_chan = self.n_in_chan
+        # else:
+        self.path_chan = self.n_in_chan
         self.load = True if self.render else self.load
         # self.minibatch_size = 1 if self.model == "GCN" else self.minibatch_size
         # self.val_batch_size = 1 if self.model == "GCN" else self.val_batch_size
@@ -175,8 +175,8 @@ class HyperSweepConfig():
         "NCA",
     ])
     task: List[Any] = field(default_factory=lambda: [
-        # "pathfinding",
-        "diameter",
+        "pathfinding",
+        # "diameter",
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
         # 4,
@@ -231,7 +231,8 @@ class HidChanSweep(HyperSweepConfig):
 @dataclass
 class ModelSweep(HyperSweepConfig):
     model: List[Any] = field(default_factory=lambda: [
-        "GCN"
+        # "GCN"
+        "FixedBfsNCA",
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
 #         4,
@@ -239,17 +240,19 @@ class ModelSweep(HyperSweepConfig):
 #         16,
 #         24,
 #         32,
-        64,
-        96,
+        # 64,
+        # 96,
+        128,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
 #         4,
+        7,
 #         8,
-        16,
-        32,
-        96,
-        128,
-        256,
+        # 16,
+        # 32,
+        # 96,
+        # 128,
+        # 256,
     ])
 
 

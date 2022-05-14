@@ -65,6 +65,7 @@ def main_batch(batch_dict_cfg: DictConfig):
         if 'n_data' in batch_hyperparams:
             setattr(batch_cfg, 'n_data', max(batch_hyperparams['n_data']))
         main_mazes(batch_cfg)
+        return
 
 
     if batch_cfg.load_all:
