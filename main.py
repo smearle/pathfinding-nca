@@ -70,6 +70,11 @@ def main_experiment(cfg: Config=None):
     # maze_data_val.get_subset(cfg.n_val_data)
   # cfg.n_data = maze_data_train.mazes_onehot.shape[0]
 
+    if cfg.evaluate or cfg.render:
+        cfg_32 = copy.copy(cfg)
+        cfg_32.width, cfg_32.height = 32, 32
+        maze_data_test_32 = load_dataset(cfg_32, test_only=True)
+
     loaded = False
     if cfg.load:
         try:
@@ -88,8 +93,9 @@ def main_experiment(cfg: Config=None):
 
         if cfg.evaluate:
             log_stats(model, logger, cfg)
-            # evaluate(model, maze_data_train, cfg.val_batch_size, "train", cfg, is_eval=True)
-            # evaluate(model, maze_data_test, cfg.val_batch_size, "test", cfg, is_eval=True)
+            evaluate(model, maze_data_train, cfg.val_batch_size, "train", cfg, is_eval=True)
+            evaluate(model, maze_data_test, cfg.val_batch_size, "test", cfg, is_eval=True)
+            evaluate(model, maze_data_test_32, cfg.val_batch_size, "test_32", cfg_32, is_eval=True)
             return
 
     if not loaded:
@@ -128,7 +134,7 @@ def main_experiment(cfg: Config=None):
             render_trained(model, maze_data_train, cfg)
             cfg_32 = copy.copy(cfg)
             cfg_32.width, cfg_32.height = 32, 32
-            _, _, maze_data_test_32 = load_dataset(cfg_32)
+            maze_data_test_32 = load_dataset(cfg_32, test_only=True)
             render_trained(model, maze_data_test_32, cfg_32, name="_32")
 
     else:

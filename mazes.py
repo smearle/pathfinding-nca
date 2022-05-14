@@ -50,26 +50,31 @@ def main_mazes(cfg: Config=None):
     # TODO: Render a big grid of all the data.
 
 
-def load_dataset(cfg: Config):
+def load_dataset(cfg: Config, test_only: bool = False):
     """Load the dataset of random mazes"""
     maze_fname = maze_data_fname + get_maze_name_suffix(cfg)
     train_fname = f"{maze_fname}_train.pk"
     val_fname = f"{maze_fname}_val.pk"
     test_fname = f"{maze_fname}_test.pk"
 
-    with open(train_fname, 'rb') as f:
-        maze_data_train: Mazes = pickle.load(f)
-    maze_data_train.get_subset(cfg)
+    if not test_only:
+        with open(train_fname, 'rb') as f:
+            maze_data_train: Mazes = pickle.load(f)
+        maze_data_train.get_subset(cfg)
 
-    with open(val_fname, 'rb') as f:
-        maze_data_val: Mazes = pickle.load(f)
-    maze_data_val.get_subset(cfg)
+        with open(val_fname, 'rb') as f:
+            maze_data_val: Mazes = pickle.load(f)
+        maze_data_val.get_subset(cfg)
 
     with open(test_fname, 'rb') as f:
         maze_data_test: Mazes = pickle.load(f)
     maze_data_test.get_subset(cfg)
 
-    return maze_data_train.to(cfg.device), maze_data_val.to(cfg.device), maze_data_test.to(cfg.device)
+    if not test_only:
+        return maze_data_train.to(cfg.device), maze_data_val.to(cfg.device), maze_data_test.to(cfg.device)
+
+    else:
+        return maze_data_test.to(cfg.device)
 
 
 class Mazes():

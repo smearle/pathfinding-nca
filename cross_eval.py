@@ -111,10 +111,13 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig):
                 with open(exp_cfg.log_dir + '/test_stats.json', 'r') as f:
                     exp_test_stats = json.load(f)
                     exp_test_stats = {f'TEST_{k}': v for k, v in exp_test_stats.items()}
+                with open(exp_cfg.log_dir + '/test_32_stats.json', 'r') as f:
+                    exp_test_32_stats = json.load(f)
+                    exp_test_32_stats = {f'TEST_32_{k}': v for k, v in exp_test_32_stats.items()}
                 with (open(exp_cfg.log_dir + '/train_stats.json', 'r')) as f:
                     exp_train_stats = json.load(f)
                     exp_train_stats = {f'TRAIN_{k}': v for k, v in exp_train_stats.items()}
-                exp_stats = {**exp_general_stats, **exp_train_stats, **exp_test_stats}
+                exp_stats = {**exp_general_stats, **exp_train_stats, **exp_test_stats, **exp_test_32_stats}
                 batch_exp_stats.append(exp_stats)
                 filtered_exp_cfgs.append(exp_cfg)
             except FileNotFoundError as e:
@@ -159,16 +162,19 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig):
         col_tpls = []
         for c in col_headers:
             if 'TEST' in c:
-                col_tpls.append(('test', c.replace('TEST ', '')))
+                if 'TEST 32' in c:
+                    col_tpls.append(('test', '32x32', c.replace('TEST 32 ', '')))
+                else:
+                    col_tpls.append(('test', '16x16', c.replace('TEST ', '')))
             elif 'TRAIN' in c:
-                col_tpls.append(('train', c.replace('TRAIN ', '')))
+                col_tpls.append(('train', '16x16', c.replace('TRAIN ', '')))
             elif c in model_stat_keys:
-                col_tpls.append(('model', c))
+                col_tpls.append(('model', '---', c))
             else:
-                col_tpls.append(('experiment', c))
+                col_tpls.append(('experiment', '---', c))
             # col_tpl = ('test' if 'TEST' in c else 'train', c.replace('TEST ', '').replace('TRAIN ', ''))
             # col_tpls.append(col_tpl)
-        col_tpls = [(c[0], col_renaming[c[1]] if c[1] in col_renaming else c[1]) for c in col_tpls]
+        col_tpls = [(c[0], c[1], col_renaming[c[-1]] if c[-1] in col_renaming else c[-1]) for c in col_tpls]
         col_indices = pd.MultiIndex.from_tuples(col_tpls)  #, names=['type', 'metric'])
 
         df = pd.DataFrame(data_rows, columns=col_indices, index=row_indices)
@@ -176,7 +182,7 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig):
 
         for k in col_indices:
             if k in df:
-                print(k[1])
+                print(k[-1])
                 df[k] = df[k].apply(
                     lambda data: preprocess_values(data, 
                                     col_name=k)
@@ -194,10 +200,10 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig):
 
     for k in col_indices:
         if k in df:
-            print(k[1])
+            print(k[-1])
             df[k] = df[k].apply(
                 lambda data: bold_extreme_values(data, 
-                                data_max=(max if ('completion time' not in k[1] and 'losses' not in k[1]) else min)\
+                                data_max=(max if ('completion time' not in k[1] and 'losses' not in k[-1]) else min)\
                                     ([(d[0] if isinstance(d, tuple) else d) for d in df[k]]), 
                                 col_name=k)
             )
@@ -230,7 +236,7 @@ def preprocess_values(data, col_name=None):
     # Assume (mean, std)
     data, err = data
     # Other preprocessing here
-    if col_name[1] not in set({"completion time", "n_params"}):
+    if col_name[-1] not in set({"completion time", "n_params"}):
         data *= 100
         err *= 100
     return data, err
@@ -240,7 +246,7 @@ def bold_extreme_values(data, data_max=-1, col_name=None):
     "Process dataframe values from floats into strings. Bold extreme (best) values."
 
     # hack
-    if col_name[1] in set({"n. params", "n. updates"}):
+    if col_name[-1] in set({"n. params", "n. updates"}):
         return '{:,}'.format(data)
 
     else:
@@ -330,12 +336,15 @@ def pandas_to_latex(df_table, latex_file, vertical_bars=False, right_align_first
         # latex_lines.insert(9, midrule_str)
 
         # detect start of multicol then add horizontal line between multicol levels
+        k = 0
         for i, l in enumerate(latex_lines):
             if '\multicolumn' in l:
                 mc_start = i
-                break
-        for i in range(len(df_table.columns[0]) - 1):
-            latex_lines.insert(mc_start + i + 1, midrule_str)
+                for j in range(len(df_table.columns[0]) - 1):
+                    latex_lines.insert(mc_start + j + 1, midrule_str)
+                k += 1
+        # for j in range(len(df_table.columns[0]) - 1):
+            # latex_lines.insert(mc_start + j + 1 + k, midrule_str)
         latex = '\n'.join(latex_lines)
 
     with open(latex_file, 'w') as f:

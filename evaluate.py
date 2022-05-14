@@ -31,7 +31,7 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
     batch_idxs = np.arange(0, mazes_onehot.shape[0])
     np.random.shuffle(batch_idxs)
     model.eval()
-    assert name in ['train', 'validate', 'test'], "Name of evaluation must be 'train', 'test' or 'validate'."
+    # assert name in ['train', 'validate', 'test'], "Name of evaluation must be 'train', 'test' or 'validate'."
 
     if is_eval:
         n_eval_minibatches = mazes_onehot.shape[0] // batch_size
@@ -53,7 +53,7 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
             batch_idx = batch_idxs[np.arange(i*batch_size, (i+1)*batch_size, dtype=int)]
             x0 = mazes_onehot[batch_idx]
             # x0_discrete = test_mazes_discrete[batch_idx]
-            x = model.seed(batch_size=batch_size)
+            x = model.seed(batch_size=batch_size, width=cfg.width, height=cfg.height)
             target_paths_minibatch = target_paths[batch_idx]
             path_lengths = target_paths_minibatch.float().sum((1, 2)).cpu().numpy()
             model.reset(x0)

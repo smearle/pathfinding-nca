@@ -168,6 +168,10 @@ class Config():
             assert 32 % self.minibatch_size == 0, "minibatch_size should divide 32."
             self.n_updates = self.n_updates * 32 // self.minibatch_size
 
+        if self.render:
+            self.wandb = False
+            self.render_minibatch_size = 1
+
 
 @dataclass
 class EnvGeneration:

@@ -182,7 +182,9 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 offspring_mazes_onehot = mazes_onehot[:env_gen_cfg.evo_batch_size]
 
                 # Mutate the mazes (except at the border walls).
-                disc_noise = th.randint(0, cfg.n_in_chan, offspring_mazes_onehot.shape)
+                disc_noise = th.randint(1, cfg.n_in_chan, offspring_mazes_onehot.shape)
+                mut_mask = th.rand(offspring_mazes_onehot.shape) < .1
+                disc_noise *= mut_mask
                 disc_noise[:, :, 0, :] = disc_noise[:, :, -1] = 0
                 disc_noise[:, :, :, 0] = disc_noise[:, :, :, -1] = 0
                 offspring_mazes_onehot = offspring_mazes_onehot + disc_noise % cfg.n_in_chan

@@ -156,7 +156,7 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, 
                     cv2.waitKey(CV2_WAIT_KEY_TIME)
             
         if SAVE_GIF:
-            with imageio.get_writer(os.path.join(cfg.log_dir, "behavior{name}.gif"), mode='I', duration=0.1) as writer:
+            with imageio.get_writer(os.path.join(cfg.log_dir, f"behavior{name}.gif"), mode='I', duration=0.1) as writer:
                 render_loop(bi, writer)
         else:
             render_loop(bi)
