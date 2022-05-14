@@ -110,21 +110,22 @@ class Mazes():
 
 def generate_random_maze(cfg):
     batch_size = 1
-    width = 16
+    width, height = cfg.width, cfg.height
     empty_chan, wall_chan, src_chan, trg_chan = cfg.empty_chan, cfg.wall_chan, cfg.src_chan, cfg.trg_chan
 
     # Generate empty room with with borders.
-    rand_maze_onehot = th.zeros((batch_size, 4, width + 2, width + 2), dtype=int)
+    rand_maze_onehot = th.zeros((batch_size, 4, width + 2, height + 2), dtype=int)
     rand_maze_onehot[:, wall_chan, [0, -1], :] = 1
     rand_maze_onehot[:, wall_chan, :, [0, -1]] = 1
 
     # Randomly generate wall/empty tiles.
-    rand_walls = th.randint(0, 2, (batch_size, 1, width, width))
+    rand_walls = th.randint(0, 2, (batch_size, 1, width, height))
     rand_maze_onehot[:, wall_chan: wall_chan + 1, 1: -1, 1: -1] = rand_walls
     rand_maze_onehot[:, empty_chan: empty_chan + 1, 1: -1, 1: -1] = (rand_walls == 0).int()
 
     # Randomly generate sources/targets.
-    src_xs, src_ys, trg_xs, trg_ys = th.randint(0, width, (4, batch_size)) + 1
+    src_xs, trg_xs = th.randint(0, width, (2, batch_size)) + 1
+    src_ys, trg_ys = th.randint(0, height, (2, batch_size)) + 1
 
     # Remove wall/empty tiles at location of source/target.
     rand_maze_onehot[th.arange(batch_size), empty_chan, src_xs, src_ys] = 0

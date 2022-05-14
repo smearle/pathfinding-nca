@@ -1,7 +1,9 @@
+from pdb import set_trace as TT
 import math
 import os
 import shutil
 import cv2
+import imageio
 from matplotlib import animation, pyplot as plt
 import numpy as np
 import torch as th
@@ -11,11 +13,13 @@ from models.nn import PathfindingNN
 
 RENDER_TYPE = 0
 N_RENDER_CHANS = None
+SAVE_GIF = True
+SAVE_PNGS = False
 N_RENDER_EPISODES = 10
-CV2_WAIT_KEY_TIME = 0
+CV2_WAIT_KEY_TIME = 1
 
 
-def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True):
+def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, name=''):
     """Generate a video showing the behavior of the trained NCA on mazes from its training distribution.
     """
     model.eval()
@@ -35,7 +39,7 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True):
 
     def reset(bi):
         batch_idx = batch_idxs[th.arange(render_minibatch_size) + bi]
-        pool = model.seed(batch_size=mazes_onehot.shape[0])
+        pool = model.seed(batch_size=mazes_onehot.shape[0], width=cfg.width, height=cfg.height,)
         x = pool[batch_idx]
         x0 = mazes_onehot[batch_idx]
         model.reset(x0, new_batch_size=True)
@@ -110,38 +114,53 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True):
 
     # Render live and indefinitely using cv2.
     if RENDER_TYPE == 0:
-        # Create large window
-        # cv2.namedWindow('maze', cv2.WINDOW_NORMAL)
-        # cv2.namedWindow('model', cv2.WINDOW_NORMAL)
-        cv2.namedWindow('pathfinding', cv2.WINDOW_NORMAL)
-        render_dir = os.path.join(cfg.log_dir, "render")
-        if os.path.exists(render_dir):
-            shutil.rmtree(render_dir)
-        os.mkdir(render_dir)
-        cv2.resizeWindow('pathfinding', 2000, 2000)
-        frame_i = 0
 
-        for ep_i in range(N_RENDER_EPISODES):
-            x, maze_imgs, bi = reset(bi)
-            oracle_out = model.oracle_out if model_has_oracle else None
-            ims = get_imgs(x, oracle_out=oracle_out, maze_imgs=maze_imgs)
-            cv2.imshow('pathfinding', ims)
-            # Save image as png
-            cv2.imwrite(os.path.join(render_dir, f"render_{frame_i}.png"), ims)
+        def render_loop(bi, writer=None):
+            # Create large window
+            # cv2.namedWindow('maze', cv2.WINDOW_NORMAL)
+            # cv2.namedWindow('model', cv2.WINDOW_NORMAL)
+            cv2.namedWindow('pathfinding', cv2.WINDOW_NORMAL)
+            render_dir = os.path.join(cfg.log_dir, f"render{name}")
+            if SAVE_PNGS:
+                if os.path.exists(render_dir):
+                    shutil.rmtree(render_dir)
+                os.mkdir(render_dir)
+            cv2.resizeWindow('pathfinding', 2000, 2000)
+            frame_i = 0
 
-            # cv2.imshow('maze', maze_imgs)
-            # cv2.imshow('model', get_imgs(x, oracle_out=oracle_out))
-            cv2.waitKey(CV2_WAIT_KEY_TIME)
-            for i in range(cfg.n_layers):
-                frame_i += 1
-                x = model.forward(x)
+            for ep_i in range(N_RENDER_EPISODES):
+                x, maze_imgs, bi = reset(bi)
                 oracle_out = model.oracle_out if model_has_oracle else None
-                # cv2.imshow('model', get_imgs(x, oracle_out=oracle_out))
                 ims = get_imgs(x, oracle_out=oracle_out, maze_imgs=maze_imgs)
                 cv2.imshow('pathfinding', ims)
-                cv2.imwrite(os.path.join(render_dir, f"render_{frame_i}.png"), ims*255)
+                # Save image as png
+                if SAVE_PNGS:
+                    cv2.imwrite(os.path.join(render_dir, f"render_{frame_i}.png"), ims)
+                if writer:
+                    writer.append_data(ims)
+
+                # cv2.imshow('maze', maze_imgs)
+                # cv2.imshow('model', get_imgs(x, oracle_out=oracle_out))
                 cv2.waitKey(CV2_WAIT_KEY_TIME)
+                for i in range(cfg.n_layers):
+                    frame_i += 1
+                    x = model.forward(x)
+                    oracle_out = model.oracle_out if model_has_oracle else None
+                    # cv2.imshow('model', get_imgs(x, oracle_out=oracle_out))
+                    ims = get_imgs(x, oracle_out=oracle_out, maze_imgs=maze_imgs)
+                    cv2.imshow('pathfinding', ims)
+                    if SAVE_PNGS:
+                        cv2.imwrite(os.path.join(render_dir, f"render_{frame_i}.png"), ims*255)
+                    if writer:
+                        writer.append_data(ims)
+                    cv2.waitKey(CV2_WAIT_KEY_TIME)
             
+        if SAVE_GIF:
+            with imageio.get_writer(os.path.join(cfg.log_dir, "behavior{name}.gif"), mode='I', duration=0.1) as writer:
+                render_loop(bi, writer)
+        else:
+            render_loop(bi)
+
 
     # Save a video with pyplot.
     elif RENDER_TYPE == 1:
@@ -193,5 +212,5 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True):
 
         anim = animation.FuncAnimation(
         fig, animate, interval=1, frames=cfg.n_layers, blit=True, save_count=50)
-        anim.save(f'{cfg.log_dir}/path_nca_anim.mp4', fps=10, extra_args=['-vcodec', 'libx264'])
+        anim.save(f'{cfg.log_dir}/path_nca_anim{name}.mp4', fps=10, extra_args=['-vcodec', 'libx264'])
 

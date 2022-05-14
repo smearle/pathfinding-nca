@@ -60,16 +60,17 @@ class PathfindingNN(ABC, nn.Module):
         self.initial_maze = initial_maze
         self.n_step = 0
 
-    def seed(self, batch_size):
+    def seed(self, batch_size, width: int = None, height: int = None):
         # NOTE: I think the effect of `sparse_update` here is to only update the last layer. Will break non-shared-weight
         #   networks. Should implement this more explicitly in the future.
+        width, height = width or self.cfg.width, height or self.cfg.height
 
         if self.cfg.skip_connections:
             n_chan = self.cfg.n_hid_chan
         else:
             n_chan = self.cfg.n_hid_chan + self.cfg.n_in_chan
 
-        x = th.zeros(batch_size, n_chan, self.cfg.height + 2, self.cfg.width + 2, requires_grad=False)
+        x = th.zeros(batch_size, n_chan, width + 2, height + 2, requires_grad=False)
         # x = th.zeros(batch_size, n_chan, cfg.height + 2, cfg.width + 2, requires_grad=not cfg.sparse_update)
 
         return x

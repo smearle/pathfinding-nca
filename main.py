@@ -1,6 +1,7 @@
 #@title Imports and Notebook Utilities
 #%tensorflow_version 2.x
 
+import copy
 import json
 import math
 import os
@@ -110,7 +111,6 @@ def main_experiment(cfg: Config=None):
             id=cfg.exp_name,
             config=hyperparam_cfg,
             # resume="allow" if cfg.load else None,
-            # resume="allow",
         )
 
     # Save a dictionary of the config to a json for future reference.
@@ -120,27 +120,17 @@ def main_experiment(cfg: Config=None):
     mazes_onehot, mazes_discrete, maze_ims, target_paths = \
         (maze_data_train.mazes_onehot, maze_data_train.mazes_discrete, maze_data_train.maze_ims, maze_data_train.target_paths)
 
-# fig, ax = plt.subplots(figsize=(20, 5))
-# plt.imshow(np.hstack(maze_ims[:cfg.render_minibatch_size]))
-
     assert cfg.path_chan == mazes_discrete.max() + 1  # Wait we don't even use this??
-
-# solved_mazes = mazes_discrete.clone()
-# solved_mazes[th.where(target_paths == 1)] = path_chan
-# fig, ax = plt.subplots(figsize=(20, 5))
-# plt.imshow(np.hstack(solved_maze_ims[:cfg.render_minibatch_size]))
-
-# fig, ax = plt.subplots(figsize=(20, 5))
-# plt.imshow(np.hstack(target_paths[:cfg.render_minibatch_size].cpu()))
-# plt.tight_layout()
-
     assert cfg.n_in_chan == mazes_onehot.shape[1]
-
-    # The set of initial mazes (padded with 0s, channel-wise, to act as the initial state of the CA).
 
     if cfg.render:
         with th.no_grad():
             render_trained(model, maze_data_train, cfg)
+            cfg_32 = copy.copy(cfg)
+            cfg_32.width, cfg_32.height = 32, 32
+            _, _, maze_data_test_32 = load_dataset(cfg_32)
+            render_trained(model, maze_data_test_32, cfg_32, name="_32")
+
     else:
         train(model, opt, maze_data_train, maze_data_val, target_paths, logger, cfg)
 
