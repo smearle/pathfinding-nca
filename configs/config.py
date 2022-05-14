@@ -95,6 +95,9 @@ class Config():
     # Whether to zero out weights and gradients so as to ignore the corners of each 3x3 patch when using convolutions.
     cut_conv_corners: bool = False
 
+    # When using NCA, encusre the weights for each adjacent cell are the same, making it essentially equivalent to a GCN.
+    symmetric_conv: bool = False
+
     task: str = "pathfinding"
     evaluate: bool = False
     load: bool = False
@@ -128,6 +131,7 @@ class Config():
                 f"_{self.n_data}-data",
                 (f"_{self.loss_interval}-loss" if self.loss_interval != self.n_layers else ''),
                 ("_cutCorners" if self.cut_conv_corners and self.model == "NCA" else ""),
+                ("_symmConv" if self.symmetric_conv and self.model == "NCA" else ""),
                 ('_sparseUpdate' if self.sparse_update else ''),
                 f"_{self.exp_name}",
             ])
@@ -135,6 +139,10 @@ class Config():
         self.log_dir = os.path.join(Path(__file__).parent.parent, "runs", self.exp_name)
 
     def validate(self):
+        if not self.model == "NCA":
+            self.symmetric_conv = False
+        if self.symmetric_conv:
+            self.cut_conv_corners = True
         if self.task == "diameter":
             self.n_in_chan = 2
         if self.model == "FixedBfsNCA":
@@ -192,7 +200,7 @@ class BatchConfig(Config):
     filter_by_config: bool = False
     selective_table: bool = False
     load_pickle: bool = False
-    n_updates: int = 100000
+    n_updates: int = 50000
 
 
 cs = ConfigStore.instance()

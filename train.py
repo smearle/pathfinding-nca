@@ -34,7 +34,7 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
     tb_writer.add_scalar('model/n_params', n_params, 0)
     if cfg.wandb:
         if logger.n_step == 0:
-            wandb.log({'n_params': n_params})
+            wandb.log({'n_params': n_params}, step=0)
 
     env_gen_cfg: EnvGeneration = cfg.env_generation
     if env_gen_cfg is not None:
@@ -110,15 +110,26 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
 
                 # for p in model.parameters():
                 for name, p in model.named_parameters():
+
                     if p.grad is None:
                         assert cfg.model == "BfsNCA", f"Gradient of parameter {name} should not be None."
                         continue
-                    if not isinstance(model, GCN) and cfg.cut_conv_corners and "weight" in name:
-                        # Zero out all the corners
-                        p.grad[:, :, 0, 0] = p.grad[:, :, -1, -1] = p.grad[:, :, -1, 0] = p.grad[:, :, 0, -1] = 0
+
+                    if "weight" in name:
+                        if not isinstance(model, GCN) and cfg.cut_conv_corners:
+                            # Zero out all the corners
+                            p.grad[:, :, 0, 0] = p.grad[:, :, -1, -1] = p.grad[:, :, -1, 0] = p.grad[:, :, 0, -1] = 0
+
+                        if cfg.symmetric_conv:
+                            symm_grad = p.grad[:, :, 1, 0] + p.grad[:, :, 0, 1] + p.grad[:, :, 1, 2] + p.grad[:, :, 2, 1]
+                            symm_grad /= 4
+                            p.grad[:, :, 1, 0] = p.grad[:, :, 0, 1] = p.grad[:, :, 1, 2] = p.grad[:, :, 2, 1] = symm_grad
+
                     p.grad /= (p.grad.norm()+1e-8)     # normalize gradients 
+
                 opt.step()
                 opt.zero_grad()
+
             # lr_sched.step()
             tb_writer.add_scalar("training/loss", loss.item(), i)
             if cfg.wandb:

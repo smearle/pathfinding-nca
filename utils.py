@@ -75,12 +75,18 @@ def log_stats(model: PathfindingNN, logger: Logger, cfg: Config):
 def count_parameters(model: PathfindingNN, cfg: Config):
     n_params = 0
     for name, p in model.named_parameters():
-        if not isinstance(model, GCN) and cfg.cut_conv_corners and "weight" in name:
-            # Don't count the corners. (Assume 3x3 convolutional kernels).
-            assert p.shape[-2:] == (3, 3)
-            n_ps = p.numel() * 5/9
-            assert n_ps % 1 == 0
-            n_params += int(n_ps)
+        if "weight" in name:
+            if not isinstance(model, GCN) and cfg.cut_conv_corners:
+                # Don't count the corners. (Assume 3x3 convolutional kernels).
+                assert p.shape[-2:] == (3, 3)
+                n_ps = p.numel() * 5/9
+                assert n_ps % 1 == 0
+                n_params += int(n_ps)
+            elif cfg.symmetric_conv:
+                assert p.shape[-2:] == (3, 3)
+                n_ps = p.numel() * 2/9
+                assert n_ps % 1 == 0
+                n_params += int(n_ps)
         else:
             n_params += p.numel()
         # TODO: support networks involving some hand-coded, non-learning sub-networks

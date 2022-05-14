@@ -38,6 +38,11 @@ class NCA(PathfindingNN):
                 conv.weight.data[:, :, 0, 0] = conv.weight.data[:, :, -1, -1] = conv.weight.data[:, :, 0, -1] = \
                     conv.weight.data[:, :, -1, 0] = 0
 
+            if cfg.symmetric_conv:
+                assert cfg.cut_conv_corners
+                conv.weight.data[:, :, 1, 0] = conv.weight.data[:, :, 0, 1] = conv.weight.data[:, :, 1, 2] = \
+                    conv.weight.data[:, :, 2, 1]
+
             return conv
 
         if not cfg.shared_weights:

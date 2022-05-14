@@ -9,33 +9,33 @@ from configs.sweeps.all import HyperSweepConfig
 class ModelSweep(HyperSweepConfig):
     name: str = 'models'
     model: List[Any] = field(default_factory=lambda: [
-        # "GCN"
-        "FixedBfsNCA",
+        "GCN"
+        # "FixedBfsNCA",
     ])
     task: List[Any] = field(default_factory=lambda: [
         "pathfinding",
         # "diameter",
     ])
     shared_weights: List[bool] = field(default_factory=lambda: [
-        True,
-        # False
+        # True,
+        False
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
-        # 4,
-        # 8,
-        # 16,
-        24,
-        32,
-        64,
-        96,
+        4,
+        8,
+        16,
+        # 24,
+        # 32,
+        # 64,
+        # 96,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
         # 4,
         # 8,
         # 16,
-        # 32,
-        # 96,
-        # 128,
+        32,
+        96,
+        128,
         256,
         # 512,
     ])
