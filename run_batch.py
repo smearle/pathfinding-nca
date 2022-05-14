@@ -25,6 +25,7 @@ from mazes import Mazes, main_mazes  # Weirdly need this to be able to load data
 
 
 PAR_DIR = Path(__file__).parent
+RUNS_DIR = os.path.join(PAR_DIR, 'runs')
 
 
 def submit_slurm_job(sbatch_file, experiment_name, job_time, job_cpus, job_gpus, job_mem):
@@ -75,20 +76,22 @@ def main_batch(batch_dict_cfg: BatchConfig):
 
     if batch_cfg.load_all:
         # Create an experiment config for each log folder present in the `runs` directory.
-        overwrite_args = set({'load', 'evaluate', 'render', 'render_minibatch_size'})
+        overwrite_args = set({'load', 'evaluate', 'render', 'render_minibatch_size', 'wandb'})
         exp_dirs = []
         exp_configs = []
-        for (dirpath, dirnames, filenames) in os.walk('runs'):
+        for (dirpath, dirnames, filenames) in os.walk(RUNS_DIR):
             exp_dirs.extend(dirnames)
             break
         for exp_dir in exp_dirs:
             exp_config = copy.deepcopy(batch_cfg)
-            cfg_path = os.path.join('runs', exp_dir, 'config.json')
+            # cfg_path = os.path.join(RUNS_DIR, exp_dir, 'config.json')
+            cfg_path = os.path.join(RUNS_DIR, exp_dir, 'config.yaml')
             if not os.path.exists(cfg_path):
                 print(f"Experiment config path does not exist:\n{cfg_path}")
                 print("Skipping experiment.")
                 continue
-            load_config = json.load(open(cfg_path))
+            # load_config = json.load(open(cfg_path))
+            load_config =OmegaConf.load(open(cfg_path, 'r'))
             [setattr(exp_config, k, v) for k, v in load_config.items() if k not in overwrite_args]
 
             if batch_cfg.filter_by_config:
@@ -102,15 +105,19 @@ def main_batch(batch_dict_cfg: BatchConfig):
                         # continue
 
                 for k, v in vars(exp_config).items():
+                    if k == 'exp_name':
+                        continue
                     if k == 'loss_interval' and v == exp_config.n_layers:
                         continue
                     if k in batch_hyperparams and v not in batch_hyperparams[k]:
+                        print(f"Batch config does not include value {v} for key {k}. (Admissible values: {batch_hyperparams[k]}.)")
                         invalid_cfg = True
                         break
                 if invalid_cfg:
                     continue
 
             exp_configs.append(exp_config)
+            print("Including config for experiment: ", exp_config.exp_name)
 
     else:
         # Create an experiment config for each combination of hyperparameters.
@@ -128,15 +135,15 @@ def main_batch(batch_dict_cfg: BatchConfig):
             exp_configs = new_exp_configs
     
     # Validate experiment configs, setting unique experiment names and filtering out invalid configs (flagged by 
-    # assertion errors in `config._validate()`).
+    # assertion errors in `config.validate()`).
     filtered_exp_configs = []
     for ec in exp_configs:
         try:
             # TODO: remove this once we implement `full_exp_name` inside `config.py`.
-            if not batch_cfg.load_all:
-                ec.set_exp_name()
-            else:
-                ec.validate()
+            # if not batch_cfg.load_all:
+            ec.set_exp_name()
+            # else:
+                # ec.validate()
             filtered_exp_configs.append(ec)
         except AssertionError as e:
             print("Experiment config is invalid:", e)

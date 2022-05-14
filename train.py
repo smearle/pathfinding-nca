@@ -13,11 +13,11 @@ from tqdm import tqdm
 import wandb
 
 from configs.config import Config, EnvGeneration
-from evaluate import count_parameters, evaluate
+from evaluate import evaluate
 from mazes import Mazes, bfs_grid, diameter, render_discrete
 from models.gnn import GCN
 from models.nn import PathfindingNN
-from utils import get_discrete_loss, get_mse_loss, Logger, to_path, save
+from utils import count_parameters, get_discrete_loss, get_mse_loss, Logger, to_path, save
 
 
 def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_data_val: Mazes, 

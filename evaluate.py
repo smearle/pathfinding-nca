@@ -7,30 +7,13 @@ from mazes import Mazes, render_discrete
 from models.gnn import GCN
 from models.nn import PathfindingNN
 
-from utils import get_discrete_loss, get_mse_loss, to_path
+from utils import Logger, get_discrete_loss, get_mse_loss, to_path
             
 
 def evaluate_train(model, cfg):
     """Evaluate the trained model on the training set."""
     # TODO: 
     pass
-
-
-def count_parameters(model: PathfindingNN, cfg: Config):
-    n_params = 0
-    for name, p in model.named_parameters():
-        if not isinstance(model, GCN) and cfg.cut_conv_corners and "weight" in name:
-            # Don't count the corners. (Assume 3x3 convolutional kernels).
-            assert p.shape[-2:] == (3, 3)
-            n_ps = p.numel() * 5/9
-            assert n_ps % 1 == 0
-            n_params += int(n_ps)
-        else:
-            n_params += p.numel()
-        # TODO: support networks involving some hand-coded, non-learning sub-networks
-        assert p.requires_grad
-
-    return n_params
 
 
 def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str, cfg: Config, 
@@ -49,10 +32,6 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
     np.random.shuffle(batch_idxs)
     model.eval()
     assert name in ['train', 'validate', 'test'], "Name of evaluation must be 'train', 'test' or 'validate'."
-    if is_eval and name == 'train':
-        n_params = count_parameters(model, cfg)
-        with open(f"{cfg.log_dir}/stats.json", "w") as f:
-            json.dump({"n_params": n_params}, f)
 
     if is_eval:
         n_eval_minibatches = mazes_onehot.shape[0] // batch_size

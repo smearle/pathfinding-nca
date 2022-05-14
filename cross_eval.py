@@ -17,9 +17,15 @@ from mazes import load_dataset
 
 EVAL_DIR = os.path.join(Path(__file__).parent, 'runs_eval')
 
+model_stat_keys = set({
+    'n params'
+})
+
 names_to_hyperparams = {
     'batch': [
+        "task",
         "model",
+        "env_generation",
         "n_layers",
         "loss_interval",
         "n_hid_chan",
@@ -82,6 +88,7 @@ hyperparam_renaming = {
 }
 col_renaming = {
     'n params': 'n. params',
+    'n updates': 'n. updates',
     'pct complete': 'pct. complete',
 }
 
@@ -136,7 +143,14 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig):
         # hyperparams = [h for h in list(yaml.safe_load(open('configs/batch.yaml', 'r')).keys()) if h not in ignored_hyperparams]
         row_tpls = []
         for exp_cfg in batch_exp_cfgs:
-            row_tpls.append([getattr(exp_cfg, h) for h in hyperparams])
+            # row_tpls.append([getattr(exp_cfg, h) for h in hyperparams])
+            row_tpl = []
+            for h in hyperparams:
+                if h == 'env_generation':
+                    row_tpl.append(getattr(exp_cfg, h) is not None)
+                else:
+                    row_tpl.append(getattr(exp_cfg, h))
+            row_tpls.append(row_tpl)
         hyperparams = [h.replace('_', ' ') for h in hyperparams]
         hyperparams = [hyperparam_renaming[h] if h in hyperparam_renaming else h for h in hyperparams]
         row_indices = pd.MultiIndex.from_tuples(row_tpls, names=hyperparams)
@@ -148,8 +162,10 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig):
                 col_tpls.append(('test', c.replace('TEST ', '')))
             elif 'TRAIN' in c:
                 col_tpls.append(('train', c.replace('TRAIN ', '')))
-            else:
+            elif c in model_stat_keys:
                 col_tpls.append(('model', c))
+            else:
+                col_tpls.append(('experiment', c))
             # col_tpl = ('test' if 'TEST' in c else 'train', c.replace('TEST ', '').replace('TRAIN ', ''))
             # col_tpls.append(col_tpl)
         col_tpls = [(c[0], col_renaming[c[1]] if c[1] in col_renaming else c[1]) for c in col_tpls]
@@ -224,7 +240,7 @@ def bold_extreme_values(data, data_max=-1, col_name=None):
     "Process dataframe values from floats into strings. Bold extreme (best) values."
 
     # hack
-    if col_name[1] == "n. params":
+    if col_name[1] in set({"n. params", "n. updates"}):
         return '{:,}'.format(data)
 
     else:

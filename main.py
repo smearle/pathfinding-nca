@@ -27,7 +27,7 @@ from models import BfsNCA, FixedBfsNCA, GCN, MLP, NCA
 from models.nn import PathfindingNN
 from render import render_trained
 from train import train
-from utils import Logger, VideoWriter, get_discrete_loss, get_mse_loss, to_path, load
+from utils import Logger, VideoWriter, get_discrete_loss, get_mse_loss, log_stats, to_path, load
 
 
 np.set_printoptions(threshold=sys.maxsize, linewidth=np.inf)
@@ -86,8 +86,9 @@ def main_experiment(cfg: Config=None):
                 print("Attempting to start experiment from scratch (not overwriting).")
 
         if cfg.evaluate:
-            evaluate(model, maze_data_train, cfg.val_batch_size, "train", cfg, is_eval=True)
-            evaluate(model, maze_data_test, cfg.val_batch_size, "test", cfg, is_eval=True)
+            log_stats(model, logger, cfg)
+            # evaluate(model, maze_data_train, cfg.val_batch_size, "train", cfg, is_eval=True)
+            # evaluate(model, maze_data_test, cfg.val_batch_size, "test", cfg, is_eval=True)
             return
 
     if not loaded:
@@ -108,7 +109,7 @@ def main_experiment(cfg: Config=None):
             name=cfg.exp_name, 
             id=cfg.exp_name,
             config=hyperparam_cfg,
-            resume="allow" if cfg.load else None,
+            # resume="allow" if cfg.load else None,
             # resume="allow",
         )
 

@@ -11,6 +11,11 @@ import hydra
 from hydra.core.config_store import ConfigStore
 import torch
 
+from configs.sweeps.all import HyperSweepConfig
+from configs.sweeps.loss_interval import LossIntervalSweep
+from configs.sweeps.models import ModelSweep
+from configs.sweeps.n_hid_chan import HidChanSweep
+
 
 @dataclass
 class Config():
@@ -105,24 +110,28 @@ class Config():
     env_generation: Any = None
 
     def set_exp_name(self):
+        # assert '-' not in self.exp_name, "Cannot have hyphens in `exp_name` (to allow for a backward compatibility hack)"
         self.validate()
         # TODO: create distinct `full_exp_name` attribute where we'll write this thing, so we don't overwrite the user-
         # supplied `exp_name`.
-        self.exp_name = ''.join([
-            f"{self.model}",
-            ("_diameter" if self.task == "diameter" else ""),
-            ("_evoData" if self.env_generation is not None else ""),
-            ("_noShared" if not self.shared_weights else ""),
-            ("_noSkip" if not self.skip_connections else ""),
-            f"_{self.n_hid_chan}-hid",
-            f"_{self.n_layers}-layer",
-            f"_lr-{'{:.0e}'.format(self.learning_rate)}",
-            f"_{self.n_data}-data",
-            (f"_{self.loss_interval}-loss" if self.loss_interval != self.n_layers else ''),
-            ("_cutCorners" if self.cut_conv_corners and self.model == "NCA" else ""),
-            ('_sparseUpdate' if self.sparse_update else ''),
-            f"_{self.exp_name}",
-        ])
+        # In the meantime, using the presence of a hyphen to mean we have set the full `exp_name`:
+        if '-' not in self.exp_name:
+            self.exp_name = ''.join([
+                f"{self.model}",
+                ("_diameter" if self.task == "diameter" else ""),
+                ("_evoData" if self.env_generation is not None else ""),
+                ("_noShared" if not self.shared_weights else ""),
+                ("_noSkip" if not self.skip_connections else ""),
+                f"_{self.n_hid_chan}-hid",
+                f"_{self.n_layers}-layer",
+                f"_lr-{'{:.0e}'.format(self.learning_rate)}",
+                f"_{self.n_data}-data",
+                (f"_{self.loss_interval}-loss" if self.loss_interval != self.n_layers else ''),
+                ("_cutCorners" if self.cut_conv_corners and self.model == "NCA" else ""),
+                ('_sparseUpdate' if self.sparse_update else ''),
+                f"_{self.exp_name}",
+            ])
+            assert '-' in self.exp_name
         self.log_dir = os.path.join(Path(__file__).parent.parent, "runs", self.exp_name)
 
     def validate(self):
@@ -165,155 +174,6 @@ class EnvGeneration:
     # How many updates to perform on the path-finding model to perform before generating new environments.
     gen_interval: int = 500
     evo_batch_size: int = 64
-
-
-@dataclass
-class HyperSweepConfig():
-    """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
-    name: str = 'batch'
-    model: List[Any] = field(default_factory=lambda: [
-        # "GCN",
-        "NCA",
-    ])
-    task: List[Any] = field(default_factory=lambda: [
-        "pathfinding",
-        # "diameter",
-    ])
-    n_hid_chan: List[Any] = field(default_factory=lambda: [
-        # 4,
-        # 8,
-        # 96,
-        128,
-        # 256,
-    ])
-    n_layers: List[Any] = field(default_factory=lambda: [
-        48,
-        64,
-        96,
-        # 128,
-    ])
-    env_generation: List[Any] = field(default_factory=lambda: [
-        None,
-        # EnvGeneration(),
-    ])
-    
-
-@dataclass
-class HidChanSweep(HyperSweepConfig):
-    """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
-    name: str = 'n_hid_chan'
-    model: List[Any] = field(default_factory=lambda: [
-        # "GCN",
-        "NCA",
-    ])
-    task: List[Any] = field(default_factory=lambda: [
-        "pathfinding",
-        # "diameter",
-    ])
-    n_hid_chan: List[Any] = field(default_factory=lambda: [
-        # 4,
-        # 8,
-        16,
-        38,
-        48,
-        96,
-        128,
-        256,
-    ])
-    n_layers: List[Any] = field(default_factory=lambda: [
-        64,
-        # 96,
-        # 128,
-    ])
-    env_generation: List[Any] = field(default_factory=lambda: [
-        None,
-        # EnvGeneration(),
-    ])
-
-
-@dataclass
-class ModelSweep(HyperSweepConfig):
-    name: str = 'models'
-    model: List[Any] = field(default_factory=lambda: [
-        # "GCN"
-        "FixedBfsNCA",
-    ])
-    task: List[Any] = field(default_factory=lambda: [
-        "pathfinding",
-        # "diameter",
-    ])
-    shared_weights: List[bool] = field(default_factory=lambda: [
-        True,
-        # False
-    ])
-    n_layers: List[Any] = field(default_factory=lambda: [
-        # 4,
-        # 8,
-        # 16,
-        24,
-        32,
-        64,
-        96,
-    ])
-    n_hid_chan: List[Any] = field(default_factory=lambda: [
-        # 4,
-        # 8,
-        # 16,
-        # 32,
-        # 96,
-        # 128,
-        256,
-        # 512,
-    ])
-    env_generation: List[Any] = field(default_factory=lambda: [
-        None,
-        # EnvGeneration(),
-    ])
-
-
-@dataclass
-class LossIntervalSweep(HyperSweepConfig):
-    name: str = 'loss_interval'
-    model: List[Any] = field(default_factory=lambda: [
-        "NCA"
-    ])
-    task: List[Any] = field(default_factory=lambda: [
-        "pathfinding",
-        # "diameter",
-    ])
-    env_generation: List[Any] = field(default_factory=lambda: [
-        None,
-        # EnvGeneration(),
-    ])
-    n_layers: List[Any] = field(default_factory=lambda: [
-#         4,
-#         8,
-#         16,
-#         24,
-#         32,
-        64,
-        # 96,
-    ])
-    n_hid_chan: List[Any] = field(default_factory=lambda: [
-#         4,
-#         8,
-        # 16,
-        # 32,
-        96,
-        # 128,
-        # 256,
-    ])
-    loss_interval: List[Any] = field(default_factory=lambda: [
-        4,
-        8,
-        16,
-        32,
-        64,
-    ])
-    shared_weights: List[bool] = field(default_factory=lambda: [
-        False,
-        True,
-    ])
 
 
 @dataclass

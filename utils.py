@@ -1,5 +1,6 @@
 import base64
 import io
+import json
 from pdb import set_trace as TT
 import pickle
 import requests
@@ -10,6 +11,10 @@ from moviepy.video.io.ffmpeg_writer import FFMPEG_VideoWriter
 import numpy as np
 import PIL
 import torch
+from wandb import Config
+from models.gnn import GCN
+
+from models.nn import PathfindingNN
 
 
 class Logger():
@@ -56,6 +61,32 @@ def load(model, opt, cfg):
 
 
     return model, opt, logger
+
+
+def log_stats(model: PathfindingNN, logger: Logger, cfg: Config):
+    n_params = count_parameters(model, cfg)
+    with open(f"{cfg.log_dir}/stats.json", "w") as f:
+        json.dump({
+            "n_params": n_params,
+            "n_updates": logger.n_step,
+        }, f, indent=4)
+
+
+def count_parameters(model: PathfindingNN, cfg: Config):
+    n_params = 0
+    for name, p in model.named_parameters():
+        if not isinstance(model, GCN) and cfg.cut_conv_corners and "weight" in name:
+            # Don't count the corners. (Assume 3x3 convolutional kernels).
+            assert p.shape[-2:] == (3, 3)
+            n_ps = p.numel() * 5/9
+            assert n_ps % 1 == 0
+            n_params += int(n_ps)
+        else:
+            n_params += p.numel()
+        # TODO: support networks involving some hand-coded, non-learning sub-networks
+        assert p.requires_grad
+
+    return n_params
 
 
 def to_path(x):
