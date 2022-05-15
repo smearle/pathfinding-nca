@@ -125,6 +125,10 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                             symm_grad /= 4
                             p.grad[:, :, 1, 0] = p.grad[:, :, 0, 1] = p.grad[:, :, 1, 2] = p.grad[:, :, 2, 1] = symm_grad
 
+                        elif isinstance(model, GCN):
+                            # Match the symmetric conv above.
+                            p.grad /= 4
+
                     p.grad /= (p.grad.norm()+1e-8)     # normalize gradients 
 
                 opt.step()

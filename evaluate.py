@@ -65,18 +65,23 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
             for j in range(cfg.n_layers):
                 x = model(x)
 
+                if j == cfg.n_layers - 1 or is_eval:
+                    x_clipped = th.clip(x, 0, 1)
+
                 if j == cfg.n_layers - 1:
                     if is_eval:
-                        baseline_losses.append(get_mse_loss(th.zeros_like(x), target_paths_minibatch).item())
-                    eval_loss = get_mse_loss(x, target_paths_minibatch).item()
-                    eval_discrete_loss = get_discrete_loss(x, target_paths_minibatch).cpu().numpy()
+                        baseline_loss = get_mse_loss(th.zeros_like(x), target_paths_minibatch).item()
+                        baseline_losses.append(baseline_loss)
+                    eval_loss = get_mse_loss(x_clipped, target_paths_minibatch).item()
+                    # print(baseline_loss, eval_loss)
+                    eval_discrete_loss = get_discrete_loss(x_clipped, target_paths_minibatch).cpu().numpy()
                     eval_pct_complete = np.sum(eval_discrete_loss.reshape(batch_size, -1).sum(1) == 0) / batch_size
                     losses.append(eval_loss)
                     discrete_losses.append(eval_discrete_loss.mean().item())
                     eval_pcts_complete.append(eval_pct_complete)
 
                 if is_eval:
-                    eval_discrete_loss = get_discrete_loss(x, target_paths_minibatch).cpu()
+                    eval_discrete_loss = get_discrete_loss(x_clipped, target_paths_minibatch).cpu()
                     completion_times = np.where(eval_discrete_loss.reshape(batch_size, -1).sum(dim=1) == 0, j, completion_times)
                     completion_times /= path_lengths
                     eval_completion_times.append(np.nanmean(completion_times))

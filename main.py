@@ -73,6 +73,8 @@ def main_experiment(cfg: Config=None):
     if cfg.evaluate or cfg.render:
         cfg_32 = copy.copy(cfg)
         cfg_32.width, cfg_32.height = 32, 32
+        if cfg.shared_weights:
+            cfg_32.n_layers = cfg.n_layers * 2
         maze_data_test_32 = load_dataset(cfg_32, test_only=True)
 
     loaded = False

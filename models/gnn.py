@@ -1,4 +1,5 @@
 from collections import OrderedDict
+import math
 from pdb import set_trace as TT
 from turtle import right
 
@@ -11,6 +12,7 @@ from models.nn import PathfindingNN
 
 
 np.set_printoptions(threshold=np.inf, linewidth=np.inf)
+th.set_printoptions(threshold=1000, linewidth=1000)
 
 
 class GCN(PathfindingNN):
@@ -22,10 +24,33 @@ class GCN(PathfindingNN):
         self.edges = None
 
         def _make_convs():
-            gconv0 = GCNConv(n_hid_chan + n_in_chan, self.n_out_chan)
-#             gconv0 = GCNConv(n_hid_chan + n_in_chan, n_hid_chan)
-#             gconv1 = GCNConv(n_hid_chan, self.n_out_chan)
+            gconv0 = GCNConv(n_hid_chan + n_in_chan, self.n_out_chan, add_self_loops=False, improved=False, normalize=False)
+            weight = list(gconv0.modules())[1].weight
+            bias = gconv0.bias
 
+            th.nn.init.normal_(weight, 0, 0.01)
+            th.nn.init.normal_(bias, 0, 0.01)
+
+            # NOTE: copy-pasted from torch Conv2d implementation. To match the initialization scheme for a 3x3 NCA with
+            #   the same weights, we get a bit more hands-on.
+            # Setting a=sqrt(5) in kaiming_uniform is the same as initializing with
+            # uniform(-1/sqrt(k), 1/sqrt(k)), where k = weight.size(1) * prod(*kernel_size)
+            # For more details see: https://github.com/pytorch/pytorch/issues/15314#issuecomment-477448573
+            # th.nn.init.kaiming_uniform_(weight, a=math.sqrt(5))
+
+            # # Here is the conv weight we're attempting to match.
+            # trg_kernel_shape = (3, 3)
+            # trg_kernel_size = math.prod(trg_kernel_shape)
+            # # Number of channels is the same as in a conv weight.
+            # k = weight.size(1) * trg_kernel_size
+            # th.nn.init.uniform_(weight, -1/math.sqrt(k), 1/math.sqrt(k))
+            # assert bias is not None
+            # fan_in, _ = th.nn.init._calculate_fan_in_and_fan_out(weight)
+            # # Not sure of specifics of `fan_in` but this seems to match the outcome in the case of a conv weight.
+            # fan_in *= trg_kernel_size
+            # if fan_in != 0:
+            #     bound = 1 / math.sqrt(fan_in)
+            #     th.nn.init.uniform_(bias, -bound, bound)
 
             return gconv0  #, gconv1
             
@@ -47,19 +72,27 @@ class GCN(PathfindingNN):
         This involves concatenating with the underlying maze-state (in `super.forward()`), and flattening along the 
         maze's width and height dimensions."""
 
-        ### DEBUG ###
+        # ### DEBUG ###
         # if self.n_step == 0:
         #     x[:] = 0.0
+        #     # provide activation in top corner of first input
         #     x[0,-1, 0, 0] = 1.0
+        # else:
+        #     # overwrite the maze
+        #     x[:, :self.cfg.n_in_chan] = 0
 
         batch_size, n_chan, width, height = x.shape
 
         # Move channel dimension to front. Then, flatten along width, height, and then batch dimensions.
         x = x.transpose(1, 0)
         x = x.reshape(x.shape[0], -1)
+
+        # (batches, channels)
         x = x.transpose(1, 0)
 
-        x = self.layers[i](x, self.grid_edges).relu()
+        # x = self.layers[i](x, self.grid_edges).relu()
+        # x = th.clip(self.layers[i](x, self.edges), 0, 1)
+        x = self.layers[i](x, self.edges).relu()
 
 #         x = self.layers[i*2](x, self.grid_edges).relu()
 #         x = self.layers[i*2+1](x, self.self_edges).relu()
@@ -80,16 +113,16 @@ class GCN(PathfindingNN):
             width, height = x0.shape[-2:]
             n_nodes = width * height
             grid_edges = get_grid_edges(width, height)
-            # self_edges = get_self_edges(width, height)
+            self_edges = get_self_edges(width, height)
             self.grid_edges = batch_edges(grid_edges, batch_size, n_nodes)
-            # self.self_edges = batch_edges(self_edges, batch_size, n_nodes)
-            # self.edges = th.hstack((self.self_edges, self.grid_edges))
+            self.self_edges = batch_edges(self_edges, batch_size, n_nodes)
+            self.edges = th.hstack((self.self_edges, self.grid_edges))
             # self.edges = self.self_edges
             # self.edges = self.grid_edges
         super().reset(x0, is_torchinfo_dummy)         
 
 
-        ### DEBUG ###
+        # ### DEBUG ###
         # for name, p in self.named_parameters():
         #     if "weight" in name:
         #         p.data.fill_(1.0)

@@ -53,3 +53,26 @@ class NCA(PathfindingNN):
 
         self.layers = nn.ModuleList(modules)
 
+
+    # def forward_layer(self, x: th.Tensor, i: int):
+    #     ### DEBUG ###
+    #     if self.n_step == 0:
+    #         x[:] = 0.0
+    #         # provide activation in top corner of first input
+    #         x[0,-1, 0, 0] = 1.0
+    #     else:
+    #         # overwrite the maze
+    #         x[:, :self.cfg.n_in_chan] = 0
+        
+    #     return super().forward_layer(x, i)
+
+    # def reset(self, *args, **kwargs):
+    #     ret = super().reset(*args, **kwargs)
+    #     ### DEBUG ###
+    #     for name, p in self.named_parameters():
+    #         if "weight" in name:
+    #             p.data.fill_(1.0)
+    #         else:
+    #             p.data.zero_()
+
+    #     return ret

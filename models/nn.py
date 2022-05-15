@@ -43,7 +43,7 @@ class PathfindingNN(ABC, nn.Module):
             if self.cfg.skip_connections or self.n_step == 0:
                 x = self.add_initial_maze(x)
 
-            x = self.forward_layer(x, self.n_step)
+            x = self.forward_layer(x, self.n_step % len(self.layers))
             self.n_step += 1
 
         return x

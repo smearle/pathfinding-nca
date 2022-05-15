@@ -87,8 +87,8 @@ def count_parameters(model: PathfindingNN, cfg: Config):
                 n_ps = p.numel() * 2/9
                 assert n_ps % 1 == 0
                 n_params += int(n_ps)
-        else:
-            n_params += p.numel()
+            else:
+                n_params += p.numel()
         # TODO: support networks involving some hand-coded, non-learning sub-networks
         assert p.requires_grad
 

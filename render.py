@@ -13,9 +13,9 @@ from models.nn import PathfindingNN
 
 RENDER_TYPE = 0
 N_RENDER_CHANS = None
-SAVE_GIF = True
+SAVE_GIF = False
 SAVE_PNGS = False
-N_RENDER_EPISODES = 10
+N_RENDER_EPISODES = None
 CV2_WAIT_KEY_TIME = 1
 
 
@@ -36,6 +36,10 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, 
     batch_idxs = path_lengths.sort(descending=True)[1]
     # batch_idx = np.random.choice(mazes_onehot.shape[0], render_minibatch_size, replace=False)
     bi = 0
+
+    global N_RENDER_EPISODES
+    if N_RENDER_EPISODES is None:
+        N_RENDER_EPISODES = len(batch_idxs)
 
     def reset(bi):
         batch_idx = batch_idxs[th.arange(render_minibatch_size) + bi]

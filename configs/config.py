@@ -178,7 +178,7 @@ class Config():
 
         if self.render:
             self.wandb = False
-            self.render_minibatch_size = 1
+            # self.render_minibatch_size = 1
 
 
 @dataclass
