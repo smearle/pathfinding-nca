@@ -105,8 +105,12 @@ def main_batch(batch_dict_cfg: BatchConfig):
                         # continue
 
                 for k, v in vars(exp_config).items():
-                    if k == 'exp_name':
+                    if k == 'full_exp_name':
                         continue
+                    if k == 'exp_name':
+                        # FIXME: Backward compatibility HACK
+                        if '-' in v:
+                            v = v.split('_')[-1]
                     if k == 'loss_interval' and v == exp_config.n_layers:
                         continue
                     if k in batch_hyperparams and v not in batch_hyperparams[k]:
@@ -116,8 +120,13 @@ def main_batch(batch_dict_cfg: BatchConfig):
                 if invalid_cfg:
                     continue
 
+            # Only perform missing evals.
+            if not batch_cfg.overwrite_evals and not batch_cfg.vis_cross_eval \
+                and os.path.exists(os.path.join(RUNS_DIR, exp_dir, 'test_32_stats.json')):
+                continue
+
             exp_configs.append(exp_config)
-            print("Including config for experiment: ", exp_config.exp_name)
+            print("Including config for experiment found at: ", exp_dir)
 
     else:
         # Create an experiment config for each combination of hyperparameters.

@@ -12,16 +12,17 @@ import torchvision.models as models
 from tqdm import tqdm
 import wandb
 
-from configs.config import Config, EnvGeneration
+from configs.config import Config
+from configs.env_gen import EnvGeneration
 from evaluate import evaluate
-from mazes import Mazes, bfs_grid, diameter, render_discrete
+from mazes import Mazes, bfs_grid, diameter, get_rand_path, render_discrete
 from models.gnn import GCN
 from models.nn import PathfindingNN
 from utils import count_parameters, get_discrete_loss, get_mse_loss, Logger, to_path, save
 
 
 def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_data_val: Mazes, 
-        target_paths: th.Tensor, logger: Logger, cfg: Config):
+        maze_data_test_32: Mazes, target_paths: th.Tensor, logger: Logger, cfg: Config, cfg_32):
     tb_writer = SummaryWriter(log_dir=cfg.log_dir)
     mazes_onehot, maze_ims = maze_data.mazes_onehot, maze_data.maze_ims
     minibatch_size = min(cfg.minibatch_size, cfg.n_data)
@@ -38,11 +39,17 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
 
     env_gen_cfg: EnvGeneration = cfg.env_generation
     if env_gen_cfg is not None:
-        if not cfg.load:
+        last_evo = 0
+        loaded_env_losses = False
+        if cfg.load:
+            try:
+                env_losses = pickle.load(open(f'{cfg.log_dir}/env_losses.pkl', 'rb'))
+                loaded_env_losses = True
+            except FileNotFoundError:
+                print("Env losses array not found. Initializing from scratch.")
+        if not loaded_env_losses:
             env_losses = th.empty((cfg.n_data))
             env_losses.fill_(-np.inf)
-        else:
-            env_losses = pickle.load(open(f'{cfg.log_dir}/env_losses.pkl', 'rb'))
 
     for i in tqdm(range(logger.n_step, cfg.n_updates)):
         with th.no_grad():
@@ -137,7 +144,7 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
             # lr_sched.step()
             tb_writer.add_scalar("training/loss", loss.item(), i)
             if cfg.wandb:
-                wandb.log({"training/loss": loss.item()})
+                wandb.log({"training/loss": loss.item()}, step=i)
             logger.log(loss=loss.item(), discrete_loss=discrete_loss.item())
                     
             if i % cfg.save_interval == 0 or i == cfg.n_updates - 1:
@@ -153,17 +160,21 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                     with open(os.path.join(cfg.log_dir, "evo_mazes.pkl"), "wb") as f:
                         pickle.dump(maze_data, f)
                     with open(os.path.join(cfg.log_dir, "env_losses.pkl"), "wb") as f:
-                        pickle.dump(maze_data, f)
+                        pickle.dump(env_losses, f)
 
             if i % cfg.eval_interval == 0:
                 val_stats = evaluate(model, maze_data_val, cfg.val_batch_size, "validate", cfg)
                 logger.log_val(val_stats)
                 for k, v in val_stats.items():
                     tb_writer.add_scalar(f"validation/mean_{k}", v[0], i)
-                    # tb_writer.add_scalar(f"validation/std_{k}", v[1], i)
                     if cfg.wandb:
-                        wandb.log({f"validation/mean_{k}": v[0]})
-                        # wandb.log({f"validation/std_{k}": v[1]})
+                        wandb.log({f"validation/mean_{k}": v[0]}, step=i)
+                val_stats_32 = evaluate(model, maze_data_test_32, cfg.val_batch_size, "validate", cfg_32)
+                # logger.log_val(val_stats_32)
+                for k, v in val_stats_32.items():
+                    tb_writer.add_scalar(f"validation/32x32/mean_{k}", v[0], i)
+                    if cfg.wandb:
+                        wandb.log({f"validation/32x32/mean_{k}": v[0]}, step=i)
 
             if i % cfg.log_interval == 0 or i == cfg.n_updates - 1:
                 log(logger, lr_sched, cfg)
@@ -183,44 +194,52 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 tb_writer.add_image("examples", np.array(tb_images), i)
                 if cfg.wandb:
                     images = wandb.Image(images, caption="Top: Input, Middle: Output, Bottom: Target")
-                    wandb.log({"examples": images})
+                    wandb.log({"examples": images}, step=i)
 
             if i == cfg.n_updates - 1:
                 vis_train(logger, render_maze_ims, render_paths, target_path_ims, render_batch_idx, cfg)
 
-            if env_gen_cfg is not None and i % env_gen_cfg.gen_interval == 0:
+            if env_gen_cfg is not None \
+                    and loss < 1e-2 and last_evo >= env_gen_cfg.gen_interval:
+                last_evo = 0
+            # if True:
+                # and i % env_gen_cfg.gen_interval == 0 \
                 ret = sorted(
                     zip(env_losses, mazes_onehot, maze_ims, target_paths), key=lambda x: x[0], reverse=True)
                 ret = list(zip(*ret))
                 env_losses, mazes_onehot, maze_ims, target_paths = th.stack(ret[0]), th.stack(ret[1]), \
                     np.stack(ret[2]), th.stack(ret[3])
-                offspring_mazes_onehot = mazes_onehot[:env_gen_cfg.evo_batch_size]
+                offspring_maze_walls = mazes_onehot[:env_gen_cfg.evo_batch_size, :2].argmax(1)
 
                 # Mutate the mazes (except at the border walls).
-                disc_noise = th.randint(1, cfg.n_in_chan, offspring_mazes_onehot.shape)
-                mut_mask = th.rand(offspring_mazes_onehot.shape) < .1
+                disc_noise = th.randint(1, 2, offspring_maze_walls.shape)
+                mut_mask = th.rand(offspring_maze_walls.shape) < .1
                 disc_noise *= mut_mask
-                disc_noise[:, :, 0, :] = disc_noise[:, :, -1] = 0
-                disc_noise[:, :, :, 0] = disc_noise[:, :, :, -1] = 0
-                offspring_mazes_onehot = offspring_mazes_onehot + disc_noise % cfg.n_in_chan
-                offspring_mazes_onehot[:, cfg.wall_chan, 0] = offspring_mazes_onehot[:, cfg.wall_chan, -1] = 1
-                offspring_maze_ims = render_discrete(offspring_mazes_onehot.argmax(dim=1), cfg)
+                disc_noise[:, 0, :] = disc_noise[:, -1] = 0
+                disc_noise[:, :, 0] = disc_noise[:, :, -1] = 0
+                offspring_maze_walls = (offspring_maze_walls + disc_noise) % 2
+                offspring_mazes = offspring_maze_walls
 
                 # Get their solutions.
-                offspring_target_paths = th.zeros_like(offspring_mazes_onehot[:, 0])
-                for mi, maze_onehot in enumerate(offspring_mazes_onehot):
-                    maze_discrete = maze_onehot.argmax(dim=0)
+                offspring_target_paths = th.zeros_like(offspring_maze_walls[:])
+                for mi, maze_discrete in enumerate(offspring_mazes):
 
                     if cfg.task == 'pathfinding':
                         # TODO: need to constrain mutation of sources and targets for this task.
-                        sol = bfs_grid(maze_discrete.cpu().numpy(), cfg.n_in_chan)
+                        sol = get_rand_path(maze_discrete)
+                        x, y = sol[0]
+                        maze_discrete[x, y] = cfg.src_chan
                         for (x, y) in sol:
                             offspring_target_paths[mi, x, y] = 1
+                        maze_discrete[x, y] = cfg.trg_chan
                     elif cfg.task == 'diameter':
                         diam, connected = diameter(maze_discrete.cpu().numpy(), cfg.n_in_chan)
                         for (x, y) in diam:
                             offspring_target_paths[mi, x, y] = 1
+                offspring_mazes_onehot = th.zeros(env_gen_cfg.evo_batch_size, cfg.n_in_chan, *offspring_mazes.shape[-2:])
+                offspring_mazes_onehot.scatter_(1, offspring_mazes[:,None,...], 1)
 
+                offspring_maze_ims = render_discrete(offspring_mazes, cfg)
                 offspring_env_losses = th.zeros(env_gen_cfg.evo_batch_size)
 
                 model.reset(offspring_mazes_onehot)
@@ -253,6 +272,11 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 path_lengths = target_paths.sum((1, 2)).float()
                 for stat in ['mean', 'min', 'max', 'std']:
                     tb_writer.add_scalar(f"data/{stat}_path-length", getattr(path_lengths, stat)(), i)
+                    if cfg.wandb:
+                        wandb.log({f"data/{stat}_path-length": getattr(path_lengths, stat)()}, step=i)
+
+            elif env_gen_cfg is not None:
+                last_evo += 1
                 
 
 def log(logger, lr_sched, cfg):

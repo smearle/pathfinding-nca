@@ -35,6 +35,7 @@ names_to_hyperparams = {
         "sparse_update",
         "n_data",
         "learning_rate",
+        "exp_name",
     ],
     'n_hid_chan': [
         'model',
@@ -151,6 +152,9 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig):
             for h in hyperparams:
                 if h == 'env_generation':
                     row_tpl.append(getattr(exp_cfg, h) is not None)
+                # elif h == 'exp_name':
+                    # FIXME: hack
+                    # row_tpl.append(getattr(exp_cfg, h).split('_')[-1])
                 else:
                     row_tpl.append(getattr(exp_cfg, h))
             row_tpls.append(row_tpl)
@@ -203,7 +207,7 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig):
             print(k[-1])
             df[k] = df[k].apply(
                 lambda data: bold_extreme_values(data, 
-                                data_max=(max if ('completion time' not in k[1] and 'losses' not in k[-1]) else min)\
+                                data_max=(max if ('completion time' not in k[-1] and 'losses' not in k[-1]) else min)\
                                     ([(d[0] if isinstance(d, tuple) else d) for d in df[k]]), 
                                 col_name=k)
             )

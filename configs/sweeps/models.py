@@ -17,27 +17,34 @@ class ModelSweep(HyperSweepConfig):
         # "diameter",
     ])
     shared_weights: List[bool] = field(default_factory=lambda: [
-        # True,
-        False
+        True,
+        # False
     ])
-    n_layers: List[Any] = field(default_factory=lambda: [
-        4,
-        8,
-        16,
+    # n_layers: List[Any] = field(default_factory=lambda: [
+        # 4,
+        # 8,
+        # 16,
         # 24,
         # 32,
         # 64,
         # 96,
-    ])
-    n_hid_chan: List[Any] = field(default_factory=lambda: [
+    # ])
+    # n_hid_chan: List[Any] = field(default_factory=lambda: [
         # 4,
         # 8,
         # 16,
-        32,
-        96,
-        128,
-        256,
+        # 32,
+        # 96,
+        # 128,
+        # 256,
         # 512,
+    # ])
+    loss_interval: List[Any] = field(default_factory=lambda: [
+    #     # 4,
+    #     # 8,
+    #     # 16,
+        32,
+        # 64,
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
         None,

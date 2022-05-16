@@ -70,12 +70,11 @@ def main_experiment(cfg: Config=None):
     # maze_data_val.get_subset(cfg.n_val_data)
   # cfg.n_data = maze_data_train.mazes_onehot.shape[0]
 
-    if cfg.evaluate or cfg.render:
-        cfg_32 = copy.copy(cfg)
-        cfg_32.width, cfg_32.height = 32, 32
-        if cfg.shared_weights:
-            cfg_32.n_layers = cfg.n_layers * 2
-        maze_data_test_32 = load_dataset(cfg_32, test_only=True)
+    cfg_32 = copy.copy(cfg)
+    cfg_32.width, cfg_32.height = 32, 32
+    if cfg.shared_weights:
+        cfg_32.n_layers = cfg.n_layers * 2
+    maze_data_test_32 = load_dataset(cfg_32, test_only=True)
 
     loaded = False
     if cfg.load:
@@ -115,8 +114,8 @@ def main_experiment(cfg: Config=None):
         wandb.login()
         wandb.init(
             project='pathfinding-nca', 
-            name=cfg.exp_name, 
-            id=cfg.exp_name,
+            name=cfg.full_exp_name, 
+            id=cfg.full_exp_name,
             config=hyperparam_cfg,
             # resume="allow" if cfg.load else None,
         )
@@ -134,13 +133,10 @@ def main_experiment(cfg: Config=None):
     if cfg.render:
         with th.no_grad():
             render_trained(model, maze_data_train, cfg)
-            cfg_32 = copy.copy(cfg)
-            cfg_32.width, cfg_32.height = 32, 32
-            maze_data_test_32 = load_dataset(cfg_32, test_only=True)
             render_trained(model, maze_data_test_32, cfg_32, name="_32")
 
     else:
-        train(model, opt, maze_data_train, maze_data_val, target_paths, logger, cfg)
+        train(model, opt, maze_data_train, maze_data_val, maze_data_test_32, target_paths, logger, cfg, cfg_32)
 
     if cfg.wandb:
         wandb.finish()

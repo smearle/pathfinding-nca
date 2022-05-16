@@ -12,9 +12,11 @@ from hydra.core.config_store import ConfigStore
 import torch
 
 from configs.sweeps.all import HyperSweepConfig
+from configs.sweeps.diam_cut_corners import DiamCutCornerSweep
 from configs.sweeps.loss_interval import LossIntervalSweep
 from configs.sweeps.models import ModelSweep
 from configs.sweeps.n_hid_chan import HidChanSweep
+from configs.sweeps.evo_data import EvoDataSweep
 
 
 @dataclass
@@ -87,7 +89,7 @@ class Config():
 
     # When to compute the loss and update the network. If None, only compute the loss at the end of an `n_layers`-length
     # episode.
-    loss_interval: Optional[int] = None
+    loss_interval: Optional[Any] = None
 
     # Whether to feed in the input maze at each pass through the network.
     skip_connections: bool = True
@@ -113,30 +115,32 @@ class Config():
     env_generation: Any = None
 
     def set_exp_name(self):
+        # BACKWARD COMPATABILITY HACK. FIXME: Remove this when all experiments from before `full_exp_name` are obsolete.
+        if '-' in self.exp_name:
+            self.exp_name = self.exp_name.split('_')[-1]
+
         # assert '-' not in self.exp_name, "Cannot have hyphens in `exp_name` (to allow for a backward compatibility hack)"
         self.validate()
         # TODO: create distinct `full_exp_name` attribute where we'll write this thing, so we don't overwrite the user-
         # supplied `exp_name`.
         # In the meantime, using the presence of a hyphen to mean we have set the full `exp_name`:
-        if '-' not in self.exp_name:
-            self.exp_name = ''.join([
-                f"{self.model}",
-                ("_diameter" if self.task == "diameter" else ""),
-                ("_evoData" if self.env_generation is not None else ""),
-                ("_noShared" if not self.shared_weights else ""),
-                ("_noSkip" if not self.skip_connections else ""),
-                f"_{self.n_hid_chan}-hid",
-                f"_{self.n_layers}-layer",
-                f"_lr-{'{:.0e}'.format(self.learning_rate)}",
-                f"_{self.n_data}-data",
-                (f"_{self.loss_interval}-loss" if self.loss_interval != self.n_layers else ''),
-                ("_cutCorners" if self.cut_conv_corners and self.model == "NCA" else ""),
-                ("_symmConv" if self.symmetric_conv and self.model == "NCA" else ""),
-                ('_sparseUpdate' if self.sparse_update else ''),
-                f"_{self.exp_name}",
-            ])
-            assert '-' in self.exp_name
-        self.log_dir = os.path.join(Path(__file__).parent.parent, "runs", self.exp_name)
+        self.full_exp_name = ''.join([
+            f"{self.model}",
+            ("_diameter" if self.task == "diameter" else ""),
+            ("_evoData" if self.env_generation is not None else ""),
+            ("_noShared" if not self.shared_weights else ""),
+            ("_noSkip" if not self.skip_connections else ""),
+            f"_{self.n_hid_chan}-hid",
+            f"_{self.n_layers}-layer",
+            f"_lr-{'{:.0e}'.format(self.learning_rate)}",
+            f"_{self.n_data}-data",
+            (f"_{self.loss_interval}-loss" if self.loss_interval != self.n_layers else ''),
+            ("_cutCorners" if self.cut_conv_corners and self.model == "NCA" else ""),
+            ("_symmConv" if self.symmetric_conv and self.model == "NCA" else ""),
+            ('_sparseUpdate' if self.sparse_update else ''),
+            f"_{self.exp_name}",
+        ])
+        self.log_dir = os.path.join(Path(__file__).parent.parent, "runs", self.full_exp_name)
 
     def validate(self):
         if not self.model == "NCA":
@@ -182,13 +186,6 @@ class Config():
 
 
 @dataclass
-class EnvGeneration:
-    # How many updates to perform on the path-finding model to perform before generating new environments.
-    gen_interval: int = 500
-    evo_batch_size: int = 64
-
-
-@dataclass
 class BatchConfig(Config):
     """A class for batch configurations. This is used for parallel SLURM jobs, or a sequence of local jobs."""
     sweep: HyperSweepConfig = HyperSweepConfig()
@@ -201,6 +198,7 @@ class BatchConfig(Config):
     selective_table: bool = False
     load_pickle: bool = False
     n_updates: int = 50000
+    overwrite_evals: bool = False
 
 
 cs = ConfigStore.instance()
@@ -210,4 +208,5 @@ cs.store(group="sweep", name="default", node=HyperSweepConfig)
 cs.store(group="sweep", name="models", node=ModelSweep)
 cs.store(group="sweep", name="loss_interval", node=LossIntervalSweep)
 cs.store(group="sweep", name="n_hid_chan", node=HidChanSweep)
-
+cs.store(group="sweep", name="evo_data", node=EvoDataSweep)
+cs.store(group="sweep", name="diam_cut_corners", node=DiamCutCornerSweep)

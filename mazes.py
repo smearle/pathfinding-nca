@@ -248,6 +248,19 @@ def diameter(arr, passable=0, impassable=1):
     return max_path_xy, max_connected_xy
 
 
+def get_rand_path(arr, passable=0, impassable=1):
+    width, height = arr.shape
+    graph = get_graph(arr, passable, impassable)
+    srcs = th.argwhere(arr==passable)
+    src = srcs[np.random.randint(len(srcs))]
+    src = src[0] * width + src[1]
+    src = src.item()
+    paths = dict(nx.shortest_path(graph, src))
+    trg, path = paths.popitem()
+    path_xy = [(i // width, i % width) for i in path]
+    return path_xy
+
+
 def gen_rand_mazes(n_data, cfg):
     # Generate new random mazes until we get enough solvable ones.
     n_data = cfg.n_data

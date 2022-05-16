@@ -2,6 +2,7 @@ from pdb import set_trace as TT
 import math
 import os
 import shutil
+import PIL
 import cv2
 import imageio
 from matplotlib import animation, pyplot as plt
@@ -17,6 +18,7 @@ SAVE_GIF = False
 SAVE_PNGS = False
 N_RENDER_EPISODES = None
 CV2_WAIT_KEY_TIME = 1
+RENDER_WEIGHTS = True
 
 
 def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, name=''):
@@ -115,6 +117,22 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, 
         return ims
 
     model_has_oracle = model == "BfsNCA"
+
+    if RENDER_WEIGHTS:
+        for name, p in model.named_parameters():
+            if "weight" in name:
+                # (in_chan, height, width, out_chan)
+                im = p.data.permute(0, 2, 3, 1)
+                # (in_chan * height, width, out_chan)
+                im = th.vstack([wi for wi in im])
+                # (out_chan, width, in_chan * height)
+                im = im.permute(2, 1, 0)
+                im = th.vstack([wi for wi in im])
+                im = (im - im.min()) / (im.max() - im.min())
+                im = PIL.Image.fromarray(im.cpu().numpy() * 255)
+                im.show()
+                im.save(open(os.path.join(cfg.log_dir, 'weights.png')))
+        return
 
     # Render live and indefinitely using cv2.
     if RENDER_TYPE == 0:

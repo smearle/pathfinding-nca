@@ -31,6 +31,10 @@ class GCN(PathfindingNN):
             th.nn.init.normal_(weight, 0, 0.01)
             th.nn.init.normal_(bias, 0, 0.01)
 
+            # _dummy_conv = th.nn.Conv2d(n_hid_chan + n_in_chan, self.n_out_chan, 3, 1, 1)
+            # weight.data[:] = _dummy_conv.weight[:,:,1,0]
+            # bias.data[:] = _dummy_conv.bias[:]
+
             # NOTE: copy-pasted from torch Conv2d implementation. To match the initialization scheme for a 3x3 NCA with
             #   the same weights, we get a bit more hands-on.
             # Setting a=sqrt(5) in kaiming_uniform is the same as initializing with
