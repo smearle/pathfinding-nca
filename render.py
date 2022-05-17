@@ -12,13 +12,14 @@ from mazes import render_discrete
 
 from models.nn import PathfindingNN
 
+
 RENDER_TYPE = 0
 N_RENDER_CHANS = None
-SAVE_GIF = False
+SAVE_GIF = True
 SAVE_PNGS = False
-N_RENDER_EPISODES = None
+N_RENDER_EPISODES = 10
 CV2_WAIT_KEY_TIME = 1
-RENDER_WEIGHTS = True
+RENDER_WEIGHTS = False
 
 
 def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, name=''):
@@ -147,14 +148,15 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, 
                 if os.path.exists(render_dir):
                     shutil.rmtree(render_dir)
                 os.mkdir(render_dir)
-            cv2.resizeWindow('pathfinding', 2000, 2000)
+            # cv2.resize('pathfinding', (2000, 2000))
             frame_i = 0
 
             for ep_i in range(N_RENDER_EPISODES):
                 x, maze_imgs, bi = reset(bi)
                 oracle_out = model.oracle_out if model_has_oracle else None
                 ims = get_imgs(x, oracle_out=oracle_out, maze_imgs=maze_imgs)
-                cv2.imshow('pathfinding', ims)
+                imS = cv2.resize(ims, (900, 900))
+                cv2.imshow('pathfinding', imS)
                 # Save image as png
                 if SAVE_PNGS:
                     cv2.imwrite(os.path.join(render_dir, f"render_{frame_i}.png"), ims)
@@ -170,7 +172,8 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, 
                     oracle_out = model.oracle_out if model_has_oracle else None
                     # cv2.imshow('model', get_imgs(x, oracle_out=oracle_out))
                     ims = get_imgs(x, oracle_out=oracle_out, maze_imgs=maze_imgs)
-                    cv2.imshow('pathfinding', ims)
+                    imS = cv2.resize(ims, (900, 900))
+                    cv2.imshow('pathfinding', imS)
                     if SAVE_PNGS:
                         cv2.imwrite(os.path.join(render_dir, f"render_{frame_i}.png"), ims*255)
                     if writer:
