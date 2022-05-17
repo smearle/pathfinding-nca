@@ -12,6 +12,7 @@ from hydra.core.config_store import ConfigStore
 import torch
 
 from configs.sweeps.all import HyperSweepConfig
+from configs.sweeps.all_scratch import ScratchSweep
 from configs.sweeps.diam_cut_corners import DiamCutCornerSweep
 from configs.sweeps.loss_interval import LossIntervalSweep
 from configs.sweeps.models import ModelSweep
@@ -154,6 +155,8 @@ class Config():
             # self.path_chan = self.n_in_chan + 1  # wait why is this??
             self.n_hid_chan = 7
             self.skip_connections = True
+        if self.model == "FixedDfsNCA":
+            self.n_hid_chan = 12
         # else:
         self.path_chan = self.n_in_chan
         self.load = True if self.render else self.load
@@ -210,3 +213,5 @@ cs.store(group="sweep", name="loss_interval", node=LossIntervalSweep)
 cs.store(group="sweep", name="n_hid_chan", node=HidChanSweep)
 cs.store(group="sweep", name="evo_data", node=EvoDataSweep)
 cs.store(group="sweep", name="diam_cut_corners", node=DiamCutCornerSweep)
+
+cs.store(group="sweep", name="scratch", node=ScratchSweep)
