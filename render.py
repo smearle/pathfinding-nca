@@ -20,6 +20,7 @@ SAVE_PNGS = False
 N_RENDER_EPISODES = 10
 CV2_WAIT_KEY_TIME = 1
 RENDER_WEIGHTS = False
+CV2_IM_SIZE = (1500, 1500)
 
 
 def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, name=''):
@@ -155,7 +156,7 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, 
                 x, maze_imgs, bi = reset(bi)
                 oracle_out = model.oracle_out if model_has_oracle else None
                 ims = get_imgs(x, oracle_out=oracle_out, maze_imgs=maze_imgs)
-                imS = cv2.resize(ims, (900, 900))
+                imS = cv2.resize(ims, CV2_IM_SIZE)
                 cv2.imshow('pathfinding', imS)
                 # Save image as png
                 if SAVE_PNGS:
@@ -172,7 +173,7 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, 
                     oracle_out = model.oracle_out if model_has_oracle else None
                     # cv2.imshow('model', get_imgs(x, oracle_out=oracle_out))
                     ims = get_imgs(x, oracle_out=oracle_out, maze_imgs=maze_imgs)
-                    imS = cv2.resize(ims, (900, 900))
+                    imS = cv2.resize(ims, CV2_IM_SIZE)
                     cv2.imshow('pathfinding', imS)
                     if SAVE_PNGS:
                         cv2.imwrite(os.path.join(render_dir, f"render_{frame_i}.png"), ims*255)
