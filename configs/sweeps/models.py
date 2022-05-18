@@ -11,18 +11,18 @@ class ModelSweep(HyperSweepConfig):
     model: List[Any] = field(default_factory=lambda: [
         # "MLP",
         "GCN",
-        "NCA",
+        # "NCA",
         # "FixedBfsNCA",
     ])
     exp_name: List[Any] = field(default_factory=lambda: [
         # "0",
         # "1",
-        # "2",
+        "2",
         # "3",
-        "5",
+        # "5",
     ])
     task: List[Any] = field(default_factory=lambda: [
-        "diameter",
+        # "diameter",
         "pathfinding",
     ])
     shared_weights: List[bool] = field(default_factory=lambda: [
@@ -39,24 +39,25 @@ class ModelSweep(HyperSweepConfig):
         # 96,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
-#         4,
+        # 4,
         # 8,
         # 16,
         # 32,
         48,
         96,
         128,
-        # 256,
+        256,
         # 512,
     ])
-#     loss_interval: List[Any] = field(default_factory=lambda: [
+    # loss_interval: List[Any] = field(default_factory=lambda: [
         # 4,
         # 8,
         # 16,
-#         32,
+        # 32,
         # 64,
-#     ])
+    # ])
     learning_rate: List[Any] = field(default_factory=lambda: [
+        # 0.0001,
         0.00005,
     ])
     env_generation: List[Any] = field(default_factory=lambda: [

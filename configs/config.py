@@ -14,7 +14,7 @@ import torch
 from configs.sweeps.all import HyperSweepConfig
 from configs.sweeps.all_scratch import ScratchSweep
 from configs.sweeps.cut_corners import CutCornerSweep
-from configs.sweeps.diam_kernel import DiamKernelSweep
+from configs.sweeps.kernel import KernelSweep
 from configs.sweeps.diam_maxpool import DiamMaxPoolSweep
 from configs.sweeps.evo_data_scratch import EvoDataScratchSweep
 from configs.sweeps.loss_interval import LossIntervalSweep
@@ -227,7 +227,7 @@ cs.store(group="sweep", name="n_hid_chan", node=HidChanSweep)
 cs.store(group="sweep", name="evo_data", node=EvoDataSweep)
 cs.store(group="sweep", name="cut_corners", node=CutCornerSweep)
 cs.store(group="sweep", name="diam_max_pool", node=DiamMaxPoolSweep)
-cs.store(group="sweep", name="diam_kernel", node=DiamKernelSweep)
+cs.store(group="sweep", name="kernel", node=KernelSweep)
 
 cs.store(group="sweep", name="scratch", node=ScratchSweep)
 cs.store(group="sweep", name="evo_data_scratch", node=EvoDataScratchSweep)

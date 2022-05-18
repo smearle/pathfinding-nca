@@ -8,10 +8,10 @@ from configs.sweeps.all import HyperSweepConfig
 
 
 @dataclass
-class DiamKernelSweep(HyperSweepConfig):
+class KernelSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
 
-    name: str = 'diam_kernel'
+    name: str = 'kernel'
 
     save_interval: List[Any] = field(default_factory=lambda: [
         10000,
@@ -26,6 +26,8 @@ class DiamKernelSweep(HyperSweepConfig):
     exp_name: List[Any] = field(default_factory=lambda: [
         "2",
         # "3",
+        # "4",
+        # "5",
         # "debug",
     ])
     cut_corners: List[Any] = field(default_factory=lambda: [
@@ -49,7 +51,7 @@ class DiamKernelSweep(HyperSweepConfig):
         3,
     ])
     max_pool: List[Any] = field(default_factory=lambda: [
-#         True,
+        True,
         False,
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
@@ -59,10 +61,10 @@ class DiamKernelSweep(HyperSweepConfig):
     n_hid_chan: List[Any] = field(default_factory=lambda: [
         # 4,
         # 8,
-#         32,
+        # 32,
         48,
         96,
-        128,
+        # 128,
         # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [

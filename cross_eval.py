@@ -63,24 +63,41 @@ names_to_hyperparams = {
         'n_layers',
         'n_hid_chan',
     ],
-    'diam_max_pool': [
+    'max_pool': [
         'model',
         'max_pool',
         'n_hid_chan',
     ],
-    'diam_kernel': [
+    'kernel': [
         'model',
         'kernel_size',
+        'max_pool',
         'n_hid_chan',
+    ],
+    'evo_data': [
+        'model',
+        'env_generation',
     ],
 }
 names_to_cols = {
     'default': [
         'n_params',
         'TRAIN_pct_complete',
-        'TRAIN_completion_time',
+        # 'TRAIN_completion_time',
         'TEST_pct_complete',
-        'TEST_completion_time',
+        # 'TEST_completion_time',
+        'TEST_32_accs',
+        'TEST_32_pct_complete',
+    ],
+    'evo_data': [
+        'n_params',
+        'TRAIN_pct_complete',
+        # 'TRAIN_completion_time',
+        'TEST_accs',
+        'TEST_pct_complete',
+        # 'TEST_completion_time',
+        'TEST_32_accs',
+        'TEST_32_pct_complete',
     ],
     'loss_interval': [
         'TRAIN_pct_complete',
@@ -209,7 +226,7 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str):
         col_indices = pd.MultiIndex.from_tuples(col_tpls)  #, names=['type', 'metric'])
 
         df = pd.DataFrame(data_rows, columns=col_indices, index=row_indices)
-        # df.sort_index(inplace=True)
+        df.sort_index(inplace=True)
 
         for k in col_indices:
             if k in df:
