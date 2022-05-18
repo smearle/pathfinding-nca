@@ -14,6 +14,8 @@ import torch
 from configs.sweeps.all import HyperSweepConfig
 from configs.sweeps.all_scratch import ScratchSweep
 from configs.sweeps.diam_cut_corners import DiamCutCornerSweep
+from configs.sweeps.diam_kernel import DiamKernelSweep
+from configs.sweeps.diam_maxpool import DiamMaxPoolSweep
 from configs.sweeps.evo_data_scratch import EvoDataScratchSweep
 from configs.sweeps.loss_interval import LossIntervalSweep
 from configs.sweeps.models import ModelSweep
@@ -102,6 +104,13 @@ class Config():
     # When using NCA, encusre the weights for each adjacent cell are the same, making it essentially equivalent to a GCN.
     symmetric_conv: bool = False
 
+    # Whether to dedicate some channels in the NCA to a per-layer max-pooling operation (one spatial, one channel-wise,
+    # over whole map and all channels, respectively).
+    max_pool: bool = False
+
+    # What size kernel to use in convolutioanl layers (when using an NCA model).
+    kernel_size: int = 3
+
     task: str = "pathfinding"
     evaluate: bool = False
     load: bool = False
@@ -132,6 +141,8 @@ class Config():
             ("_evoData" if self.env_generation is not None else ""),
             ("_noShared" if not self.shared_weights else ""),
             ("_noSkip" if not self.skip_connections else ""),
+            ("_maxPool" if self.max_pool else ""),
+            (f"_{self.kernel_size}-kern" if self.kernel_size != 3 else ""),
             f"_{self.n_hid_chan}-hid",
             f"_{self.n_layers}-layer",
             f"_lr-{'{:.0e}'.format(self.learning_rate)}",
@@ -147,6 +158,7 @@ class Config():
     def validate(self):
         if not self.model == "NCA":
             self.symmetric_conv = False
+            self.max_pool = False
         if self.symmetric_conv:
             self.cut_conv_corners = True
         if self.task == "diameter":
@@ -214,6 +226,8 @@ cs.store(group="sweep", name="loss_interval", node=LossIntervalSweep)
 cs.store(group="sweep", name="n_hid_chan", node=HidChanSweep)
 cs.store(group="sweep", name="evo_data", node=EvoDataSweep)
 cs.store(group="sweep", name="diam_cut_corners", node=DiamCutCornerSweep)
+cs.store(group="sweep", name="diam_max_pool", node=DiamMaxPoolSweep)
+cs.store(group="sweep", name="diam_kernel", node=DiamKernelSweep)
 
 cs.store(group="sweep", name="scratch", node=ScratchSweep)
 cs.store(group="sweep", name="evo_data_scratch", node=EvoDataScratchSweep)
