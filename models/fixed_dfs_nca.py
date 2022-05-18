@@ -67,8 +67,12 @@ class FixedDfsNCA(PathfindingNN):
 
                     if np.all(b_adj == [2,2]):
                         continue
+                    # If a higher-priority neighbor of the neighbor is empty, then it has priority over us.
+                    # This is ignored, though, if neighbor of the neighbor is also flooded! 
+                    # But we also ignore this if the neighbor is on the stack (???).
                     self.conv_0.weight[flood_chan + 1 + ai, cfg.empty_chan, b_adj[0], b_adj[1]] = -1.
                     self.conv_0.weight[flood_chan + 1 + ai, self.src_chan, b_adj[0], b_adj[1]] = -1.
+                    self.conv_0.weight[flood_chan + 1 + ai, cfg.trg_chan, b_adj[0], b_adj[1]] = -1.
                     self.conv_0.weight[flood_chan + 1 + ai, flood_chan, b_adj[0], b_adj[1]] = 1.
             
             # Flood is blocked by walls. (Also blocking directional floods for interpretability.)
@@ -80,9 +84,9 @@ class FixedDfsNCA(PathfindingNN):
             self.conv_0.weight[flood_chan, flood_chan, 2, 2] = 1.
 
             # Stack chan becomes active when the pebble passes by us, but we are not flooded.
-            self.conv_0.weight[self.stack_chan, self.flood_chan, 2, 2] = -1.
-            self.conv_0.weight[self.stack_rank_chan, self.flood_chan, 2, 2] = -1.
-            self.conv_0.weight[self.stack_direction_chan, self.flood_chan, 2, 2] = -1
+            self.conv_0.weight[self.stack_chan, self.flood_chan, 2, 2] = -2.
+            self.conv_0.weight[self.stack_rank_chan, self.flood_chan, 2, 2] = -2.
+            self.conv_0.weight[self.stack_direction_chan, self.flood_chan, 2, 2] = -2
             for ai, adj in enumerate(self.adjs):
                 self.conv_0.weight[self.stack_chan, self.pebble_chan, adj[0], adj[1]] = 1.
                 self.conv_0.weight[self.stack_rank_chan, self.pebble_chan, adj[0], adj[1]] = 1
@@ -93,9 +97,9 @@ class FixedDfsNCA(PathfindingNN):
             self.conv_0.weight[self.stack_direction_chan, self.stack_direction_chan, 2, 2] = 1.
 
             # Do not add wall tiles to stack
-            self.conv_0.weight[self.stack_chan, cfg.wall_chan, 2, 2] = -1.
-            self.conv_0.weight[self.stack_rank_chan, cfg.wall_chan, 2, 2] = -1.
-            self.conv_0.weight[self.stack_direction_chan, cfg.wall_chan, 2, 2] = -1.
+            self.conv_0.weight[self.stack_chan, cfg.wall_chan, 2, 2] = -2.
+            self.conv_0.weight[self.stack_rank_chan, cfg.wall_chan, 2, 2] = -2.
+            self.conv_0.weight[self.stack_direction_chan, cfg.wall_chan, 2, 2] = -2.
 
             # Stack rank chan is incremented each timestep when stack is present.
             self.conv_0.weight[self.stack_rank_chan, self.stack_chan, 2, 2] = 1.
@@ -104,8 +108,7 @@ class FixedDfsNCA(PathfindingNN):
             # FIXME: This shouldn't be necessary, because if it's flooded then we've popped it from the stack already.
             # self.conv_0.weight[self.stack_rank_chan, self.flood_chan, 2, 2] = -1.
 
-
-            # I need to be in the stack to be activated when the flood is stuck.
+            # I need to be in the stack to be activated when the pebble is stuck.
 
     def forward(self, x):
         with th.no_grad():
@@ -134,15 +137,12 @@ class FixedDfsNCA(PathfindingNN):
         return x[:, self.n_in_chan:]
             
     def flood(self, x):
+        print('step:', self.n_step)
         # TODO: Think about how a learning model would handle all the weird bits.
         x0 = x.clone()  # for debugging
         x = self.conv_0(x)
-        x[:, self.flood_chan + 1: self.flood_chan + 5] = th.clamp(x[:, self.flood_chan + 1: self.flood_chan + 5], 0., 1.)
 
-        # flood = x[:, self.flood_chan]
-        # stacks = x[:, self.stack_chan]
-        # stack_directions = x[:, self.stack_direction_chan]
-        # stack_ranks = x[:, self.stack_rank_chan]
+        x[:, self.flood_chan + 1: self.flood_chan + 5] = th.clamp(x[:, self.flood_chan + 1: self.flood_chan + 5], 0., 1.)
 
         x[:, self.stack_rank_chan] = th.relu(x[:, self.stack_rank_chan])
         x[:, self.stack_direction_chan] = th.relu(x[:, self.stack_direction_chan])
@@ -159,11 +159,15 @@ class FixedDfsNCA(PathfindingNN):
 
         # Pebble represents the edge of the flood (which only occupies one new tile per time slot).
         pbl = x[:, self.flood_chan] - x0[:, self.flood_chan]
+
+        if th.sum(pbl).item() > 1:
+            TT()
+
         x[:, self.pebble_chan] = pbl
 
         # If we are overwriting a previous stacked tile, clear the stack order chan and remove the previous directional 
         # value from the stack direction chan.
-        dbl_stacked = (x[:, self.stack_chan] == 2).float()
+        dbl_stacked = ((x[:, self.stack_chan] > 1.5) & (x[:, self.stack_chan] < 2.5)).float()
 
         # if th.sum(dbl_stacked) > 0:
             # TT()
@@ -171,18 +175,32 @@ class FixedDfsNCA(PathfindingNN):
         # Remove stack ranks where a new stack has overwritten an existing one. (Multiplicative skip function?)
         # (Note that the stack rank will grow back at following timesteps now that a new stack activation is present.)
         # x[:, self.stack_rank_chan] = x[:, self.stack_rank_chan] * (1 - dbl_stacked) + dbl_stacked * 1
-        x[:, self.stack_rank_chan] = x[:, self.stack_rank_chan] - x0[:, self.stack_rank_chan] * dbl_stacked
+        # NOTE: We are subtracting a little extra from a previously stacked tile that has just been stacked again,
+        #   because in it has gained +2 rank during the last pass through the convolution (both from aging and from the new
+        #   addition).
+        x[:, self.stack_rank_chan] -= (x0[:, self.stack_rank_chan] + 1) * dbl_stacked
         # Remove the previous direction activation where a stack is being overwritten.
-        x[:, self.stack_direction_chan] = x[:, self.stack_direction_chan] - x0[:, self.stack_direction_chan] * dbl_stacked
+        x[:, self.stack_direction_chan] -= x0[:, self.stack_direction_chan] * dbl_stacked
+        x[:, self.stack_chan] -= x0[:, self.stack_chan] * dbl_stacked
 
-        if th.sum(x[:, self.stack_direction_chan] > 0.8).item() > 0:
+        if th.sum(x[:, self.stack_direction_chan] > 0.9).item() > 0:
             TT()
 
-        x[:, self.stack_rank_chan] = th.relu(x[:, self.stack_rank_chan])
-        x[:, self.stack_direction_chan] = th.relu(x[:, self.stack_direction_chan])
+        assert x[:, self.stack_direction_chan].min().item() >= 0.
+        assert x[:, self.stack_rank_chan].min().item() >= 0.
+
+        # x[:, self.stack_rank_chan] = th.relu(x[:, self.stack_rank_chan])
+        # x[:, self.stack_direction_chan] = th.relu(x[:, self.stack_direction_chan])
+
+        if th.sum((x[:, self.stack_rank_chan] > 0) != (x[:, self.stack_direction_chan] > 0)).item() > 0:
+            TT()
 
         # Whether the pebble is stuck in each maze.
-        pbl_is_stuck = (th.sum(x[:, self.pebble_chan, :, :], dim=(1, 2)) == 0).float()
+        pbl_sum = th.sum(pbl, dim=(1, 2))
+        pbl_is_stuck = ((pbl_sum > -.5) & (pbl_sum < .5)).float()
+
+        # if th.sum(pbl_is_stuck).item() > 0:
+            # TT()
 
         # This will give a unique ordering of stacks to be popped if the pebble is stuck.
         stack_full_rank = x[:, self.stack_rank_chan] + x[:, self.stack_direction_chan]
@@ -190,11 +208,12 @@ class FixedDfsNCA(PathfindingNN):
         # The rank implies the stack order, i.e. the next stack to be popped. (Need to fiddle to ignore zeros.)
         # FIXME: Doing this the lazy (non-differentiable) way for now.
         stack_full_rank[th.where(stack_full_rank == 0)] = float("inf")
-        next_full_stack_rank = th.min(th.min(stack_full_rank,-1)[0], -1)[0]
-        next_full_stack_rank[next_full_stack_rank == float("inf")] = 0
+        min_full_stack_rank = th.min(th.min(stack_full_rank,-1)[0], -1)[0]
+        min_full_stack_rank[min_full_stack_rank == float("inf")] = 0
 
         # One where the stack is popped, zeros everywhere else.
-        stack_is_popped = ((stack_full_rank - next_full_stack_rank) == 0).int()
+        stack_diff = stack_full_rank - min_full_stack_rank
+        stack_is_popped = ((stack_diff > -.1) & (stack_diff < .1)).int() * pbl_is_stuck
 
         if th.sum(stack_is_popped) > 1:
             TT()
@@ -203,19 +222,7 @@ class FixedDfsNCA(PathfindingNN):
         # next_stack_rank = th.max(th.max((stack_full_rank * -1 + max_stack_rank) * (stack_full_rank > 0), dim=-1)[0], dim=-1)[0]
         # next_stack_rank = (next_stack_rank - max_stack_rank) * -1
 
-        # Cannot pop two stacks simultaneously.
-        # # We will subtract this stack order value only where the pebble is stuck.
-        stack_rank_diff = pbl_is_stuck * next_full_stack_rank
-
-        stack_next_full_rank = th.clamp(stack_full_rank - stack_rank_diff, 0., 1.)
-
-        # if th.sum(pbl_is_stuck).item() > 0:
-            # TT()
-
-        # if th.sum(pbl_is_stuck).item() > 0:
-            # TT()
-
-        if th.sum((stack_full_rank == next_full_stack_rank) & (stack_full_rank != 0)) > 1:
+        if th.sum((stack_full_rank == min_full_stack_rank) & (stack_full_rank != 0)) > 1:
             TT()
 
         x[:, self.stack_rank_chan] -= stack_is_popped * x[:, self.stack_rank_chan]
@@ -231,18 +238,15 @@ class FixedDfsNCA(PathfindingNN):
         # x[:, self.stack_direction_chan] = (1 - pbl_is_stuck) * stack_directions + \
                             # pbl_is_stuck * th.relu(stack_directions - stack_rank_diff + stack_ranks)
 
-        x[:, self.stack_chan] = th.clamp(x[:, self.stack_chan], 0., 1.)
+
+        # x[:, self.stack_chan] = th.clamp(x[:, self.stack_chan], 0., 1.)
 
         last_stack_chan = x[:, self.stack_chan].clone()
 
         # Where the stack has been popped, also zero out the stack and stack direction chans.
         # Maintain existing stack activation where pebble is not stuck.
         # Otherwise, remove stack activations where full stack order has been reduced to zero.
-        # x[:, self.stack_chan] = (1 - pbl_is_stuck) * x[:, self.stack_chan] + \
-                        # pbl_is_stuck * th.clamp(x[:, self.stack_chan] * (stack_next_full_rank > 0), 0., 1.)  # If pebb
         x[:, self.stack_chan] -= stack_is_popped * x[:, self.stack_chan]
-        # x[:, self.stack_direction_chan] = (1 - pbl_is_stuck) * x[:, self.stack_direction_chan] + \
-                        # pbl_is_stuck * th.clamp(x[:, self.stack_direction_chan] * stack_next_full_rank, 0., 1.)
 
         # Should only pop one stack tile.
         if th.sum(x[:, self.stack_chan] != last_stack_chan).item() > 1:
@@ -257,8 +261,7 @@ class FixedDfsNCA(PathfindingNN):
         # if th.sum((x[:, self.stack_direction_chan] > 1) == (x[:, self.flood_chan])).item() > 0:
             # TT()
         
-        # if pbl_is_stuck[0]:
-        # if pbl_is_stuck[0]:
+        # if self.n_step == 47:
             # TT()
 
         return x
