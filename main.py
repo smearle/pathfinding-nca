@@ -96,7 +96,8 @@ def main_experiment(cfg: Config=None):
             log_stats(model, logger, cfg)
             evaluate(model, maze_data_train, cfg.val_batch_size, "train", cfg, is_eval=True)
             evaluate(model, maze_data_test, cfg.val_batch_size, "test", cfg, is_eval=True)
-            evaluate(model, maze_data_test_32, cfg.val_batch_size, "test_32", cfg_32, is_eval=True)
+            if cfg.model != "MLP":
+                evaluate(model, maze_data_test_32, cfg.val_batch_size, "test_32", cfg_32, is_eval=True)
             return
 
     if not loaded:

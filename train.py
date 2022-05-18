@@ -170,12 +170,13 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                     tb_writer.add_scalar(f"validation/mean_{k}", v[0], i)
                     if cfg.wandb:
                         wandb.log({f"validation/mean_{k}": v[0]}, step=i)
-                val_stats_32 = evaluate(model, maze_data_test_32, cfg.val_batch_size, "validate", cfg_32)
-                # logger.log_val(val_stats_32)
-                for k, v in val_stats_32.items():
-                    tb_writer.add_scalar(f"validation/32x32/mean_{k}", v[0], i)
-                    if cfg.wandb:
-                        wandb.log({f"validation/32x32/mean_{k}": v[0]}, step=i)
+                if cfg.model != "MLP":
+                    val_stats_32 = evaluate(model, maze_data_test_32, cfg.val_batch_size, "validate", cfg_32)
+                    # logger.log_val(val_stats_32)
+                    for k, v in val_stats_32.items():
+                        tb_writer.add_scalar(f"validation/32x32/mean_{k}", v[0], i)
+                        if cfg.wandb:
+                            wandb.log({f"validation/32x32/mean_{k}": v[0]}, step=i)
 
             if i % cfg.log_interval == 0 or i == cfg.n_updates - 1:
                 log(logger, lr_sched, cfg)
