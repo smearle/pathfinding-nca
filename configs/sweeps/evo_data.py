@@ -22,15 +22,14 @@ class EvoDataSweep(HyperSweepConfig):
 
     exp_name: List[Any] = field(default_factory=lambda: [
         "2",
-        "3",
-        # "debug",
+        # "3",
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
-        EnvGeneration(),
         None,
+        EnvGeneration(),
     ])
     task: List[Any] = field(default_factory=lambda: [
-        # "pathfinding",
+        "pathfinding",
         "diameter",
     ])
     model: List[Any] = field(default_factory=lambda: [
@@ -44,10 +43,10 @@ class EvoDataSweep(HyperSweepConfig):
     n_hid_chan: List[Any] = field(default_factory=lambda: [
     #     # 4,
     #     # 8,
-        32,
+        # 32,
         48,
         96,
-        # 128,
+        128,
     #     # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [

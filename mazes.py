@@ -296,6 +296,25 @@ def gen_rand_mazes(n_data, cfg):
         th.vstack(target_diameters)
 
 
+def get_target_path(maze_discrete, cfg):
+    if cfg.task == 'pathfinding':
+        # TODO: need to constrain mutation of sources and targets for this task.
+        sol = get_rand_path(maze_discrete)
+        x, y = sol[0]
+        maze_discrete[x, y] = cfg.src_chan
+        # for (x, y) in sol:
+            # offspring_target_paths[mi, x, y] = 1
+        maze_discrete[x, y] = cfg.trg_chan
+        return sol
+
+
+def get_target_diam(maze_discrete, cfg):
+    diam, connected = diameter(maze_discrete.cpu().numpy(), cfg.n_in_chan)
+    # for (x, y) in diam:
+        # offspring_target_paths[mi, x, y] = 1
+    return diam
+
+
 if __name__ == "__main__":
 
     main_mazes()

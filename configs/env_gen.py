@@ -7,3 +7,8 @@ class EnvGeneration:
     gen_interval: int = 200
     evo_batch_size: int = 64
 
+
+@dataclass
+class EnvGeneration2:
+    gen_interval: int = 10
+    evo_batch_size: int = 64

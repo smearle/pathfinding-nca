@@ -5,6 +5,7 @@ import PIL
 
 from matplotlib import image, pyplot as plt
 import numpy as np
+from ray.util.multiprocessing import Pool
 from timeit import default_timer as timer
 import torch as th
 from torch.utils.tensorboard import SummaryWriter
@@ -15,7 +16,7 @@ import wandb
 from configs.config import Config
 from configs.env_gen import EnvGeneration
 from evaluate import evaluate
-from mazes import Mazes, bfs_grid, diameter, get_rand_path, render_discrete
+from mazes import Mazes, bfs_grid, diameter, get_rand_path, get_target_diam, get_target_path, render_discrete
 from models.gnn import GCN
 from models.nn import PathfindingNN
 from utils import count_parameters, get_discrete_loss, get_mse_loss, Logger, to_path, save
@@ -201,15 +202,20 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
 
             if env_gen_cfg is not None \
                     and loss < 1e-2 and last_evo >= env_gen_cfg.gen_interval:
-                last_evo = 0
             # if True:
+                last_evo = 0
                 # and i % env_gen_cfg.gen_interval == 0 \
-                ret = sorted(
-                    zip(env_losses, mazes_onehot, maze_ims, target_paths), key=lambda x: x[0], reverse=True)
-                ret = list(zip(*ret))
-                env_losses, mazes_onehot, maze_ims, target_paths = th.stack(ret[0]), th.stack(ret[1]), \
-                    np.stack(ret[2]), th.stack(ret[3])
-                offspring_maze_walls = mazes_onehot[:env_gen_cfg.evo_batch_size, :2].argmax(1)
+
+                # Select top k for mutattion. TODO: don't need to sort everything here.
+                # ret = sorted(
+                #     zip(env_losses, mazes_onehot, maze_ims, target_paths), key=lambda x: x[0], reverse=True)
+                # ret = list(zip(*ret))
+                # env_losses, mazes_onehot, maze_ims, target_paths = th.stack(ret[0]), th.stack(ret[1]), \
+                #     np.stack(ret[2]), th.stack(ret[3])
+                # offspring_maze_walls = mazes_onehot[:env_gen_cfg.evo_batch_size, :2].argmax(1)
+
+                # Select random k for mutation.
+                offspring_maze_walls = mazes_onehot[th.randint(cfg.n_data, (env_gen_cfg.evo_batch_size,)), :2].argmax(1)
 
                 # Mutate the mazes (except at the border walls).
                 disc_noise = th.randint(1, 2, offspring_maze_walls.shape)
@@ -222,20 +228,22 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
 
                 # Get their solutions.
                 offspring_target_paths = th.zeros_like(offspring_maze_walls[:])
-                for mi, maze_discrete in enumerate(offspring_mazes):
+                if cfg.task == 'pathfinding':
+                    # sols = pool.map(get_target_path, [maze_discrete for maze_discrete in offspring_mazes.cpu()])
+                    sols = [get_target_path(maze_discrete, cfg) for maze_discrete in offspring_mazes.cpu()]
+                elif cfg.task == 'diameter':
+                    # sols = pool.map(get_target_diam, [maze_discrete for maze_discrete in offspring_mazes.cpu()])
+                    sols = [get_target_diam(maze_discrete, cfg) for maze_discrete in offspring_mazes.cpu()]
+                else:
+                    raise Exception
 
-                    if cfg.task == 'pathfinding':
-                        # TODO: need to constrain mutation of sources and targets for this task.
-                        sol = get_rand_path(maze_discrete)
-                        x, y = sol[0]
-                        maze_discrete[x, y] = cfg.src_chan
-                        for (x, y) in sol:
-                            offspring_target_paths[mi, x, y] = 1
-                        maze_discrete[x, y] = cfg.trg_chan
-                    elif cfg.task == 'diameter':
-                        diam, connected = diameter(maze_discrete.cpu().numpy(), cfg.n_in_chan)
-                        for (x, y) in diam:
-                            offspring_target_paths[mi, x, y] = 1
+                for si, sol in enumerate(sols):
+                    sol = th.Tensor(sol).long()
+                    offspring_target_paths[si, sol[:, 0], sol[:, 1]] = 1
+
+                # for mi, maze_discrete in enumerate(offspring_mazes):
+                    # get_target_path(maze_discrete)
+
                 offspring_mazes_onehot = th.zeros(env_gen_cfg.evo_batch_size, cfg.n_in_chan, *offspring_mazes.shape[-2:])
                 offspring_mazes_onehot.scatter_(1, offspring_mazes[:,None,...], 1)
 
@@ -257,19 +265,45 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 offspring_env_losses /= n_subepisodes
 
                 # Add the offspring to the population, ranked by their fitness (the loss they induce from the model).
+                # old_env_losses = env_losses
+
                 env_losses, mazes_onehot, maze_ims, target_paths = th.cat((env_losses, offspring_env_losses), dim=0), \
                     th.cat((mazes_onehot, offspring_mazes_onehot), dim=0), \
                     np.concatenate((maze_ims, offspring_maze_ims), axis=0), \
                     th.cat((target_paths, offspring_target_paths), dim=0)
-                ret = sorted(
-                    list(zip(env_losses, mazes_onehot, maze_ims, target_paths)), key=lambda x: x[0], reverse=True)
-                ret = ret[:cfg.n_data]
-                ret = list(zip(*ret))
-                env_losses, mazes_onehot, maze_ims, target_paths = th.stack(ret[0]), th.stack(ret[1]), \
-                    np.stack(ret[2]), th.stack(ret[3])
 
-                # TODO: log number of offspring added.
+                env_losses = env_losses.cpu()
+
+                kick_idxs = th.topk(env_losses, env_gen_cfg.evo_batch_size, largest=False, sorted=False)[1]
+                n_kicked = th.sum(kick_idxs < cfg.n_data)
+                kick_idxs = th.sort(kick_idxs)[0]
+
+                remain_idxs = th.arange(0, kick_idxs[0])
+                for ki, k in enumerate(kick_idxs[0:-1]):
+                    remain_idxs = th.cat((remain_idxs, th.arange(k+1, kick_idxs[ki+1])))
+                remain_idxs = th.cat((remain_idxs, th.arange(kick_idxs[-1]+1, cfg.n_data + env_gen_cfg.evo_batch_size)))
+
+                remain_idxs = remain_idxs.cpu()
+                env_losses = env_losses[remain_idxs].to(cfg.device)
+                mazes_onehot = mazes_onehot[remain_idxs]
+                maze_ims = maze_ims[remain_idxs]
+                target_paths = target_paths[remain_idxs]
+                # env_losses, mazes_onehot, maze_ims, target_paths = env_losses[remain_idxs], mazes_onehot[remain_idxs], \
+                    # maze_ims[remain_idxs], target_paths[remain_idxs]
+
+                # ret = list(zip(env_losses, mazes_onehot, maze_ims, target_paths))
+                # ret = sorted(ret, key=lambda x: x[0], reverse=True)
+                # ret = ret[:cfg.n_data]
+                # ret = list(zip(*ret))
+                # env_losses, mazes_onehot, maze_ims, target_paths = th.stack(ret[0]), th.stack(ret[1]), \
+                    # np.stack(ret[2]), th.stack(ret[3])
+
                 path_lengths = target_paths.sum((1, 2)).float()
+
+                tb_writer.add_scalar(f"data/n_added", n_kicked, i)
+                if cfg.wandb:
+                    wandb.log({f"data/n_added": n_kicked}, step=i)
+
                 for stat in ['mean', 'min', 'max', 'std']:
                     tb_writer.add_scalar(f"data/{stat}_path-length", getattr(path_lengths, stat)(), i)
                     if cfg.wandb:

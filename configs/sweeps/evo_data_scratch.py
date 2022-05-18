@@ -1,75 +1,72 @@
-
 from dataclasses import dataclass, field
 from typing import Any, List
 import hydra
 
-from configs.env_gen import EnvGeneration
+from configs.env_gen import EnvGeneration2
 from configs.sweeps.all import HyperSweepConfig
 
 
 @dataclass
-class DiamCutCornerSweep(HyperSweepConfig):
+class EvoDataScratchSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
-    name: str = 'diam_cut_corners'
+    name: str = 'evo_data'
     save_interval: List[Any] = field(default_factory=lambda: [
+        # 1000,
         10000,
     ])
     log_interval: List[Any] = field(default_factory=lambda: [
+        # 200,
         10000,
     ])
     n_updates: List[Any] = field(default_factory=lambda: [
-        50000,
+        100000,
     ])
 
     exp_name: List[Any] = field(default_factory=lambda: [
-        "2",
+        # "2",
         # "3",
-        # "debug",
-    ])
-    cut_corners: List[Any] = field(default_factory=lambda: [
-        True,
-        False,
+        "scratch",
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
-        # EnvGeneration(),
-        None,
+        EnvGeneration2(),
+        # None,
     ])
     task: List[Any] = field(default_factory=lambda: [
-        # "pathfinding",
         "diameter",
+        # "pathfinding",
     ])
     model: List[Any] = field(default_factory=lambda: [
         "NCA",
         # "GCN",
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
-        True,
-        # False,
+        # True,
+        False,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
-    # #     # 4,
-    # #     # 8,
-    # #     # 32,
-        48,
+    #     # 4,
+    #     # 8,
+        # 32,
         96,
-        128,
-    # #     # 256,
+        48,
+        # 128,
+    #     # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
-    # #     # 48,
+    #     # 48,
         64,
-    #     # 96,
-    # #     # 128,
+        # 96,
+    #     # 128,
     ])
     loss_interval: List[Any] = field(default_factory=lambda: [
-    # #     # 4,
-    # #     # 8,
-    # #     # 16,
+    #     # 4,
+    #     # 8,
+    #     # 16,
         32,
-    #     64,
+        # 64,
     ])
-    # symmetric_conv: List[Any] = field(default_factory=lambda: [
+    symmetric_conv: List[Any] = field(default_factory=lambda: [
         # True,
-        # False,
-    # ])
+        False,
+    ])
     
