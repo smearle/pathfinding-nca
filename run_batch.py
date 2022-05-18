@@ -152,7 +152,18 @@ def main_batch(batch_dict_cfg: BatchConfig):
     exp_configs = filtered_exp_configs
 
     if batch_cfg.vis_cross_eval:
-        return vis_cross_eval(exp_configs, batch_cfg)
+        # Visualize one table per task.
+        tasks = {}
+        for ec in exp_configs:
+            if ec.task not in tasks:
+                tasks[ec.task] = [ec]
+            else:
+                tasks[ec.task].append(ec)
+
+        for task, exp_configs in tasks.items():
+            vis_cross_eval(exp_configs, batch_cfg, task)
+
+        return
 
     # Only perform missing evals.
     filtered_exp_configs = []

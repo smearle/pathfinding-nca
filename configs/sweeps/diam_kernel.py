@@ -62,7 +62,7 @@ class DiamKernelSweep(HyperSweepConfig):
 #         32,
         48,
         96,
-        # 128,
+        128,
         # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [

@@ -61,6 +61,7 @@ names_to_hyperparams = {
     'models': [
         'model',
         'n_layers',
+        'n_hid_chan',
     ],
     'diam_max_pool': [
         'model',
@@ -89,10 +90,11 @@ names_to_cols = {
     ],
     'models': [
         'n_params',
-        'TRAIN_accs',
+        # 'TRAIN_accs',
         'TRAIN_pct_complete',
         'TEST_accs',
         'TEST_pct_complete',
+        'TEST_32_pct_complete',
     ],
     'diam_max_pool': [
         'n_params',
@@ -115,7 +117,7 @@ col_renaming = {
 }
 
 
-def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig):
+def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str):
     """
     Visualize the results of a set of experiments.
 
@@ -158,7 +160,7 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig):
         else:
             # Assuming all stats have the same set of evaluated metrics. (E.g., need to not put MLPs first, if including
             # other models, since they are not evaluated on larger mazes.)
-            col_headers = list(batch_exp_stats[0].keys())
+            col_headers = list(batch_exp_stats[1].keys())
 
         data_rows = []
         for exp_stats in batch_exp_stats:
@@ -207,7 +209,7 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig):
         col_indices = pd.MultiIndex.from_tuples(col_tpls)  #, names=['type', 'metric'])
 
         df = pd.DataFrame(data_rows, columns=col_indices, index=row_indices)
-        df.sort_index(inplace=True)
+        # df.sort_index(inplace=True)
 
         for k in col_indices:
             if k in df:
@@ -216,10 +218,10 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig):
                     lambda data: preprocess_values(data, 
                                     col_name=k)
                 )
-        df.to_csv(os.path.join(EVAL_DIR, f'{name}_cross_eval.csv'))
+        df.to_csv(os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval.csv'))
 
         # Save dataframe using pickle
-        with open(os.path.join(EVAL_DIR, f'{name}_cross_eval.pkl'), 'wb') as f:
+        with open(os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval.pkl'), 'wb') as f:
             pickle.dump(df, f)
 
     else: 
@@ -236,11 +238,13 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig):
                                     ([(d[0] if isinstance(d, tuple) else d) for d in df[k]]), 
                                 col_name=k)
             )
+    
+    raw_tbl_tex_name = f'{task}_{name}_cross_eval{("_selective" if batch_cfg.selective_table else "")}.tex'
 
     # df.to_latex(os.path.join(EVAL_DIR, 'cross_eval.tex'), multirow=True)
     pandas_to_latex(
         df, 
-        os.path.join(EVAL_DIR, f'{name}_cross_eval.tex'), 
+        os.path.join(EVAL_DIR, raw_tbl_tex_name), 
         multirow=True, 
         index=True, 
         header=True,
@@ -252,7 +256,21 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig):
         bold_rows=True,
         )
     proj_dir = os.curdir
-    os.system(f'cd {EVAL_DIR}; pdflatex tables.tex; cd {proj_dir}')
+
+    # Read in the latex template
+    with open(os.path.join(proj_dir, EVAL_DIR, 'table_template.tex'), 'r') as f:
+        temp = f.read()
+
+    # Replace the template input with path to file
+    temp = temp.replace('INPUT', raw_tbl_tex_name)
+
+    tables_tex_name = f"{task}_{name}_table{('_selective' if batch_cfg.selective_table else '')}.tex"
+
+    # Write the output to a file.
+    with open(os.path.join(proj_dir, EVAL_DIR, tables_tex_name), 'w') as f:
+        f.write(temp)
+
+    os.system(f'cd {EVAL_DIR}; pdflatex {tables_tex_name}; cd {proj_dir}')
 
 
 def preprocess_values(data, col_name=None):
@@ -261,6 +279,9 @@ def preprocess_values(data, col_name=None):
     # hack
     if isinstance(data, int) or isinstance(data, float):
         return data
+
+    if data is None:
+        return 0 
 
     # Assume (mean, std)
     data, err = data
@@ -277,6 +298,10 @@ def bold_extreme_values(data, data_max=-1, col_name=None):
     # hack
     if col_name[-1] in set({"n. params", "n. updates"}):
         return '{:,}'.format(data)
+
+    if isinstance(data, int):
+        assert data == 0
+        return '---'
 
     else:
         # TODO: get standard deviation in a smart way.

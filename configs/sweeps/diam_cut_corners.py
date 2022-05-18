@@ -28,7 +28,7 @@ class DiamCutCornerSweep(HyperSweepConfig):
     ])
     cut_corners: List[Any] = field(default_factory=lambda: [
         True,
-        False,
+        # False,
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
         # EnvGeneration(),
@@ -47,13 +47,13 @@ class DiamCutCornerSweep(HyperSweepConfig):
         # False,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
-    # #     # 4,
-    # #     # 8,
-    # #     # 32,
+        # 4,
+        # 8,
+        # 32,
         48,
         96,
-        128,
-    # #     # 256,
+        # 128,
+        # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
     # #     # 48,
