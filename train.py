@@ -5,7 +5,7 @@ import PIL
 
 from matplotlib import image, pyplot as plt
 import numpy as np
-from ray.util.multiprocessing import Pool
+# from ray.util.multiprocessing import Pool
 from timeit import default_timer as timer
 import torch as th
 from torch.utils.tensorboard import SummaryWriter
