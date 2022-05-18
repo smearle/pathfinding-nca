@@ -25,8 +25,13 @@ class DiamMaxPoolSweep(HyperSweepConfig):
 
     exp_name: List[Any] = field(default_factory=lambda: [
         "2",
+        # "2_200k",
         # "3",
         # "debug",
+    ])
+    model: List[Any] = field(default_factory=lambda: [
+        "NCA",
+        # "GCN",
     ])
     cut_corners: List[Any] = field(default_factory=lambda: [
         # True,
@@ -40,13 +45,9 @@ class DiamMaxPoolSweep(HyperSweepConfig):
         # "pathfinding",
         "diameter",
     ])
-    model: List[Any] = field(default_factory=lambda: [
-        "NCA",
-        # "GCN",
-    ])
     max_pool: List[Any] = field(default_factory=lambda: [
         True,
-        # False,
+        False,
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
         True,
@@ -56,7 +57,7 @@ class DiamMaxPoolSweep(HyperSweepConfig):
         # 4,
         # 8,
         # 32,
-        # 48,
+        48,
         96,
         # 128,
         # 256,

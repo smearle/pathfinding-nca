@@ -46,7 +46,7 @@ class DiamKernelSweep(HyperSweepConfig):
     ])
     kernel_size: List[Any] = field(default_factory=lambda: [
         5,
-#         3,
+        3,
     ])
     max_pool: List[Any] = field(default_factory=lambda: [
 #         True,
@@ -62,7 +62,7 @@ class DiamKernelSweep(HyperSweepConfig):
 #         32,
         48,
         96,
-        128,
+        # 128,
         # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [

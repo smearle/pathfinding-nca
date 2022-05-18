@@ -120,14 +120,6 @@ def main_batch(batch_dict_cfg: BatchConfig):
                 if invalid_cfg:
                     continue
 
-            # Only perform missing evals.
-            if not batch_cfg.overwrite_evals and not batch_cfg.vis_cross_eval \
-                and os.path.exists(os.path.join(RUNS_DIR, exp_dir, 'test_32_stats.json')):
-                continue
-
-            exp_configs.append(exp_config)
-            print("Including config for experiment found at: ", exp_dir)
-
     else:
         # Create an experiment config for each combination of hyperparameters.
         exp_configs = [copy.deepcopy(batch_cfg)]
@@ -135,13 +127,13 @@ def main_batch(batch_dict_cfg: BatchConfig):
             if key == 'name': 
                 continue
             old_exp_configs = exp_configs
-            new_exp_configs = []
+            filtered_exp_configs = []
             for hyperparam in hyperparams:
                 for exp_config in old_exp_configs:
                     exp_config = copy.deepcopy(exp_config)
                     setattr(exp_config, key, hyperparam)
-                    new_exp_configs.append(exp_config)
-            exp_configs = new_exp_configs
+                    filtered_exp_configs.append(exp_config)
+            exp_configs = filtered_exp_configs
     
     # Validate experiment configs, setting unique experiment names and filtering out invalid configs (flagged by 
     # assertion errors in `config.validate()`).
@@ -161,6 +153,18 @@ def main_batch(batch_dict_cfg: BatchConfig):
 
     if batch_cfg.vis_cross_eval:
         return vis_cross_eval(exp_configs, batch_cfg)
+
+    # Only perform missing evals.
+    filtered_exp_configs = []
+    for exp_cfg in exp_configs:
+        if not batch_cfg.overwrite_evals and batch_cfg.evaluate and not batch_cfg.vis_cross_eval \
+            and os.path.exists(os.path.join(exp_cfg.log_dir, 'test_stats.json')):
+            # and os.path.exists(os.path.join(RUNS_DIR, exp_dir, 'test_stats.json')):
+            continue
+
+        filtered_exp_configs.append(exp_cfg)
+        print("Including config for experiment found at: ", exp_cfg.full_exp_name)
+    exp_configs = filtered_exp_configs
 
     experiment_names = []
     for exp_cfg in exp_configs:

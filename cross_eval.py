@@ -27,6 +27,8 @@ names_to_hyperparams = {
         "model",
         "env_generation",
         "n_layers",
+        "max_pool",
+        "kernel_size",
         "loss_interval",
         "n_hid_chan",
         "shared_weights",
@@ -59,7 +61,17 @@ names_to_hyperparams = {
     'models': [
         'model',
         'n_layers',
-    ]
+    ],
+    'diam_max_pool': [
+        'model',
+        'max_pool',
+        'n_hid_chan',
+    ],
+    'diam_kernel': [
+        'model',
+        'kernel_size',
+        'n_hid_chan',
+    ],
 }
 names_to_cols = {
     'default': [
@@ -82,6 +94,15 @@ names_to_cols = {
         'TEST_accs',
         'TEST_pct_complete',
     ],
+    'diam_max_pool': [
+        'n_params',
+        'TRAIN_pct_complete',
+        # 'TRAIN_completion_time',
+        'TEST_pct_complete',
+        # 'TEST_completion_time',
+        'TEST_32_accs',
+        'TEST_32_pct_complete',
+    ]
 }
 hyperparam_renaming = {
     'n hid chan': 'n. hid chan',
@@ -112,9 +133,12 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig):
                 with open(exp_cfg.log_dir + '/test_stats.json', 'r') as f:
                     exp_test_stats = json.load(f)
                     exp_test_stats = {f'TEST_{k}': v for k, v in exp_test_stats.items()}
-                with open(exp_cfg.log_dir + '/test_32_stats.json', 'r') as f:
-                    exp_test_32_stats = json.load(f)
-                    exp_test_32_stats = {f'TEST_32_{k}': v for k, v in exp_test_32_stats.items()}
+                if exp_cfg.model != "MLP":
+                    with open(exp_cfg.log_dir + '/test_32_stats.json', 'r') as f:
+                        exp_test_32_stats = json.load(f)
+                        exp_test_32_stats = {f'TEST_32_{k}': v for k, v in exp_test_32_stats.items()}
+                else:
+                    exp_test_32_stats = {}
                 with (open(exp_cfg.log_dir + '/train_stats.json', 'r')) as f:
                     exp_train_stats = json.load(f)
                     exp_train_stats = {f'TRAIN_{k}': v for k, v in exp_train_stats.items()}
@@ -132,7 +156,8 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig):
             else:
                 col_headers = names_to_cols['default']
         else:
-            # Assuming all stats have the same set of evaluated metrics.
+            # Assuming all stats have the same set of evaluated metrics. (E.g., need to not put MLPs first, if including
+            # other models, since they are not evaluated on larger mazes.)
             col_headers = list(batch_exp_stats[0].keys())
 
         data_rows = []

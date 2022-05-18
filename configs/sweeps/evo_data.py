@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any, List
 import hydra
 
-from configs.env_gen import EnvGeneration
+from configs.env_gen import EnvGeneration, EnvGeneration2
 from configs.sweeps.all import HyperSweepConfig
 
 
@@ -23,13 +23,15 @@ class EvoDataSweep(HyperSweepConfig):
     exp_name: List[Any] = field(default_factory=lambda: [
         "2",
         # "3",
+        "4",
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
         None,
-        EnvGeneration(),
+        # EnvGeneration(),
+        EnvGeneration2(),
     ])
     task: List[Any] = field(default_factory=lambda: [
-        "pathfinding",
+        # "pathfinding",
         "diameter",
     ])
     model: List[Any] = field(default_factory=lambda: [
@@ -37,16 +39,16 @@ class EvoDataSweep(HyperSweepConfig):
         # "GCN",
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
-        True,
+        # True,
         False,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
     #     # 4,
     #     # 8,
         # 32,
-        48,
+        # 48,
         96,
-        128,
+        # 128,
     #     # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
@@ -60,7 +62,7 @@ class EvoDataSweep(HyperSweepConfig):
     #     # 8,
     #     # 16,
         32,
-        64,
+        # 64,
     ])
     symmetric_conv: List[Any] = field(default_factory=lambda: [
         # True,
