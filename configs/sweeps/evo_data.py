@@ -31,7 +31,7 @@ class EvoDataSweep(HyperSweepConfig):
         EnvGeneration2(),
     ])
     task: List[Any] = field(default_factory=lambda: [
-        # "pathfinding",
+        "pathfinding",
         "diameter",
     ])
     model: List[Any] = field(default_factory=lambda: [
@@ -39,16 +39,16 @@ class EvoDataSweep(HyperSweepConfig):
         # "GCN",
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
-        # True,
+        True,
         False,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
     #     # 4,
     #     # 8,
         # 32,
-        # 48,
+        48,
         96,
-        # 128,
+        128,
     #     # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [

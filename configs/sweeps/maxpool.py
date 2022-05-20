@@ -8,17 +8,17 @@ from configs.sweeps.all import HyperSweepConfig
 
 
 @dataclass
-class DiamMaxPoolSweep(HyperSweepConfig):
+class MaxPoolSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
 
-    name: str = 'diam_max_pool'
+    name: str = 'max_pool'
 
-    # save_interval: List[Any] = field(default_factory=lambda: [
-        # 10000,
-    # ])
-    # log_interval: List[Any] = field(default_factory=lambda: [
-        # 10000,
-    # ])
+    save_interval: List[Any] = field(default_factory=lambda: [
+        10000,
+    ])
+    log_interval: List[Any] = field(default_factory=lambda: [
+        10000,
+    ])
     n_updates: List[Any] = field(default_factory=lambda: [
         50000,
     ])
@@ -42,8 +42,8 @@ class DiamMaxPoolSweep(HyperSweepConfig):
         None,
     ])
     task: List[Any] = field(default_factory=lambda: [
-        # "pathfinding",
-        "diameter",
+        "pathfinding",
+        # "diameter",
     ])
     max_pool: List[Any] = field(default_factory=lambda: [
         True,

@@ -23,7 +23,8 @@ class CutCornerSweep(HyperSweepConfig):
 
     exp_name: List[Any] = field(default_factory=lambda: [
         # "2",
-#         "3",
+        # "3",
+        # "4",
         "5", 
         # "debug",
     ])

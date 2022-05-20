@@ -77,6 +77,7 @@ names_to_hyperparams = {
     'evo_data': [
         'model',
         'env_generation',
+        'n_hid_chan',
     ],
 }
 names_to_cols = {
@@ -131,6 +132,7 @@ col_renaming = {
     'n params': 'n. params',
     'n updates': 'n. updates',
     'pct complete': 'pct. complete',
+    'accs': 'accuracies',
 }
 
 

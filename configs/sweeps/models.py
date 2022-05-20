@@ -9,9 +9,9 @@ from configs.sweeps.all import HyperSweepConfig
 class ModelSweep(HyperSweepConfig):
     name: str = 'models'
     model: List[Any] = field(default_factory=lambda: [
-        # "MLP",
+        "MLP",
         "GCN",
-        # "NCA",
+        "NCA",
         # "FixedBfsNCA",
     ])
     exp_name: List[Any] = field(default_factory=lambda: [
@@ -19,6 +19,7 @@ class ModelSweep(HyperSweepConfig):
         # "1",
         "2",
         # "3",
+        "4",
         # "5",
     ])
     task: List[Any] = field(default_factory=lambda: [
@@ -30,8 +31,8 @@ class ModelSweep(HyperSweepConfig):
         # False
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
-        4,
-        8,
+        # 4,
+        # 8,
         16,
         # 24,
         # 32,
@@ -43,9 +44,9 @@ class ModelSweep(HyperSweepConfig):
         # 8,
         # 16,
         # 32,
-        48,
+        # 48,
         96,
-        128,
+        # 128,
         256,
         # 512,
     ])

@@ -14,9 +14,10 @@ from models.nn import PathfindingNN
 
 
 RENDER_TYPE = 0
-N_RENDER_CHANS = None
+N_RENDER_CHANS = 1
+RENDER_BORDER = False
 SAVE_GIF = True
-SAVE_PNGS = False
+SAVE_PNGS = True
 N_RENDER_EPISODES = 10
 CV2_WAIT_KEY_TIME = 1
 RENDER_WEIGHTS = False
@@ -37,7 +38,11 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, 
     path_lengths = target_paths.sum((1, 2))
     path_chan = mazes_discrete[0].max() + 1
     mazes_discrete = th.where((mazes_discrete == cfg.empty_chan) & (target_paths == 1), path_chan, mazes_discrete)
-    batch_idxs = path_lengths.sort(descending=True)[1]
+
+    # Render most complex mazes first
+    # batch_idxs = path_lengths.sort(descending=True)[1]
+    batch_idxs = th.arange(mazes_onehot.shape[0])
+
     # batch_idx = np.random.choice(mazes_onehot.shape[0], render_minibatch_size, replace=False)
     bi = 0
 
@@ -110,7 +115,7 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, 
         height = stackable_ims[0].shape[1]
         
         # Highlight the path channel (assuming it is the second tile in our grid of rendered channels).
-        if maze_imgs is not None:
+        if maze_imgs is not None and RENDER_BORDER:
             ims[:width+1, height, 2] = 1
             ims[:width+1, 2*height+1, 2] = 1
             ims[0, height:2*height+2, 2] = 1
