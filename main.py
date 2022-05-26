@@ -34,7 +34,27 @@ from utils import Logger, VideoWriter, get_discrete_loss, get_mse_loss, log_stat
 np.set_printoptions(threshold=sys.maxsize, linewidth=np.inf)
 
 
-def main_experiment(cfg: Config=None):
+def main_experiment_load_cfg(cfg_path: str = None):
+    cfg = Config()
+    load_cfg = OmegaConf.load(cfg_path)
+    [setattr(cfg, k, v) for k, v in load_cfg.items() if not k.startswith('_')]
+    cfg.set_exp_name()
+    main_experiment(cfg=cfg)
+
+
+# @hydra.main(config_path=None, config_name="config")
+def main_experiment(cfg: Config = None, cfg_path: str = None):
+    # TODO: Re-enable running this script/function directly? (i.e. main hydra.main.) Currently always going through 
+    #   `run_batch.py`.
+    if cfg is None:
+        cfg = Config()
+        cfg.set_exp_name()
+    # Validate and set full experiment name if this has not been done already (i.e. if running this script directly or 
+    # launching via SLURM).
+    # if not hasattr(load_cfg, 'full_exp_name'):
+        # cfg = Config()
+        # [setattr(cfg, k, v) for k, v in vars(load_cfg).items() if not k.startswith('_')]
+        # cfg.set_exp_name()
     os.system('nvidia-smi -L')
     if th.cuda.is_available():
             print('Using GPU/CUDA.')
@@ -42,10 +62,6 @@ def main_experiment(cfg: Config=None):
     else:
             print('Not using GPU/CUDA, using CPU.')
         
-    if cfg is None:
-        cfg = Config()
-        cfg.set_exp_name()
-
     model_cls = globals()[cfg.model]
 
     print(f"Running experiment with config:\n {OmegaConf.to_yaml(cfg)}")

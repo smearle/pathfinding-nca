@@ -25,19 +25,25 @@ class CutCornerSweep(HyperSweepConfig):
         # "2",
         # "3",
         # "4",
-        "5", 
+        # "5", 
         # "debug",
+
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
     ])
     cut_conv_corners: List[Any] = field(default_factory=lambda: [
         True,
-        False,
+        # False,
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
         # EnvGeneration(),
         None,
     ])
     task: List[Any] = field(default_factory=lambda: [
-        # "pathfinding",
+        "pathfinding",
         "diameter",
     ])
     model: List[Any] = field(default_factory=lambda: [
@@ -45,8 +51,8 @@ class CutCornerSweep(HyperSweepConfig):
         # "GCN",
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
-        True,
-        # False,
+        # True,
+        False,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
         # 4,
@@ -54,7 +60,7 @@ class CutCornerSweep(HyperSweepConfig):
         # 32,
         48,
         96,
-        # 128,
+        128,
         # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [

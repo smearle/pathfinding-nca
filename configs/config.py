@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 import os
 from pathlib import Path
 from pdb import set_trace as TT
-from tokenize import String
 from typing import Any, List, Optional
 from xml.dom.pulldom import default_bufsize
 
@@ -21,6 +20,7 @@ from configs.sweeps.loss_interval import LossIntervalSweep
 from configs.sweeps.models import ModelSweep
 from configs.sweeps.n_hid_chan import HidChanSweep
 from configs.sweeps.evo_data import EvoDataSweep
+from configs.sweeps.weight_sharing import WeightSharingSweep
 
 
 @dataclass
@@ -125,6 +125,9 @@ class Config():
     # A regime for generating environments in parallel with training with the aim of increasing the model's generality.
     env_generation: Any = None
 
+    # Load a config from a file at this path. Will override all other config options.
+    load_config_path: Any = None
+
     def set_exp_name(self):
         # BACKWARD COMPATABILITY HACK. FIXME: Remove this when all experiments from before `full_exp_name` are obsolete.
         if '-' in self.exp_name:
@@ -156,6 +159,7 @@ class Config():
         self.log_dir = os.path.join(Path(__file__).parent.parent, "runs", self.full_exp_name)
 
     def validate(self):
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         if not self.model == "NCA":
             self.symmetric_conv = False
             self.max_pool = False
@@ -228,6 +232,7 @@ cs.store(group="sweep", name="evo_data", node=EvoDataSweep)
 cs.store(group="sweep", name="cut_corners", node=CutCornerSweep)
 cs.store(group="sweep", name="max_pool", node=MaxPoolSweep)
 cs.store(group="sweep", name="kernel", node=KernelSweep)
+cs.store(group="sweep", name="shared_weights", node=WeightSharingSweep)
 
 cs.store(group="sweep", name="scratch", node=ScratchSweep)
 cs.store(group="sweep", name="evo_data_scratch", node=EvoDataScratchSweep)

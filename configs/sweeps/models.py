@@ -17,13 +17,19 @@ class ModelSweep(HyperSweepConfig):
     exp_name: List[Any] = field(default_factory=lambda: [
         # "0",
         # "1",
-        "2",
+        # "2",
         # "3",
-        "4",
+        # "4",
         # "5",
+
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
     ])
     task: List[Any] = field(default_factory=lambda: [
-        # "diameter",
+        "diameter",
         "pathfinding",
     ])
     shared_weights: List[bool] = field(default_factory=lambda: [
@@ -45,9 +51,9 @@ class ModelSweep(HyperSweepConfig):
         # 16,
         # 32,
         # 48,
-        96,
-        # 128,
-        256,
+        # 96,
+        128,
+        # 256,
         # 512,
     ])
     # loss_interval: List[Any] = field(default_factory=lambda: [

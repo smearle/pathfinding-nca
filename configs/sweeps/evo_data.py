@@ -23,11 +23,18 @@ class EvoDataSweep(HyperSweepConfig):
     exp_name: List[Any] = field(default_factory=lambda: [
         # "2",
         # "3",
-        "4",
+        # "4",
+        # "5",
+
+        # "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
         None,
-        # EnvGeneration(),
         EnvGeneration2(),
     ])
     task: List[Any] = field(default_factory=lambda: [
@@ -39,16 +46,18 @@ class EvoDataSweep(HyperSweepConfig):
         # "GCN",
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
-        True,
+        # True,
         False,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
     #     # 4,
     #     # 8,
         # 32,
+
         48,
         96,
         128,
+
     #     # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [

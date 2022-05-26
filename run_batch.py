@@ -7,6 +7,7 @@ import argparse
 from collections import namedtuple
 import copy
 from pathlib import Path
+from typing import List
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from itertools import product
@@ -28,16 +29,20 @@ PAR_DIR = Path(__file__).parent
 RUNS_DIR = os.path.join(PAR_DIR, 'runs')
 
 
-def submit_slurm_job(sbatch_file, experiment_name, job_time, job_cpus, job_gpus, job_mem):
-    cmd = f"python main.py --load_config {experiment_name}"
+def submit_slurm_job(sbatch_file, experiment_name, exp_cfg_path, job_time, job_cpus, job_gpus, job_mem):
+    # Need to `import *` here to prevent missing classes when loading mazes using pickle.
+    cmd = f'python -c "from main import *; main_experiment_load_cfg(\'{exp_cfg_path}\')"'
 
     with open(sbatch_file) as f:
         content = f.read()
-        job_name = 'nca_'
+        # job_name = 'nca_'
         # if args.evaluate:
             # job_name += 'eval_'
-        job_name += str(experiment_name)
-        content = re.sub(r'nca_(eval_)?.+', job_name, content)
+        # job_name += str(experiment_name)
+        output_path = os.path.join(RUNS_DIR, f'{experiment_name}.out')
+        job_name = experiment_name
+        content = re.sub(r'--job-name=.*', f'--job-name={job_name}', content)
+        content = re.sub(r'--output=.*', f'--output={output_path}', content)
         ##SBATCH --gres=gpu:1
         gpu_str = f"#SBATCH --gres=gpu:{job_gpus}" if job_gpus > 0 else f"##SBATCH --gres=gpu:1"
         content = re.sub(r'#+SBATCH --gres=gpu:\d+', gpu_str, content)
@@ -45,7 +50,7 @@ def submit_slurm_job(sbatch_file, experiment_name, job_time, job_cpus, job_gpus,
         content = re.sub(r'#SBATCH --cpus-per-task=\d+', '#SBATCH --cpus-per-task={}'.format(job_cpus), content)
         content = re.sub(r'#SBATCH --mem=\d+GB', '#SBATCH --mem={}GB'.format(job_mem), content)
         cmd = '\n' + cmd
-        new_content = re.sub('\n.*python main.py.*', cmd, content)
+        new_content = re.sub('\n.*python -c "from main import.*', cmd, content)
 
     with open(sbatch_file, 'w') as f:
         f.write(new_content)
@@ -53,9 +58,9 @@ def submit_slurm_job(sbatch_file, experiment_name, job_time, job_cpus, job_gpus,
     os.system('sbatch {}'.format(sbatch_file))
 
 
-def dump_config(exp_name, exp_config):
+def dump_config(exp_name, exp_cfg):
     with open(os.path.join('configs', 'auto', f'{exp_name}.json'), 'w') as f:
-        json.dump(exp_config, f, indent=4)
+        json.dump(exp_cfg, f, indent=4)
 
 
 @hydra.main(config_path=None, config_name="batch_config")
@@ -63,7 +68,7 @@ def main_batch(batch_dict_cfg: BatchConfig):
     batch_cfg: BatchConfig = BatchConfig()
     [setattr(batch_cfg, k, v) for k, v in batch_dict_cfg.items() if k != 'sweep']
     batch_cfg.sweep_name = batch_dict_cfg.sweep.name
-    job_time = 48
+    job_time = 2
     batch_hyperparams = batch_dict_cfg.sweep
 
     # Generate dataset of mazes if necessary.
@@ -83,7 +88,7 @@ def main_batch(batch_dict_cfg: BatchConfig):
             exp_dirs.extend(dirnames)
             break
         for exp_dir in exp_dirs:
-            exp_config = copy.deepcopy(batch_cfg)
+            exp_cfg = copy.deepcopy(batch_cfg)
             # cfg_path = os.path.join(RUNS_DIR, exp_dir, 'config.json')
             cfg_path = os.path.join(RUNS_DIR, exp_dir, 'config.yaml')
             if not os.path.exists(cfg_path):
@@ -92,7 +97,7 @@ def main_batch(batch_dict_cfg: BatchConfig):
                 continue
             # load_config = json.load(open(cfg_path))
             load_config =OmegaConf.load(open(cfg_path, 'r'))
-            [setattr(exp_config, k, v) for k, v in load_config.items() if k not in overwrite_args]
+            [setattr(exp_cfg, k, v) for k, v in load_config.items() if k not in overwrite_args]
 
             if batch_cfg.filter_by_config:
                 # Exclude experiments that would not have been launched by the batch config.
@@ -100,18 +105,18 @@ def main_batch(batch_dict_cfg: BatchConfig):
 
                 # Ad hoc filtering
                 # if batch_cfg.batch_hyperparams == "weight_sharing":
-                    # if exp_config.shared_weights is True and exp_config.sparse_weights is False:
+                    # if exp_cfg.shared_weights is True and exp_cfg.sparse_weights is False:
                         # invalid_cfg = True
                         # continue
 
-                for k, v in vars(exp_config).items():
+                for k, v in vars(exp_cfg).items():
                     if k == 'full_exp_name':
                         continue
                     if k == 'exp_name':
                         # FIXME: Backward compatibility HACK
                         if '-' in v:
                             v = v.split('_')[-1]
-                    if k == 'loss_interval' and v == exp_config.n_layers:
+                    if k == 'loss_interval' and v == exp_cfg.n_layers:
                         continue
                     if k in batch_hyperparams and v not in batch_hyperparams[k]:
                         print(f"Batch config does not include value {v} for key {k}. (Admissible values: {batch_hyperparams[k]}.)")
@@ -129,10 +134,10 @@ def main_batch(batch_dict_cfg: BatchConfig):
             old_exp_configs = exp_configs
             filtered_exp_configs = []
             for hyperparam in hyperparams:
-                for exp_config in old_exp_configs:
-                    exp_config = copy.deepcopy(exp_config)
-                    setattr(exp_config, key, hyperparam)
-                    filtered_exp_configs.append(exp_config)
+                for exp_cfg in old_exp_configs:
+                    exp_cfg = copy.deepcopy(exp_cfg)
+                    setattr(exp_cfg, key, hyperparam)
+                    filtered_exp_configs.append(exp_cfg)
             exp_configs = filtered_exp_configs
     
     # Validate experiment configs, setting unique experiment names and filtering out invalid configs (flagged by 
@@ -166,7 +171,7 @@ def main_batch(batch_dict_cfg: BatchConfig):
         return
 
     # Only perform missing evals.
-    filtered_exp_configs = []
+    filtered_exp_configs: List[BatchConfig] = []  # this shouldn't really be a `BatcConfig` eh?
     for exp_cfg in exp_configs:
         if not batch_cfg.overwrite_evals and batch_cfg.evaluate and not batch_cfg.vis_cross_eval \
             and os.path.exists(os.path.join(exp_cfg.log_dir, 'test_stats.json')):
@@ -177,7 +182,7 @@ def main_batch(batch_dict_cfg: BatchConfig):
         print("Including config for experiment found at: ", exp_cfg.full_exp_name)
     exp_configs = filtered_exp_configs
 
-    experiment_names = []
+    # experiment_names = []
     for exp_cfg in exp_configs:
         if not batch_cfg.slurm:
             try:
@@ -189,7 +194,11 @@ def main_batch(batch_dict_cfg: BatchConfig):
                 continue
 
         else:
-            raise NotImplementedError
+            exp_cfg_path = os.path.abspath(os.path.join(Path(__file__).parent, 'slurm', 'auto_configs', f'{exp_cfg.full_exp_name}.yaml'))
+            yaml.dump(OmegaConf.to_yaml(exp_cfg), open(exp_cfg_path, 'w'))
+            sbatch_file = os.path.join(Path(__file__).parent, 'slurm', 'run.sh')
+            submit_slurm_job(sbatch_file=sbatch_file, experiment_name=exp_cfg.full_exp_name, exp_cfg_path=exp_cfg_path, 
+                job_time=job_time, job_cpus=1, job_gpus=1, job_mem=16)
         # elif not batch_cfg.load:
         #     experiment_names.append(exp_cfg.exp_name)
         #     dump_config(exp_cfg.exp_name, exp_cfg)
@@ -210,14 +219,6 @@ def main_batch(batch_dict_cfg: BatchConfig):
         #         print('No save directory found for experiment. Skipping.')
         #     else:
         #         print('Found save dir: ', exp_cfg.exp_name)
-
-    if batch_cfg.slurm:
-        sbatch_file = os.path.join('slurm', 'run.sh')
-        for experiment_name in experiment_names:
-            # Because of our parallel evo/train implementation, we need an additional CPU for the remote trainer, and 
-            # anoter for the local worker (actually the latter is not true, but... for breathing room).
-            submit_slurm_job(sbatch_file=sbatch_file, experiment_name=experiment_name, job_time=job_time, job_cpus=1, \
-                job_gpus=1, job_mem=16)
 
 
 if __name__ == '__main__':
