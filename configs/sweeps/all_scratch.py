@@ -21,10 +21,10 @@ class ScratchSweep(HyperSweepConfig):
     ])
 
     exp_name: List[Any] = field(default_factory=lambda: [
-        "2",
+        # "2",
         # "3",
         # "4",
-        # "scratch",
+        "scratch",
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
         # EnvGeneration(),
@@ -39,9 +39,10 @@ class ScratchSweep(HyperSweepConfig):
         # False,
     # ])
     model: List[Any] = field(default_factory=lambda: [
-        "NCA",
+        # "NCA",
         # "GCN",
         # "MLP",
+        "FixedBfsNCA",
         # "FixedDfsNCA",
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [

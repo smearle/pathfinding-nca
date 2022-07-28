@@ -16,7 +16,7 @@ class FixedBfsNCA(PathfindingNN):
     # source and age for activation map; path channel and 4 directional path activation channels for path extraction
     n_hid_chan = 2 + 1 + len(adjs)
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, requires_grad=False):
         """A Neural Cellular Automata model for pathfinding over grid-based mazes.
         
         Args:
@@ -32,50 +32,53 @@ class FixedBfsNCA(PathfindingNN):
         assert self.n_in_chan == 4
         self.conv_0 = nn.Conv2d(self.n_in_chan + self.n_hid_chan, self.n_in_chan + self.n_hid_chan, 
             3, 1, padding=1, bias=True)
-        with th.no_grad():
-            # input: (empty, wall, src, trg)
-            # weight: (out_chan, in_chan, w, h)
-            self.flood_chan = flood_chan = self.n_in_chan
+        # with th.no_grad():
+        # input: (empty, wall, src, trg)
+        # weight: (out_chan, in_chan, w, h)
+        self.flood_chan = flood_chan = self.n_in_chan
 
-            # This convolution handles the flood and path extraction.
-            self.conv_0.weight = nn.Parameter(th.zeros_like(self.conv_0.weight), requires_grad=False)
-            self.conv_0.bias = nn.Parameter(th.zeros_like(self.conv_0.bias), requires_grad=False)
+        # This convolution handles the flood and path extraction.
+        conv_0_weight = th.zeros_like(self.conv_0.weight)
+        conv_0_bias = th.zeros_like(self.conv_0.bias)
 
-            # the first n_in_chans channels will hold the actual map (via additive skip connections)
+        # the first n_in_chans channels will hold the actual map (via additive skip connections)
 
-            # the next channel will contain the (binary) flood, with activation flowing from the source and flooded tiles...
-            self.conv_0.weight[flood_chan, self.src_chan, 1, 1] = 1.
-            for adj in self.adjs + [(1, 1)]:
-                self.conv_0.weight[flood_chan, flood_chan, adj[0], adj[1]] = 1.
+        # the next channel will contain the (binary) flood, with activation flowing from the source and flooded tiles...
+        conv_0_weight[flood_chan, self.src_chan, 1, 1] = 1.
+        for adj in self.adjs + [(1, 1)]:
+            conv_0_weight[flood_chan, flood_chan, adj[0], adj[1]] = 1.
 
-            # ...but stopping at walls.
-            self.conv_0.weight[flood_chan, cfg.wall_chan, 1, 1] = -6.
+        # ...but stopping at walls.
+        conv_0_weight[flood_chan, cfg.wall_chan, 1, 1] = -6.
 
-            # the next channel will contain the age of the flood
-            self.age_chan = age_chan = flood_chan + 1
-            self.conv_0.weight[age_chan, flood_chan, 1, 1] = 1.
-            self.conv_0.weight[age_chan, age_chan, 1, 1] = 1.
+        # the next channel will contain the age of the flood
+        self.age_chan = age_chan = flood_chan + 1
+        conv_0_weight[age_chan, flood_chan, 1, 1] = 1.
+        conv_0_weight[age_chan, age_chan, 1, 1] = 1.
 
-            # in the final channel, we will extract the optimal path(s)
-            self.path_chan = path_chan = age_chan + 1
+        # in the final channel, we will extract the optimal path(s)
+        self.path_chan = path_chan = age_chan + 1
 
-            # The transposed convolution will be begin illuminating path channels along the shortest path once the flood
-            # meets the target.
-            self.conv_0.weight[path_chan, flood_chan, 1, 1] = 1.
-            self.conv_0.weight[path_chan, self.trg_chan, 1, 1] = 1.
-            self.conv_0.bias[path_chan] = -1.
+        # The transposed convolution will be begin illuminating path channels along the shortest path once the flood
+        # meets the target.
+        conv_0_weight[path_chan, flood_chan, 1, 1] = 1.
+        conv_0_weight[path_chan, self.trg_chan, 1, 1] = 1.
+        conv_0_bias[path_chan] = -1.
 
-            # It then spreads path channel to neighboring cells with greater age values.
-            for i, adj in enumerate(self.adjs):
-                self.conv_0.weight[path_chan + i + 1, path_chan, adj[0], adj[1]] = 1
-                self.conv_0.weight[path_chan + i + 1, age_chan, adj[0], adj[1]] = 2
-                self.conv_0.weight[path_chan + i + 1, age_chan, 1, 1] = -2
+        # It then spreads path channel to neighboring cells with greater age values.
+        for i, adj in enumerate(self.adjs):
+            conv_0_weight[path_chan + i + 1, path_chan, adj[0], adj[1]] = 1
+            conv_0_weight[path_chan + i + 1, age_chan, adj[0], adj[1]] = 2
+            conv_0_weight[path_chan + i + 1, age_chan, 1, 1] = -2
+
+        self.conv_0.weight = nn.Parameter(conv_0_weight, requires_grad=requires_grad)
+        self.conv_0.bias = nn.Parameter(conv_0_bias, requires_grad=requires_grad)
                 
     def forward(self, x):
-        with th.no_grad():
-            x = self.add_initial_maze(x)
-            x = self.hid_forward(x)
-            self.n_step += 1
+        # with th.no_grad():
+        x = self.add_initial_maze(x)
+        x = self.hid_forward(x)
+        self.n_step += 1
 
         return x
 
@@ -98,15 +101,18 @@ class FixedBfsNCA(PathfindingNN):
         return x[:, self.n_in_chan:]
             
     def flood(self, x):
-        x0 = x.clone()  # for debugging
+        # x0 = x.clone()  # for debugging
         x = self.conv_0(x)
-        x[:, self.flood_chan] = th.clamp(x[:, self.flood_chan], 0., 1.)
+
+        # x[:, self.flood_chan] = th.clamp(x[:, self.flood_chan], 0., 1.)
+        x[:, self.flood_chan] = clamp(x[:, self.flood_chan], 0., 1.)
+
         # Are the directional path activation channels equal to -1?
         path_activs = x[:, self.path_chan + 1: self.path_chan + 1 + len(self.adjs)] == -1.0
         path_activs = th.max(path_activs, dim=1)[0]
         # If any one of them is, then make the path channel at that cell equal to 1.
         x[:, self.path_chan] += path_activs.float()
-        x[:, self.path_chan] = th.clamp(x[:, self.path_chan], 0., 1.)
+        x[:, self.path_chan] = clamp(x[:, self.path_chan], 0., 1.)
         return x
 
     def get_dones(self, x, trg_pos):
@@ -116,3 +122,11 @@ class FixedBfsNCA(PathfindingNN):
     def reset(self, initial_maze, is_torchinfo_dummy=False, **kwargs):
         super().reset(initial_maze)
 
+
+def clamp_relu(x, min_val, max_val):
+    """Essentially `th.clamp(x, min_val, max_val)`, but differentiable."""
+    return -th.relu(-(th.relu(x - min_val) + min_val) + max_val) + max_val
+
+
+clamp = clamp_relu
+# clamp = th.clamp

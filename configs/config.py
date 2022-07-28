@@ -28,7 +28,10 @@ from configs.sweeps.weight_sharing import WeightSharingSweep
 class Config():
     """Default configuration. For use with hydra."""
     # The channel of the maze corresponding to empty/traversable space.
-    empty_chan, wall_chan, src_chan, trg_chan = 0, 1, 2, 3  # immutable
+    empty_chan: int = 0 # immutable
+    wall_chan: int = 1
+    src_chan: int = 2
+    trg_chan: int = 3
 
     # The number of channels in the one-hot encodings of the training mazes.
     n_in_chan = 4  # cannot be controlled by user

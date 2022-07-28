@@ -48,6 +48,7 @@ def main_experiment(cfg: Config = None, cfg_path: str = None):
     #   `run_batch.py`.
     if cfg is None:
         cfg = Config()
+    if not hasattr(cfg, 'full_exp_name'):
         cfg.set_exp_name()
     # Validate and set full experiment name if this has not been done already (i.e. if running this script directly or 
     # launching via SLURM).
