@@ -129,6 +129,7 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                             p.grad[:, :, 0, 0] = p.grad[:, :, -1, -1] = p.grad[:, :, -1, 0] = p.grad[:, :, 0, -1] = 0
 
                         if cfg.symmetric_conv:
+                            # Force the NCA to behave equivalently to a GCN (this is a sanity check).
                             symm_grad = p.grad[:, :, 1, 0] + p.grad[:, :, 0, 1] + p.grad[:, :, 1, 2] + p.grad[:, :, 2, 1]
                             symm_grad /= 4
                             p.grad[:, :, 1, 0] = p.grad[:, :, 0, 1] = p.grad[:, :, 1, 2] = p.grad[:, :, 2, 1] = symm_grad

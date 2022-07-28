@@ -13,6 +13,7 @@ import torch
 from configs.sweeps.all import HyperSweepConfig
 from configs.sweeps.all_scratch import ScratchSweep
 from configs.sweeps.cut_corners import CutCornerSweep
+from configs.sweeps.handcoded import HandcodedSweep
 from configs.sweeps.kernel import KernelSweep
 from configs.sweeps.maxpool import MaxPoolSweep
 from configs.sweeps.evo_data_scratch import EvoDataScratchSweep
@@ -233,6 +234,7 @@ cs.store(group="sweep", name="cut_corners", node=CutCornerSweep)
 cs.store(group="sweep", name="max_pool", node=MaxPoolSweep)
 cs.store(group="sweep", name="kernel", node=KernelSweep)
 cs.store(group="sweep", name="shared_weights", node=WeightSharingSweep)
+cs.store(group="sweep", name="handcoded", node=HandcodedSweep)
 
 cs.store(group="sweep", name="scratch", node=ScratchSweep)
 cs.store(group="sweep", name="evo_data_scratch", node=EvoDataScratchSweep)

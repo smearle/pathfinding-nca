@@ -11,7 +11,7 @@ from moviepy.video.io.ffmpeg_writer import FFMPEG_VideoWriter
 import numpy as np
 import PIL
 import torch
-from wandb import Config
+from configs.config import Config
 from models.gnn import GCN
 
 from models.nn import PathfindingNN
@@ -89,8 +89,12 @@ def count_parameters(model: PathfindingNN, cfg: Config):
                 n_params += int(n_ps)
             else:
                 n_params += p.numel()
-        # TODO: support networks involving some hand-coded, non-learning sub-networks
-        assert p.requires_grad
+
+        # Some models have a mix of learnable weights and a handcoded "oracle", with potentially frozen weights.
+        if ("Bfs" in cfg.model or "Dfs" in cfg.model) and "oracle" in name:
+            assert not p.requires_grad
+        else:
+            assert p.requires_grad
 
     return n_params
 
