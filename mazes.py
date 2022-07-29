@@ -270,8 +270,8 @@ def gen_rand_mazes(n_data, cfg):
     target_diameters = []
     i = 0
     for i in tqdm(range(n_data)):
-    # while len(solvable_mazes_onehot) < n_data:
         sol = None
+        # Generate random mazes until we get a solvable one.
         while not sol:
             rand_maze_onehot = generate_random_maze(cfg)
             rand_maze_discrete = rand_maze_onehot.argmax(axis=1)
@@ -283,6 +283,7 @@ def gen_rand_mazes(n_data, cfg):
         for x, y in sol:
                 target_path[0, x, y] = 1
         target_paths.append(target_path)
+        # For convenience, we use the same maze in the dataset for the diameter problem.
         target_diameter = th.zeros_like(rand_maze_discrete)
         diam, connected = diameter(rand_maze_discrete[0].cpu().numpy())
         for x, y in diam:

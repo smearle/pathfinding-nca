@@ -17,7 +17,7 @@ from configs.config import Config
 from configs.env_gen import EnvGeneration
 from evaluate import evaluate
 from mazes import Mazes, bfs_grid, diameter, get_rand_path, get_target_diam, get_target_path, render_discrete
-from models.gnn import GCN
+from models.gnn import GCN, GNN
 from models.nn import PathfindingNN
 from utils import count_parameters, get_discrete_loss, get_mse_loss, Logger, to_path, save
 
@@ -124,7 +124,9 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                         continue
 
                     if "weight" in name:
-                        if not isinstance(model, GCN) and cfg.cut_conv_corners:
+                        # If this is a graph neural net, we are already ignoring the corners (they are not neighbors as
+                        # defined by our grid representation of the maze).
+                        if not isinstance(model, GNN) and cfg.cut_conv_corners:
                             # Zero out all the corners
                             p.grad[:, :, 0, 0] = p.grad[:, :, -1, -1] = p.grad[:, :, -1, 0] = p.grad[:, :, 0, -1] = 0
 
@@ -134,6 +136,7 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                             symm_grad /= 4
                             p.grad[:, :, 1, 0] = p.grad[:, :, 0, 1] = p.grad[:, :, 1, 2] = p.grad[:, :, 2, 1] = symm_grad
 
+                        # TODO: Should we do the same thing for GAT? Need to understand GAT better to have intuition.
                         elif isinstance(model, GCN):
                             # Match the symmetric conv above.
                             p.grad /= 4

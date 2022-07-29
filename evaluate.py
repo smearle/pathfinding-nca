@@ -4,7 +4,6 @@ from pdb import set_trace as TT
 import torch as th
 from configs.config import Config
 from mazes import Mazes, render_discrete
-from models.gnn import GCN
 from models.nn import PathfindingNN
 
 from utils import Logger, get_discrete_loss, get_mse_loss, to_path

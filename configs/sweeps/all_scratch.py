@@ -40,9 +40,10 @@ class ScratchSweep(HyperSweepConfig):
     # ])
     model: List[Any] = field(default_factory=lambda: [
         # "NCA",
+        "GAT",
         # "GCN",
         # "MLP",
-        "FixedBfsNCA",
+        # "FixedBfsNCA",
         # "FixedDfsNCA",
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
@@ -60,14 +61,14 @@ class ScratchSweep(HyperSweepConfig):
         # 24,
     # #     # 32,
         # 48,
-        96,
-    #     128,
+        # 96,
+        128,
         # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
-        # 16,
+        16,
     # #     # 48,
-        64,
+        # 64,
     #     # 96,
     # #     # 128,
     ])
