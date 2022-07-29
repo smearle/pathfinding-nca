@@ -3,6 +3,8 @@ from functools import partial
 import math
 from pdb import set_trace as TT
 from turtle import right
+from typing import Iterable
+from einops import rearrange
 
 import numpy as np
 import torch as th
@@ -137,8 +139,8 @@ class GNN(PathfindingNN):
                 n_nodes = width * height
                 grid_edges = get_grid_edges(width, height)
                 self_edges = get_self_edges(width, height)
-                self.grid_edges = batch_edges(grid_edges, batch_size, n_nodes)
-                self.self_edges = batch_edges(self_edges, batch_size, n_nodes)
+                self.grid_edges = batch_edges(th.tile(grid_edges, (1, batch_size)), [n_nodes] * batch_size)
+                self.self_edges = batch_edges(th.tile(self_edges, (1, batch_size)), [n_nodes] * batch_size)
                 self.edges = th.hstack((self.self_edges, self.grid_edges))
                 # self.edges = self.self_edges
                 # self.edges = self.grid_edges
@@ -174,9 +176,17 @@ class GAT(GNN):
         super().__init__(cfg, conv=GATConv)
 
 
-def get_grid_edges(width, height):
+def get_grid_edges(width, height, traversable: th.Tensor = None):
     """Create an edge matrix of shape (2, n_edges) for a graph corresponding to a 2D grid, in which grid cells sharing
-    a border are connected by an edge."""
+    a border are connected by an edge.
+    
+    Args:
+        width (int): Width of the grid.
+        height (int): Height of the grid.
+        traversable (th.Tensor, optional): A tensor of shape (width, height) indicating whether each grid cell is 
+            traversable. If None, we include each tile in the grid as a node in the graph. Otherwise, we include only 
+            traversable tiles. Defaults to None.
+    """
     # The 2D indices of all nodes, with shape (width, height, 2)
     node_indices = np.indices((width, height)).transpose(1, 2, 0)
 
@@ -190,8 +200,21 @@ def get_grid_edges(width, height):
         np.stack((node_indices[:, 1:], left_indices)), np.stack((node_indices[1:], down_indices)), \
         np.stack((node_indices[:, :-1], right_indices)), np.stack((node_indices[:-1], up_indices))
 
+    edge_sets = [left_edges, down_edges, right_edges, up_edges]
+
+    ### DEBUG ###
+    traversable = th.randn((width, height)) > 0
+    ### DEBUG ###
+
+    if traversable is not None:
+        # Filter out edges that include non-traversable tiles.
+        for edge_set in edge_sets:
+            flat_edge_set = rearrange(edge_set, 'ij h w xy -> ij (h w) xy')
+            traversable[flat_edge_set[0, :, 0], ]
+            TT()
+
     # Arrays of edges, shape, e.g., (2, 2, width, (height - 1)) ~ (xy_coords, endpoints, nodes_per_row, nodes_per_col)
-    dir_edges_lst = [e.transpose(3, 0, 1, 2) for e in [left_edges, down_edges, right_edges, up_edges]]
+    dir_edges_lst = [e.transpose(3, 0, 1, 2) for e in edge_sets]
 
     # Array of flattened 2D indices, shape, e.g., (2, 2, width * (height - 1)) ~ (xy_coords, endpoints, nodes).
     edges = np.concatenate([e.reshape(2, 2, -1) for e in dir_edges_lst], -1)
@@ -210,20 +233,21 @@ def get_self_edges(width, height):
     return th.Tensor(self_edges).long()
 
 
-def batch_edges(edges, batch_size, n_nodes):
+def batch_edges(edges: Iterable[th.Tensor], n_nodes: Iterable[int]):
     """
     Batch edges into connected components width identical connectivity.
 
     For each set of edges, increment all the node indices to refer to the next connected component. 
 
     Args:
-        edges (th.Tensor): Tensor of shape (2, n_edges), corresponding to the graph
-        batch_size (int): Number of connected components in the output.
-        n_nodes (int): Number of nodes in each connected component in the output.
+        edges (Iterable[th.Tensor]): List of tensors of shape (2, n_edges), corresponding to each input graph (connected 
+            component in the output graph).
+        n_nodes (Iterable[int]): Number of nodes in each input graph.
     """
-    n_edges = edges.shape[-1]
-    edges = th.tile(edges, (1, batch_size))
-    for i in range(1, batch_size):
-        edges[:, i * n_edges:] += n_nodes
+    n_prev_nodes = 0
+    for i, (edge_set, n_subgraph_nodes) in enumerate(zip(edges, n_nodes)):
+        edge_set += n_prev_nodes
+        edges[i] = edge_set
+        n_prev_nodes += n_subgraph_nodes
 
     return edges
