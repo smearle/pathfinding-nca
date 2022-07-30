@@ -278,6 +278,7 @@ def gen_rand_mazes(n_data, cfg):
     target_paths = []
     target_diameters = []
     i = 0
+    j = 0
     for i in tqdm(range(n_data)):
         sol = None
         # Generate random mazes until we get a solvable one.
@@ -285,6 +286,7 @@ def gen_rand_mazes(n_data, cfg):
             rand_maze_onehot = generate_random_maze(cfg)
             rand_maze_discrete = rand_maze_onehot.argmax(axis=1)
             sol = bfs_grid(rand_maze_discrete[0].cpu().numpy())
+            j += 1
         # print(f'Adding maze {i}.')
         solvable_mazes_onehot.append(rand_maze_onehot)
         solvable_mazes_discrete.append(rand_maze_discrete)
@@ -301,7 +303,7 @@ def gen_rand_mazes(n_data, cfg):
         target_diameters.append(target_diameter)
         i += 1
     # print(f'Solution length: {len(sol)}') 
-    print(f'Generated {i} random mazes to produce {n_data} solvable mazes.')
+    print(f'Generated {j} random mazes to produce {n_data} solvable mazes.')
 
     return th.vstack(solvable_mazes_discrete), th.vstack(solvable_mazes_onehot), th.vstack(solvable_mazes_edges), \
         th.vstack(target_paths), th.vstack(target_diameters)

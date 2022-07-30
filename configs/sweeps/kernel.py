@@ -13,16 +13,6 @@ class KernelSweep(HyperSweepConfig):
 
     name: str = 'kernel'
 
-    save_interval: List[Any] = field(default_factory=lambda: [
-        10000,
-    ])
-    log_interval: List[Any] = field(default_factory=lambda: [
-        10000,
-    ])
-    n_updates: List[Any] = field(default_factory=lambda: [
-        50000,
-    ])
-
     exp_name: List[Any] = field(default_factory=lambda: [
         # "2",
         # "3",
@@ -54,7 +44,7 @@ class KernelSweep(HyperSweepConfig):
     ])
     kernel_size: List[Any] = field(default_factory=lambda: [
         5,
-        # 3,
+        3,
     ])
     max_pool: List[Any] = field(default_factory=lambda: [
         # True,
@@ -71,7 +61,7 @@ class KernelSweep(HyperSweepConfig):
 
         48,
         96,
-        128,
+        # 128,
 
         # 256,
     ])

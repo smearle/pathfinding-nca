@@ -11,15 +11,15 @@ from configs.sweeps.all import HyperSweepConfig
 class CutCornerSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
     name: str = 'cut_corners'
-    save_interval: List[Any] = field(default_factory=lambda: [
-        10000,
-    ])
-    log_interval: List[Any] = field(default_factory=lambda: [
-        10000,
-    ])
-    n_updates: List[Any] = field(default_factory=lambda: [
-        50000,
-    ])
+    # save_interval: List[Any] = field(default_factory=lambda: [
+    #     10000,
+    # ])
+    # log_interval: List[Any] = field(default_factory=lambda: [
+    #     10000,
+    # ])
+    # n_updates: List[Any] = field(default_factory=lambda: [
+    #     50000,
+    # ])
 
     exp_name: List[Any] = field(default_factory=lambda: [
         # "2",
@@ -36,7 +36,7 @@ class CutCornerSweep(HyperSweepConfig):
     ])
     cut_conv_corners: List[Any] = field(default_factory=lambda: [
         True,
-        # False,
+        False,
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
         # EnvGeneration(),
@@ -57,10 +57,15 @@ class CutCornerSweep(HyperSweepConfig):
     n_hid_chan: List[Any] = field(default_factory=lambda: [
         # 4,
         # 8,
+
         # 32,
+        # 64,
+        # 150,
+
         48,
         96,
-        128,
+        # 128,
+
         # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
@@ -73,8 +78,10 @@ class CutCornerSweep(HyperSweepConfig):
     # #     # 4,
     # #     # 8,
     # #     # 16,
+
         32,
-    #     64,
+        # 64,
+
     ])
     symmetric_conv: List[Any] = field(default_factory=lambda: [
         # True,

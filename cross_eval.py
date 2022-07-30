@@ -186,7 +186,7 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str):
             data_rows.append([exp_stats[k] if k in exp_stats else None for k in col_headers])
 
         if batch_cfg.selective_table and name in names_to_hyperparams:
-            hyperparams = names_to_hyperparams[name]
+            hyperparams = names_to_hyperparams[name] + ['exp_name']
         else:
             hyperparams = names_to_hyperparams['batch']
         # Hierarchical rows, separating experiments according to relevant hyperparameters
@@ -230,6 +230,15 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str):
         df = pd.DataFrame(data_rows, columns=col_indices, index=row_indices)
         df.sort_index(inplace=True)
 
+        csv_name_multi = os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval_multi.csv')
+        csv_name = os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval.csv')
+        # csv_name = r"{}/cross_eval_multi.csv".format(EVAL_DIR)
+        html_name_multi = os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval_multi.html')
+        html_name = os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval.html')
+        # html_name = r"{}/cross_eval_multi.html".format(EVAL_DIR)
+        df.to_csv(csv_name_multi)
+        df.to_html(html_name_multi)
+
         for k in col_indices:
             if k in df:
                 print(k[-1])
@@ -237,7 +246,37 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str):
                     lambda data: preprocess_values(data, 
                                     col_name=k)
                 )
-        df.to_csv(os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval.csv'))
+
+        # Take mean/std over multiple runs with the same relevant hyperparameters
+        new_rows = []
+        new_row_names = []
+        # Get some p-values for statistical significance
+        for i in range(df.shape[0]):
+            row = df.iloc[i]
+            row_name = row.name
+            if row_name[:-1] in new_row_names:
+                continue
+            new_row_names.append(row_name[:-1])
+            repeat_exps = df.loc[row_name[:-1]]
+            mean_exp = repeat_exps.mean(axis=0)
+            std_exp = repeat_exps.std(axis=0)
+            mean_exp = [(i, e) for i, e in zip(mean_exp, std_exp)]
+            new_rows.append(mean_exp)
+        ndf = pd.DataFrame()
+        ndf = ndf.append(new_rows)
+        new_col_indices = pd.MultiIndex.from_tuples(df.columns)
+        new_row_indices = pd.MultiIndex.from_tuples(new_row_names)
+        ndf.index = new_row_indices
+        ndf.columns = new_col_indices
+        ndf.index.names = df.index.names[:-1]
+        ndf = ndf
+        ndf.to_csv(csv_name)
+        ndf.to_html(html_name)
+
+        df = ndf
+
+
+        # df.to_csv(os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval.csv'))
 
         # Save dataframe using pickle
         with open(os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval.pkl'), 'wb') as f:
@@ -308,15 +347,18 @@ def preprocess_values(data, col_name=None):
     if col_name[-1] not in set({"completion time", "n_params"}):
         data *= 100
         err *= 100
-    return data, err
+    # return data, err
+    return data
 
 
 def bold_extreme_values(data, data_max=-1, col_name=None):
     "Process dataframe values from floats into strings. Bold extreme (best) values."
 
     # hack
+    
     if col_name[-1] in set({"n. params", "n. updates"}):
-        return '{:,}'.format(data)
+        data, err = data
+        return '{:,}'.format(int(data))
 
     if isinstance(data, int):
         assert data == 0
@@ -325,6 +367,7 @@ def bold_extreme_values(data, data_max=-1, col_name=None):
     else:
         # TODO: get standard deviation in a smart way.
         data, err = data
+        # data = data
 
     if data == data_max:
         bold = True

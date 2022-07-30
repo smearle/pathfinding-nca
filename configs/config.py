@@ -72,7 +72,7 @@ class Config():
     minibatch_size: int= 32 
 
     # Size of minibatch for rendering images and animations.
-    render_minibatch_size: int = 8
+    render_minibatch_size: int = 1
 
     device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
 

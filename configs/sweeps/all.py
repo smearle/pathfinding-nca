@@ -8,16 +8,20 @@ from configs.env_gen import EnvGeneration
 @dataclass
 class HyperSweepConfig():
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
+    # FIXME: Why can't these guys just be ints, since we won't sweep over their value?
     name: str = 'batch'
-    save_interval: List[Any] = field(default_factory=lambda: [
-        10000,
-    ])
-    log_interval: List[Any] = field(default_factory=lambda: [
-        10000,
-    ])
-    n_updates: List[Any] = field(default_factory=lambda: [
-        50000,
-    ])
+    # save_interval: List[Any] = field(default_factory=lambda: [
+        # 10000,
+    # ])
+    save_interval: int = 10000
+    # log_interval: List[Any] = field(default_factory=lambda: [
+        # 10000,
+    # ])
+    log_interval: int = 10000
+    # n_updates: List[Any] = field(default_factory=lambda: [
+        # 50000,
+    # ])
+    n_updates: int = 50000
 
     # exp_name: List[Any] = field(default_factory=lambda: [
         # "2",

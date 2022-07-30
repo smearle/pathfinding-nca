@@ -10,15 +10,6 @@ from configs.sweeps.all import HyperSweepConfig
 class HandcodedSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
     name: str = 'cut_corners'
-    save_interval: List[Any] = field(default_factory=lambda: [
-        10000,
-    ])
-    log_interval: List[Any] = field(default_factory=lambda: [
-        10000,
-    ])
-    n_updates: List[Any] = field(default_factory=lambda: [
-        50000,
-    ])
 
     exp_name: List[Any] = field(default_factory=lambda: [
         "debug",

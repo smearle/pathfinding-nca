@@ -10,17 +10,7 @@ from configs.sweeps.all import HyperSweepConfig
 class EvoDataScratchSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
     name: str = 'evo_data'
-    save_interval: List[Any] = field(default_factory=lambda: [
-        # 1000,
-        10000,
-    ])
-    log_interval: List[Any] = field(default_factory=lambda: [
-        # 200,
-        10000,
-    ])
-    n_updates: List[Any] = field(default_factory=lambda: [
-        100000,
-    ])
+    n_updates: int = 100000
 
     exp_name: List[Any] = field(default_factory=lambda: [
         # "2",

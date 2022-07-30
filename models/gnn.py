@@ -12,6 +12,7 @@ from torch import nn, Tensor
 from torch_geometric.nn import GCNConv, GATConv, MessagePassing
 from configs.config import Config
 from grid_to_graph import get_neighb_edges, get_self_edges
+from mazes import Tiles
 
 from models.nn import PathfindingNN
 
@@ -152,7 +153,7 @@ class GNN(PathfindingNN):
             #  bears repeating).
             # TODO:...
             # Modify e0, incrementing each set of edges by then number of nodes in all previous mazes.
-            self.edges = e0
+            self.edges = batch_edges(edges=e0, n_nodes=th.sum(x0[:, Tiles.WALL, ...] != 1, axis=0))
             pass
         super().reset(x0, is_torchinfo_dummy)         
 

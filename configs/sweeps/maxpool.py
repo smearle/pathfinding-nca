@@ -13,16 +13,6 @@ class MaxPoolSweep(HyperSweepConfig):
 
     name: str = 'max_pool'
 
-    save_interval: List[Any] = field(default_factory=lambda: [
-        10000,
-    ])
-    log_interval: List[Any] = field(default_factory=lambda: [
-        10000,
-    ])
-    n_updates: List[Any] = field(default_factory=lambda: [
-        50000,
-    ])
-
     exp_name: List[Any] = field(default_factory=lambda: [
         # "2",
         # "2_200k",
@@ -63,9 +53,11 @@ class MaxPoolSweep(HyperSweepConfig):
         # 4,
         # 8,
         # 32,
+
         48,
         96,
         128,
+
         # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [

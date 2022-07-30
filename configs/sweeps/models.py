@@ -51,18 +51,18 @@ class ModelSweep(HyperSweepConfig):
         # 16,
         # 32,
         # 48,
-        # 96,
+        96,
         128,
-        # 256,
+        256,
         # 512,
     ])
-    # loss_interval: List[Any] = field(default_factory=lambda: [
+    loss_interval: List[Any] = field(default_factory=lambda: [
         # 4,
         # 8,
-        # 16,
+        16,
         # 32,
         # 64,
-    # ])
+    ])
     learning_rate: List[Any] = field(default_factory=lambda: [
         # 0.0001,
         0.00005,

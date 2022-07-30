@@ -28,7 +28,8 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, 
     """Generate a video showing the behavior of the trained NCA on mazes from its training distribution.
     """
     model.eval()
-    mazes_onehot, mazes_discrete, target_paths = maze_data.mazes_onehot, maze_data.mazes_discrete, maze_data.target_paths
+    mazes_onehot, mazes_discrete, edges, target_paths = maze_data.mazes_onehot, maze_data.mazes_discrete, maze_data.edges,\
+         maze_data.target_paths
     if N_RENDER_CHANS is None:
         n_render_chans = model.n_out_chan
     else:
@@ -40,10 +41,10 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, 
     mazes_discrete = th.where((mazes_discrete == Tiles.EMPTY) & (target_paths == 1), path_chan, mazes_discrete)
 
     # Render most complex mazes first
-    # batch_idxs = path_lengths.sort(descending=True)[1]
-    batch_idxs = th.arange(mazes_onehot.shape[0])
+    batch_idxs = path_lengths.sort(descending=True)[1]
+    # batch_idxs = th.arange(mazes_onehot.shape[0])
 
-    # batch_idx = np.random.choice(mazes_onehot.shape[0], render_minibatch_size, replace=False)
+    batch_idx = np.random.choice(mazes_onehot.shape[0], render_minibatch_size, replace=False)
     bi = 0
 
     global N_RENDER_EPISODES
@@ -55,7 +56,7 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, 
         pool = model.seed(batch_size=mazes_onehot.shape[0], width=cfg.width, height=cfg.height,)
         x = pool[batch_idx]
         x0 = mazes_onehot[batch_idx]
-        model.reset(x0, new_batch_size=True)
+        model.reset(x0, e0=edges, new_batch_size=True)
         maze_imgs = np.hstack(render_discrete(mazes_discrete[batch_idx], cfg))
         bi = (bi + render_minibatch_size) % mazes_onehot.shape[0]
 

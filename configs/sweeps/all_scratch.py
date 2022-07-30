@@ -10,16 +10,6 @@ from configs.sweeps.all import HyperSweepConfig
 class ScratchSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
     name: str = 'scratch'
-    save_interval: List[Any] = field(default_factory=lambda: [
-        10000,
-    ])
-    log_interval: List[Any] = field(default_factory=lambda: [
-        10000,
-    ])
-    n_updates: List[Any] = field(default_factory=lambda: [
-        50000,
-    ])
-
     exp_name: List[Any] = field(default_factory=lambda: [
         # "2",
         # "3",
@@ -34,10 +24,10 @@ class ScratchSweep(HyperSweepConfig):
         "pathfinding",
         # "diameter",
     ])
-    # max_pooling: List[Any] = field(default_factory=lambda: [
-        # True,
+    max_pooling: List[Any] = field(default_factory=lambda: [
+        True,
         # False,
-    # ])
+    ])
     model: List[Any] = field(default_factory=lambda: [
         # "NCA",
         # "GAT",
@@ -45,6 +35,14 @@ class ScratchSweep(HyperSweepConfig):
         # "MLP",
         # "FixedBfsNCA",
         # "FixedDfsNCA",
+    ])
+    traversable_edges_only: List[Any] = field(default_factory=lambda: [
+        # False,
+        True,
+    ])
+    positional_edge_features: List[Any] = field(default_factory=lambda: [
+        # False,
+        True,
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
         True,
@@ -84,7 +82,7 @@ class ScratchSweep(HyperSweepConfig):
     #     # False,
     # # ])
     learning_rate: List[Any] = field(default_factory=lambda: [
-        # 0.0001,
-        0.00005,
+        0.0001,
+        # 0.00005,
     ])
     

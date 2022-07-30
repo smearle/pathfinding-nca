@@ -33,12 +33,15 @@ def set_exp_name(cfg: Config):
         ("_cutCorners" if cfg.cut_conv_corners and cfg.model == "NCA" else ""),
         ("_symmConv" if cfg.symmetric_conv and cfg.model == "NCA" else ""),
         ('_sparseUpdate' if cfg.sparse_update else ''),
+        ('_edgeFeats' if cfg.positional_edge_features else ''),
+        ('_travEdges' if cfg.traversable_edges_only else ''),
         f"_{cfg.exp_name}",
     ])
     cfg.log_dir = os.path.join(Path(__file__).parent.parent, "runs", cfg.full_exp_name)
 
 def validate(cfg: Config):
     cfg.device = "cuda" if th.cuda.is_available() else "cpu"
+    print(cfg.model)
     model_cls = getattr(models, cfg.model)
     if not issubclass(model_cls, models.GNN):
         assert (cfg.traversable_edges_only is False and cfg.positional_edge_features is False), "Hyperparameters " \

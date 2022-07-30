@@ -67,10 +67,11 @@ def main_experiment(cfg: Config = None, cfg_path: str = None):
 
     print(f"Running experiment with config:\n {OmegaConf.to_yaml(cfg)}")
     
-    # Setup training
-    model = model_cls(cfg)
-    # Set a dummy initial maze state.
-    model.reset(th.zeros(cfg.minibatch_size, cfg.n_in_chan, cfg.width + 2, cfg.width + 2), is_torchinfo_dummy=True)
+    # Setup training.
+    model: PathfindingNN = model_cls(cfg)
+    # Set a dummy initial maze state to probe model.
+    x0 = th.zeros(cfg.minibatch_size, cfg.n_in_chan, cfg.width + 2, cfg.width + 2)
+    model.reset(x0, is_torchinfo_dummy=True)
 
     # if not (cfg.render or cfg.evaluate):
     #     dummy_input = model.seed(batch_size=cfg.minibatch_size)

@@ -7,7 +7,7 @@ import argparse
 from collections import namedtuple
 import copy
 from pathlib import Path
-from typing import List
+from typing import Iterable, List
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from itertools import product
@@ -16,6 +16,7 @@ import os
 from pdb import set_trace as TT
 import re
 import traceback
+import omegaconf
 import yaml
 
 from configs.config import BatchConfig
@@ -125,13 +126,18 @@ def main_batch(batch_dict_cfg: BatchConfig):
                         break
                 if invalid_cfg:
                     continue
+            exp_configs.append(exp_cfg)
 
     else:
         # Create an experiment config for each combination of hyperparameters.
         exp_configs = [copy.deepcopy(batch_cfg)]
-        for key, hyperparams in batch_hyperparams.items():
+        for key, val in batch_hyperparams.items():
             if key == 'name': 
                 continue
+            if isinstance(val, omegaconf.listconfig.ListConfig):
+                hyperparams = val
+            else:
+                hyperparams = [val]
             old_exp_configs = exp_configs
             filtered_exp_configs = []
             for hyperparam in hyperparams:
