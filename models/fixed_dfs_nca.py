@@ -4,6 +4,7 @@ import numpy as np
 import torch as th
 from torch import nn
 from configs.config import Config
+from mazes import Tiles
 
 from models.nn import PathfindingNN
 
@@ -29,8 +30,8 @@ class FixedDfsNCA(PathfindingNN):
             drop_diagonals: Whether to drop diagonals in the 3x3 input patches to each conv layer.
             """
         super().__init__(cfg)
-        self.src_chan = cfg.src_chan
-        self.trg_chan = cfg.trg_chan
+        self.src_chan = Tiles.SRC
+        self.trg_chan = Tiles.TRG
         self.n_in_chan = cfg.n_in_chan
         # self.n_hid_chan = cfg.n_hid_chan
         assert self.n_in_chan == 4
@@ -70,13 +71,13 @@ class FixedDfsNCA(PathfindingNN):
                     # If a higher-priority neighbor of the neighbor is empty, then it has priority over us.
                     # This is ignored, though, if neighbor of the neighbor is also flooded! 
                     # But we also ignore this if the neighbor is on the stack (???).
-                    self.conv_0.weight[flood_chan + 1 + ai, cfg.empty_chan, b_adj[0], b_adj[1]] = -1.
+                    self.conv_0.weight[flood_chan + 1 + ai, Tiles.EMPTY, b_adj[0], b_adj[1]] = -1.
                     self.conv_0.weight[flood_chan + 1 + ai, self.src_chan, b_adj[0], b_adj[1]] = -1.
-                    self.conv_0.weight[flood_chan + 1 + ai, cfg.trg_chan, b_adj[0], b_adj[1]] = -1.
+                    self.conv_0.weight[flood_chan + 1 + ai, Tiles.TRG, b_adj[0], b_adj[1]] = -1.
                     self.conv_0.weight[flood_chan + 1 + ai, flood_chan, b_adj[0], b_adj[1]] = 1.
             
             # Flood is blocked by walls. (Also blocking directional floods for interpretability.)
-            self.conv_0.weight[flood_chan: flood_chan + 5, cfg.wall_chan, 2, 2] = -2.
+            self.conv_0.weight[flood_chan: flood_chan + 5, Tiles.WALL, 2, 2] = -2.
 
             self.conv_0.weight[flood_chan, self.stack_chan, 2, 2] = -1.
 
@@ -97,9 +98,9 @@ class FixedDfsNCA(PathfindingNN):
             self.conv_0.weight[self.stack_direction_chan, self.stack_direction_chan, 2, 2] = 1.
 
             # Do not add wall tiles to stack
-            self.conv_0.weight[self.stack_chan, cfg.wall_chan, 2, 2] = -2.
-            self.conv_0.weight[self.stack_rank_chan, cfg.wall_chan, 2, 2] = -2.
-            self.conv_0.weight[self.stack_direction_chan, cfg.wall_chan, 2, 2] = -2.
+            self.conv_0.weight[self.stack_chan, Tiles.WALL, 2, 2] = -2.
+            self.conv_0.weight[self.stack_rank_chan, Tiles.WALL, 2, 2] = -2.
+            self.conv_0.weight[self.stack_direction_chan, Tiles.WALL, 2, 2] = -2.
 
             # Stack rank chan is incremented each timestep when stack is present.
             self.conv_0.weight[self.stack_rank_chan, self.stack_chan, 2, 2] = 1.

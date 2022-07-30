@@ -19,6 +19,7 @@ import traceback
 import yaml
 
 from configs.config import BatchConfig
+from configs import helper as config_helper
 from cross_eval import vis_cross_eval
 from main import main_experiment
 from mazes import Mazes, main_mazes  # Weirdly need this to be able to load dataset of mazes.
@@ -147,7 +148,7 @@ def main_batch(batch_dict_cfg: BatchConfig):
         try:
             # TODO: remove this once we implement `full_exp_name` inside `config.py`.
             # if not batch_cfg.load_all:
-            ec.set_exp_name()
+            config_helper.set_exp_name(ec)
             # else:
                 # ec.validate()
             filtered_exp_configs.append(ec)

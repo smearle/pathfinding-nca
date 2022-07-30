@@ -4,6 +4,7 @@ from numpy import require
 
 import torch as th
 from torch import nn
+from mazes import Tiles
 
 from models.nn import PathfindingNN
 
@@ -25,8 +26,8 @@ class FixedBfsNCA(PathfindingNN):
             drop_diagonals: Whether to drop diagonals in the 3x3 input patches to each conv layer.
             """
         super().__init__(cfg)
-        self.src_chan = cfg.src_chan
-        self.trg_chan = cfg.trg_chan
+        self.src_chan = Tiles.SRC
+        self.trg_chan = Tiles.TRG
         self.n_in_chan = cfg.n_in_chan
         # self.n_hid_chan = cfg.n_hid_chan
         assert self.n_in_chan == 4
@@ -49,7 +50,7 @@ class FixedBfsNCA(PathfindingNN):
             conv_0_weight[flood_chan, flood_chan, adj[0], adj[1]] = 1.
 
         # ...but stopping at walls.
-        conv_0_weight[flood_chan, cfg.wall_chan, 1, 1] = -6.
+        conv_0_weight[flood_chan, Tiles.WALL, 1, 1] = -6.
 
         # the next channel will contain the age of the flood
         self.age_chan = age_chan = flood_chan + 1

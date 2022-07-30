@@ -1,3 +1,4 @@
+from enum import Enum
 import os
 from pathlib import Path
 from pdb import set_trace as TT
@@ -11,10 +12,18 @@ import torch as th
 from tqdm import tqdm
 
 from configs.config import BatchConfig, Config
+from grid_to_graph import get_traversable_grid_edges
 
 
 maze_data_fname = os.path.join(Path(__file__).parent, os.path.join("data", "maze_data"))
 path_chan = 4
+
+
+class Tiles:
+    EMPTY = 0
+    WALL = 1
+    SRC = 2
+    TRG = 3
 
 
 def get_maze_name_suffix(cfg: Config):
@@ -81,7 +90,7 @@ class Mazes():
     def __init__(self, cfg: Config, evo_mazes={}):
         if len(evo_mazes) == 0:
             width, height = cfg.width, cfg.height
-            self.mazes_discrete, self.mazes_onehot, self.target_paths, self.target_diameters = gen_rand_mazes(cfg.n_data, cfg)
+            self.mazes_discrete, self.mazes_onehot, self.edges, self.target_paths, self.target_diameters = gen_rand_mazes(cfg.n_data, cfg)
             self.maze_ims = th.Tensor(np.array(
                 [render_discrete(maze_discrete[None,], cfg)[0] for maze_discrete in self.mazes_discrete]
             ))
@@ -104,19 +113,18 @@ class Mazes():
 
             # Remove source and targets.
             self.mazes_discrete = th.where(
-                    (self.mazes_discrete == cfg.src_chan) | (self.mazes_discrete == cfg.trg_chan), 
-                cfg.empty_chan, self.mazes_discrete)
-            assert cfg.empty_chan == 0 and cfg.wall_chan == 1 and cfg.src_chan == 2
-            self.mazes_onehot = self.mazes_onehot[:, :cfg.src_chan]
+                    (self.mazes_discrete == Tiles.SRC) | (self.mazes_discrete == Tiles.TRG), 
+                Tiles.EMPTY, self.mazes_discrete)
+            assert Tiles.EMPTY == 0 and Tiles.WALL == 1 and Tiles.SRC == 2
+            self.mazes_onehot = self.mazes_onehot[:, :Tiles.SRC]
         else:
             raise Exception
-        
 
 
 def generate_random_maze(cfg):
     batch_size = 1
     width, height = cfg.width, cfg.height
-    empty_chan, wall_chan, src_chan, trg_chan = cfg.empty_chan, cfg.wall_chan, cfg.src_chan, cfg.trg_chan
+    empty_chan, wall_chan, src_chan, trg_chan = Tiles.EMPTY, Tiles.WALL, Tiles.SRC, Tiles.TRG
 
     # Generate empty room with with borders.
     rand_maze_onehot = th.zeros((batch_size, 4, width + 2, height + 2), dtype=int)
@@ -146,7 +154,7 @@ def generate_random_maze(cfg):
 
 
 def render_discrete(arr, cfg):
-    empty_chan, wall_chan, src_chan, trg_chan = cfg.empty_chan, cfg.wall_chan, cfg.src_chan, cfg.trg_chan
+    empty_chan, wall_chan, src_chan, trg_chan = Tiles.EMPTY, Tiles.WALL, Tiles.SRC, Tiles.TRG
     empty_color = th.Tensor([1.0, 1.0, 1.0])
     wall_color = th.Tensor([0.0, 0.0, 0.0])
     src_color = th.Tensor([1.0, 1.0, 0.0])
@@ -266,6 +274,7 @@ def gen_rand_mazes(n_data, cfg):
     n_data = cfg.n_data
     solvable_mazes_onehot = []
     solvable_mazes_discrete = []
+    solvable_mazes_edges = []
     target_paths = []
     target_diameters = []
     i = 0
@@ -279,6 +288,7 @@ def gen_rand_mazes(n_data, cfg):
         # print(f'Adding maze {i}.')
         solvable_mazes_onehot.append(rand_maze_onehot)
         solvable_mazes_discrete.append(rand_maze_discrete)
+        solvable_mazes_edges.append(get_traversable_grid_edges(rand_maze_onehot[0, Tiles.WALL] == 0))
         target_path = th.zeros_like(rand_maze_discrete)
         for x, y in sol:
                 target_path[0, x, y] = 1
@@ -290,11 +300,11 @@ def gen_rand_mazes(n_data, cfg):
             target_diameter[0, x, y] = 1
         target_diameters.append(target_diameter)
         i += 1
-    # print(f'Solution length: {len(sol)}')
+    # print(f'Solution length: {len(sol)}') 
     print(f'Generated {i} random mazes to produce {n_data} solvable mazes.')
 
-    return th.vstack(solvable_mazes_discrete), th.vstack(solvable_mazes_onehot), th.vstack(target_paths), \
-        th.vstack(target_diameters)
+    return th.vstack(solvable_mazes_discrete), th.vstack(solvable_mazes_onehot), th.vstack(solvable_mazes_edges), \
+        th.vstack(target_paths), th.vstack(target_diameters)
 
 
 def get_target_path(maze_discrete, cfg):
@@ -302,10 +312,10 @@ def get_target_path(maze_discrete, cfg):
         # TODO: need to constrain mutation of sources and targets for this task.
         sol = get_rand_path(maze_discrete)
         x, y = sol[0]
-        maze_discrete[x, y] = cfg.src_chan
+        maze_discrete[x, y] = Tiles.SRC
         # for (x, y) in sol:
             # offspring_target_paths[mi, x, y] = 1
-        maze_discrete[x, y] = cfg.trg_chan
+        maze_discrete[x, y] = Tiles.TRG
         return sol
 
 
@@ -317,5 +327,4 @@ def get_target_diam(maze_discrete, cfg):
 
 
 if __name__ == "__main__":
-
     main_mazes()

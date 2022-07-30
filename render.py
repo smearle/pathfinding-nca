@@ -8,7 +8,7 @@ import imageio
 from matplotlib import animation, pyplot as plt
 import numpy as np
 import torch as th
-from mazes import render_discrete
+from mazes import Tiles, render_discrete
 
 from models.nn import PathfindingNN
 
@@ -37,7 +37,7 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, 
     render_minibatch_size = min(cfg.render_minibatch_size, mazes_onehot.shape[0])
     path_lengths = target_paths.sum((1, 2))
     path_chan = mazes_discrete[0].max() + 1
-    mazes_discrete = th.where((mazes_discrete == cfg.empty_chan) & (target_paths == 1), path_chan, mazes_discrete)
+    mazes_discrete = th.where((mazes_discrete == Tiles.EMPTY) & (target_paths == 1), path_chan, mazes_discrete)
 
     # Render most complex mazes first
     # batch_idxs = path_lengths.sort(descending=True)[1]

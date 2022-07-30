@@ -11,6 +11,7 @@ import torch as th
 from torch import nn, Tensor
 from torch_geometric.nn import GCNConv, GATConv, MessagePassing
 from configs.config import Config
+from grid_to_graph import get_neighb_edges, get_self_edges
 
 from models.nn import PathfindingNN
 
@@ -24,7 +25,7 @@ class GNN(PathfindingNN):
     def __init__(self, cfg, conv: MessagePassing):
         super().__init__(cfg)
         n_in_chan, n_hid_chan = cfg.n_in_chan, cfg.n_hid_chan
-        self.grid_edges = None
+        self.neighb_edges = None
         self.self_edges = None
         self.edges = None
 
@@ -85,13 +86,14 @@ class GNN(PathfindingNN):
         maze's width and height dimensions."""
 
         # ### DEBUG ###
-        # if self.n_step == 0:
-        #     x[:] = 0.0
-        #     # provide activation in top corner of first input
-        #     x[0,-1, 0, 0] = 1.0
-        # else:
-        #     # overwrite the maze
-        #     x[:, :self.cfg.n_in_chan] = 0
+        if self.n_step == 0:
+            x[:] = 0.0
+            # provide activation in top corner of first input
+            x[0,-1, 0, 0] = 1.0
+        else:
+            # overwrite the maze
+            x[:, :self.cfg.n_in_chan] = 0
+        ### DEBUG ###
 
         batch_size, n_chan, width, height = x.shape
 
@@ -137,11 +139,11 @@ class GNN(PathfindingNN):
                 batch_size = x0.shape[0]
                 width, height = x0.shape[-2:]
                 n_nodes = width * height
-                grid_edges = get_grid_edges(width, height)
+                grid_edges = get_neighb_edges(width, height)
                 self_edges = get_self_edges(width, height)
-                self.grid_edges = batch_edges(th.tile(grid_edges, (1, batch_size)), [n_nodes] * batch_size)
+                self.neighb_edges = batch_edges(th.tile(grid_edges, (1, batch_size)), [n_nodes] * batch_size)
                 self.self_edges = batch_edges(th.tile(self_edges, (1, batch_size)), [n_nodes] * batch_size)
-                self.edges = th.hstack((self.self_edges, self.grid_edges))
+                self.edges = th.hstack((self.self_edges, self.neighb_edges))
                 # self.edges = self.self_edges
                 # self.edges = self.grid_edges
         else:
@@ -156,11 +158,11 @@ class GNN(PathfindingNN):
 
 
         # ### DEBUG ###
-        # for name, p in self.named_parameters():
-        #     if "weight" in name:
-        #         p.data.fill_(1.0)
-        #     else:
-        #         p.data.zero_()
+        for name, p in self.named_parameters():
+            if "weight" in name:
+                p.data.fill_(1.0)
+            else:
+                p.data.zero_()
 
 
 class GCN(GNN):
@@ -174,63 +176,6 @@ class GAT(GNN):
     """A graph attention network, which #TODO..."""
     def __init__(self, cfg: Config):
         super().__init__(cfg, conv=GATConv)
-
-
-def get_grid_edges(width, height, traversable: th.Tensor = None):
-    """Create an edge matrix of shape (2, n_edges) for a graph corresponding to a 2D grid, in which grid cells sharing
-    a border are connected by an edge.
-    
-    Args:
-        width (int): Width of the grid.
-        height (int): Height of the grid.
-        traversable (th.Tensor, optional): A tensor of shape (width, height) indicating whether each grid cell is 
-            traversable. If None, we include each tile in the grid as a node in the graph. Otherwise, we include only 
-            traversable tiles. Defaults to None.
-    """
-    # The 2D indices of all nodes, with shape (width, height, 2)
-    node_indices = np.indices((width, height)).transpose(1, 2, 0)
-
-    # The 2D indices of adjacent nodes in each of four directions, missing rows/columns corresponding to relevant 
-    # borders, with shape, e.g., (width, height - 1, 2).
-    left_indices, down_indices, right_indices, up_indices = \
-        node_indices[:, :-1], node_indices[:-1], node_indices[:, 1:], node_indices[1:]
-
-    # Arrays of edges in each direction, shape, e.g. (2, width, (height - 1), 2).
-    left_edges, down_edges, right_edges, up_edges = \
-        np.stack((node_indices[:, 1:], left_indices)), np.stack((node_indices[1:], down_indices)), \
-        np.stack((node_indices[:, :-1], right_indices)), np.stack((node_indices[:-1], up_indices))
-
-    edge_sets = [left_edges, down_edges, right_edges, up_edges]
-
-    ### DEBUG ###
-    traversable = th.randn((width, height)) > 0
-    ### DEBUG ###
-
-    if traversable is not None:
-        # Filter out edges that include non-traversable tiles.
-        for edge_set in edge_sets:
-            flat_edge_set = rearrange(edge_set, 'ij h w xy -> ij (h w) xy')
-            traversable[flat_edge_set[0, :, 0], ]
-            TT()
-
-    # Arrays of edges, shape, e.g., (2, 2, width, (height - 1)) ~ (xy_coords, endpoints, nodes_per_row, nodes_per_col)
-    dir_edges_lst = [e.transpose(3, 0, 1, 2) for e in edge_sets]
-
-    # Array of flattened 2D indices, shape, e.g., (2, 2, width * (height - 1)) ~ (xy_coords, endpoints, nodes).
-    edges = np.concatenate([e.reshape(2, 2, -1) for e in dir_edges_lst], -1)
-
-    # Array of flattened 1D indices in flattened grid, e.g., (2, width * (height - 1))
-    edges = np.ravel_multi_index(edges, (width, height))
-
-    return th.Tensor(edges).long()
-
-def get_self_edges(width, height):
-    node_indices = np.indices((width, height)).transpose(1, 2, 0)
-    self_edges = np.stack((node_indices, node_indices))
-    self_edges = self_edges.transpose(3, 0, 1, 2).reshape(2, 2, -1)
-    self_edges = np.ravel_multi_index(self_edges, (width, height))
-
-    return th.Tensor(self_edges).long()
 
 
 def batch_edges(edges: Iterable[th.Tensor], n_nodes: Iterable[int]):

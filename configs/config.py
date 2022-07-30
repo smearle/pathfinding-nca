@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 from pdb import set_trace as TT
 from typing import Any, List, Optional
-from xml.dom.pulldom import default_bufsize
 
 import hydra
 from hydra.core.config_store import ConfigStore
@@ -27,12 +26,6 @@ from configs.sweeps.weight_sharing import WeightSharingSweep
 @dataclass
 class Config():
     """Default configuration. For use with hydra."""
-    # The channel of the maze corresponding to empty/traversable space.
-    empty_chan: int = 0 # immutable
-    wall_chan: int = 1
-    src_chan: int = 2
-    trg_chan: int = 3
-
     # The number of channels in the one-hot encodings of the training mazes.
     n_in_chan = 4  # cannot be controlled by user
 
@@ -40,7 +33,7 @@ class Config():
     exp_name: str = "0"
 
     # How many mazes on which to train at a time
-    n_data: int = 8192
+    n_data: int = 100
 
     # The width (and height, mazes are square for now) of the maze.
     width: int = 16 
@@ -132,81 +125,13 @@ class Config():
     # Load a config from a file at this path. Will override all other config options.
     load_config_path: Any = None
 
-    def set_exp_name(self):
-        # BACKWARD COMPATABILITY HACK. FIXME: Remove this when all experiments from before `full_exp_name` are obsolete.
-        if '-' in self.exp_name:
-            self.exp_name = self.exp_name.split('_')[-1]
-
-        # assert '-' not in self.exp_name, "Cannot have hyphens in `exp_name` (to allow for a backward compatibility hack)"
-        self.validate()
-        # TODO: create distinct `full_exp_name` attribute where we'll write this thing, so we don't overwrite the user-
-        # supplied `exp_name`.
-        # In the meantime, using the presence of a hyphen to mean we have set the full `exp_name`:
-        self.full_exp_name = ''.join([
-            f"{self.model}",
-            ("_diameter" if self.task == "diameter" else ""),
-            ("_evoData" if self.env_generation is not None else ""),
-            ("_noShared" if not self.shared_weights else ""),
-            ("_noSkip" if not self.skip_connections else ""),
-            ("_maxPool" if self.max_pool else ""),
-            (f"_{self.kernel_size}-kern" if self.kernel_size != 3 else ""),
-            f"_{self.n_hid_chan}-hid",
-            f"_{self.n_layers}-layer",
-            f"_lr-{'{:.0e}'.format(self.learning_rate)}",
-            f"_{self.n_data}-data",
-            (f"_{self.loss_interval}-loss" if self.loss_interval != self.n_layers else ''),
-            ("_cutCorners" if self.cut_conv_corners and self.model == "NCA" else ""),
-            ("_symmConv" if self.symmetric_conv and self.model == "NCA" else ""),
-            ('_sparseUpdate' if self.sparse_update else ''),
-            f"_{self.exp_name}",
-        ])
-        self.log_dir = os.path.join(Path(__file__).parent.parent, "runs", self.full_exp_name)
-
-    def validate(self):
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        if not self.model == "NCA":
-            self.symmetric_conv = False
-            self.max_pool = False
-        if self.symmetric_conv:
-            self.cut_conv_corners = True
-        if self.task == "diameter":
-            self.n_in_chan = 2
-        if self.model == "FixedBfsNCA":
-            assert self.task != "diameter", "No hand-coded model implemented for diameter task."
-            # self.path_chan = self.n_in_chan + 1  # wait why is this??
-            self.n_hid_chan = 7
-            self.skip_connections = True
-        if self.model == "FixedDfsNCA":
-            self.n_hid_chan = 12
-        # else:
-        self.path_chan = self.n_in_chan
-        self.load = True if self.render else self.load
-        # self.minibatch_size = 1 if self.model == "GCN" else self.minibatch_size
-        # self.val_batch_size = 1 if self.model == "GCN" else self.val_batch_size
-        assert self.n_val_data % self.val_batch_size == 0, "Validation dataset size must be a multiple of val_batch_size."
-        if self.sparse_update:
-            assert self.shared_weights, "Sparse update only works with shared weights. (Otherwise early layers may not "\
-                "be updated.)"
-        if self.model == "GCN":
-            self.cut_conv_corners = True
-        elif self.cut_conv_corners:
-            assert self.model == "NCA", "Cutting corners only works with NCA (optional) or GCN (forced)."
-        if self.loss_interval is None:
-            self.loss_interval = self.n_layers
-        
-        # For backward compatibility, we assume 50k updates, where each update is following a 32-batch of episodes. So
-        # we ensure that we have approximately the same number of episodes given different batch sizes here.
-        if self.minibatch_size != 32:
-            self.n_updates = int(self.n_updates * 32 / self.minibatch_size) 
-
-        assert self.n_layers % self.loss_interval == 0, "loss_interval should divide n_layers."
-        if self.minibatch_size < 32:
-            assert 32 % self.minibatch_size == 0, "minibatch_size should divide 32."
-            self.n_updates = self.n_updates * 32 // self.minibatch_size
-
-        if self.render:
-            self.wandb = False
-            # self.render_minibatch_size = 1
+    ### For GNNs only -- grid to graph conversion ###
+    # TODO: Make this a separate sub-config, active only when we are using GNNs?
+    # If False, feed the GNN the entire grid. If True, feed it only traversable nodes and edges.
+    traversable_edges_only: bool = False
+    # If True, include edge features corresponding to the edge's relative position to the central node.
+    positional_edge_features: bool = False
+    ###
 
 
 @dataclass
