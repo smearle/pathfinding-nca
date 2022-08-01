@@ -4,10 +4,12 @@ import os
 import shutil
 import PIL
 import cv2
+from einops import rearrange
 import imageio
 from matplotlib import animation, pyplot as plt
 import numpy as np
 import torch as th
+from configs.config import Config
 from mazes import Tiles, render_discrete
 
 from models.nn import PathfindingNN
@@ -24,12 +26,12 @@ RENDER_WEIGHTS = False
 CV2_IM_SIZE = (1500, 1500)
 
 
-def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, name=''):
+def render_trained(model: PathfindingNN, maze_data, cfg: Config, pyplot_animation=True, name=''):
     """Generate a video showing the behavior of the trained NCA on mazes from its training distribution.
     """
     model.eval()
-    mazes_onehot, mazes_discrete, edges, target_paths = maze_data.mazes_onehot, maze_data.mazes_discrete, maze_data.edges,\
-         maze_data.target_paths
+    mazes_onehot, mazes_discrete, edges, edge_feats, target_paths = maze_data.mazes_onehot, maze_data.mazes_discrete, \
+        maze_data.edges, maze_data.edge_feats, maze_data.target_paths
     if N_RENDER_CHANS is None:
         n_render_chans = model.n_out_chan
     else:
@@ -40,9 +42,9 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, 
     path_chan = mazes_discrete[0].max() + 1
     mazes_discrete = th.where((mazes_discrete == Tiles.EMPTY) & (target_paths == 1), path_chan, mazes_discrete)
 
-    # Render most complex mazes first
-    batch_idxs = path_lengths.sort(descending=True)[1]
-    # batch_idxs = th.arange(mazes_onehot.shape[0])
+    # Render most complex mazes first.
+    # batch_idxs = path_lengths.sort(descending=True)[1]
+    batch_idxs = th.arange(mazes_onehot.shape[0])
 
     batch_idx = np.random.choice(mazes_onehot.shape[0], render_minibatch_size, replace=False)
     bi = 0
@@ -56,7 +58,13 @@ def render_trained(model: PathfindingNN, maze_data, cfg, pyplot_animation=True, 
         pool = model.seed(batch_size=mazes_onehot.shape[0], width=cfg.width, height=cfg.height,)
         x = pool[batch_idx]
         x0 = mazes_onehot[batch_idx]
-        model.reset(x0, e0=edges, new_batch_size=True)
+        e0 = None
+        if cfg.traversable_edges_only:
+            e0 = [edges[i] for i in batch_idx]
+        ef = None
+        if cfg.positional_edge_features:
+            ef = [edge_feats[i] for i in batch_idx]
+        model.reset(x0, e0=e0, edge_feats=ef, new_batch_size=True)
         maze_imgs = np.hstack(render_discrete(mazes_discrete[batch_idx], cfg))
         bi = (bi + render_minibatch_size) % mazes_onehot.shape[0]
 

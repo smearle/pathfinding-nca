@@ -25,7 +25,8 @@ from utils import count_parameters, get_discrete_loss, get_mse_loss, Logger, to_
 def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_data_val: Mazes, 
         maze_data_test_32: Mazes, target_paths: th.Tensor, logger: Logger, cfg: Config, cfg_32):
     tb_writer = SummaryWriter(log_dir=cfg.log_dir)
-    mazes_onehot, maze_ims = maze_data.mazes_onehot, maze_data.maze_ims
+    mazes_onehot, edges, edge_feats, maze_ims = maze_data.mazes_onehot, maze_data.edges, maze_data.edge_feats, \
+        maze_data.maze_ims
     minibatch_size = min(cfg.minibatch_size, cfg.n_data)
     lr_sched = th.optim.lr_scheduler.MultiStepLR(opt, [10000], 0.1)
     logger.last_time = timer()
@@ -63,7 +64,13 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
             x0 = mazes_onehot[batch_idx].clone()
             target_paths_mini_batch = target_paths[batch_idx]
 
-            model.reset(x0)
+            e0 = None
+            if cfg.traversable_edges_only:
+                e0 = [edges[i] for i in batch_idx]
+            ef = None
+            if cfg.positional_edge_features:
+                ef = [edge_feats[i] for i in batch_idx]
+            model.reset(x0, e0=e0, edge_feats=ef)
 
         # TODO: move initial auxiliary state to model? Probably a better way...
         x = hid_states[batch_idx]
@@ -111,8 +118,8 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
         with th.no_grad():
             if "Fixed" not in cfg.model:
 
-                # NOTE: why are we doing this??
-                model.reset(x0)
+                # FIXME: why are we resetting here??
+                model.reset(x0, e0=e0)
 
                 loss.backward()
 
@@ -255,7 +262,8 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 offspring_maze_ims = render_discrete(offspring_mazes, cfg)
                 offspring_env_losses = th.zeros(env_gen_cfg.evo_batch_size)
 
-                model.reset(offspring_mazes_onehot)
+                # TODO: Get edges of evolved mazes.
+                model.reset(offspring_mazes_onehot, e0=e0)
                 x = hid_states[:env_gen_cfg.evo_batch_size]
                 for _ in range(n_subepisodes):
 

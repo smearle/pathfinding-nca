@@ -1,3 +1,5 @@
+from pdb import set_trace as TT
+
 import numpy as np
 import torch as th
 
@@ -10,9 +12,11 @@ def get_traversable_grid_edges(traversable: th.Tensor):
         traversable (th.Tensor[bool]): A 2D boolean array. True/False elements correspond to traversable/non-traversable
             tiles.
     """
-    neighb_edges = get_neighb_edges(traversable.shape[0], traversable.shape[1], traversable)
-    self_edges = get_self_edges(traversable.shape[0], traversable.shape[1], traversable)
-    return th.hstack((neighb_edges, self_edges))
+    neighb_edges, neighb_edge_feats = get_neighb_edges(traversable.shape[0], traversable.shape[1], traversable)
+    self_edges, self_edge_feats = get_self_edges(traversable.shape[0], traversable.shape[1], traversable)
+    edges = th.hstack((neighb_edges, self_edges))
+    edge_feats = th.vstack((neighb_edge_feats, self_edge_feats))
+    return edges, edge_feats
 
 
 def get_neighb_edges(width, height, traversable: th.Tensor = None):
@@ -51,13 +55,20 @@ def get_neighb_edges(width, height, traversable: th.Tensor = None):
     # Array of flattened 2D indices, shape, e.g., (2, 2, width * (height - 1)) ~ (xy_coords, endpoints, nodes).
     edges = np.concatenate([e.reshape(2, 2, -1) for e in dir_edges_lst], -1)
 
+    edge_features = th.zeros((edges.shape[-1], 2))
+    n = 0
+    for n_edges, adj in [(height * (width - 1), [0, -1]), ((height - 1) * width, [1, 0]), \
+            (height * (width - 1), [0, 1]), ((height - 1) * width, [-1, 0])]:
+        edge_features[n: n + n_edges] = th.Tensor(adj)
+        n += n_edges
+
     if traversable is not None:
-        filter_nontraversable_edges(edges, traversable)
+        edges = filter_nontraversable_edges(edges, traversable)
 
     # Array of flattened 1D indices in flattened grid, e.g., (2, width * (height - 1))
     edges = np.ravel_multi_index(edges, (width, height))
 
-    return th.Tensor(edges).long()
+    return th.Tensor(edges).long(), edge_features
 
 
 def get_self_edges(width, height, traversable: th.Tensor = None):
@@ -66,11 +77,11 @@ def get_self_edges(width, height, traversable: th.Tensor = None):
     self_edges = self_edges.transpose(3, 0, 1, 2).reshape(2, 2, -1)
 
     if traversable is not None:
-        filter_nontraversable_edges(self_edges, traversable)
+        self_edges = filter_nontraversable_edges(self_edges, traversable)
 
     self_edges = np.ravel_multi_index(self_edges, (width, height))
 
-    return th.Tensor(self_edges).long()
+    return th.Tensor(self_edges).long(), th.zeros((self_edges.shape[-1], 2))
 
 
 def filter_nontraversable_edges(edges, traversable):

@@ -24,8 +24,8 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
         is_eval (bool): Whether we are evaluating after training, in which case we collect more stats. (Otherwise, we 
             are validating during training, and compute less expensive metrics.)
     """
-    mazes_onehot, mazes_discrete, target_paths = maze_data.mazes_onehot, maze_data.mazes_discrete, \
-        maze_data.target_paths
+    mazes_onehot, mazes_discrete, edges, edge_feats, target_paths = maze_data.mazes_onehot, maze_data.mazes_discrete, \
+        maze_data.edges, maze_data.edge_feats, maze_data.target_paths
 
     batch_idxs = np.arange(0, mazes_onehot.shape[0])
     np.random.shuffle(batch_idxs)
@@ -55,7 +55,16 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
             x = model.seed(batch_size=batch_size, width=cfg.width, height=cfg.height)
             target_paths_minibatch = target_paths[batch_idx]
             path_lengths = target_paths_minibatch.float().sum((1, 2)).cpu().numpy()
-            model.reset(x0)
+
+            e0 = None
+            ef = None
+            if cfg.traversable_edges_only:
+                e0 = [edges[i] for i in batch_idx]
+                # If we're using positional edge features but have included all edges (the whole grid), the model will
+                # handle the edge features.
+                if cfg.positional_edge_features:
+                    ef = [edge_feats[i] for i in batch_idx]
+            model.reset(x0, e0=e0, edge_feats=ef)
 
             if is_eval:
                 completion_times = np.empty(batch_size)

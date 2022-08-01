@@ -25,20 +25,20 @@ class ScratchSweep(HyperSweepConfig):
         # "diameter",
     ])
     max_pooling: List[Any] = field(default_factory=lambda: [
-        True,
-        # False,
+        # True,
+        False,
     ])
     model: List[Any] = field(default_factory=lambda: [
         # "NCA",
-        # "GAT",
-        "GCN",
+        "GAT",
+        # "GCN",
         # "MLP",
         # "FixedBfsNCA",
         # "FixedDfsNCA",
     ])
     traversable_edges_only: List[Any] = field(default_factory=lambda: [
-        # False,
-        True,
+        False,
+        # True,
     ])
     positional_edge_features: List[Any] = field(default_factory=lambda: [
         # False,

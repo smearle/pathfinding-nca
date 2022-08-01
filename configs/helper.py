@@ -46,6 +46,8 @@ def validate(cfg: Config):
     if not issubclass(model_cls, models.GNN):
         assert (cfg.traversable_edges_only is False and cfg.positional_edge_features is False), "Hyperparameters " \
             "relating to representation of (sub-)grids as graphs are applicable only to GNNs."
+    if not model_cls == models.GAT:
+        assert cfg.positional_edge_features is False, f"Model class {model_cls} does not accept edge features."
     if not cfg.model == "NCA":
         cfg.symmetric_conv = False
         cfg.max_pool = False

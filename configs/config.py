@@ -113,7 +113,7 @@ class Config():
     load: bool = False
     render: bool = False
     overwrite: bool = False
-    wandb: bool = True
+    wandb: bool = False
 
     # Update our own image of loss curves and model outputs in the training directory (in addition to writing them to 
     # tensorboard and/or wandb).
