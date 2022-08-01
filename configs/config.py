@@ -33,7 +33,7 @@ class Config():
     exp_name: str = "0"
 
     # How many mazes on which to train at a time
-    n_data: int = 100
+    n_data: int = 10000
 
     # The width (and height, mazes are square for now) of the maze.
     width: int = 16 
@@ -155,6 +155,7 @@ cs.store(name="config", node=Config)
 cs.store(name="batch_config", node=BatchConfig)
 cs.store(group="sweep", name="default", node=HyperSweepConfig)
 cs.store(group="sweep", name="models", node=ModelSweep)
+cs.store(group="sweep", name="gnn", node=)
 cs.store(group="sweep", name="loss_interval", node=LossIntervalSweep)
 cs.store(group="sweep", name="n_hid_chan", node=HidChanSweep)
 cs.store(group="sweep", name="evo_data", node=EvoDataSweep)

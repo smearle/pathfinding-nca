@@ -10,6 +10,7 @@ from configs.sweeps.all import HyperSweepConfig
 @dataclass
 class KernelSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
+    n_updates: int = 100000
 
     name: str = 'kernel'
 
@@ -20,11 +21,13 @@ class KernelSweep(HyperSweepConfig):
         # "5",
         # "debug",
 
-        "8",
-        "9",
-        "10",
-        "11",
-        "12",
+        # "8",
+        # "9",
+        # "10",
+        # "11",
+        # "12",
+        # "13"
+        "scratch"
     ])
     cut_corners: List[Any] = field(default_factory=lambda: [
         # True,
@@ -35,7 +38,7 @@ class KernelSweep(HyperSweepConfig):
         None,
     ])
     task: List[Any] = field(default_factory=lambda: [
-        "pathfinding",
+        # "pathfinding",
         "diameter",
     ])
     model: List[Any] = field(default_factory=lambda: [
@@ -51,19 +54,19 @@ class KernelSweep(HyperSweepConfig):
         False,
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
-        # True,
-        False,
+        True,
+        # False,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
         # 4,
         # 8,
         # 32,
 
-        48,
-        96,
+        # 48,
+        # 96,
         # 128,
 
-        # 256,
+        256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
         # 48,
@@ -75,8 +78,8 @@ class KernelSweep(HyperSweepConfig):
         # 4,
         # 8,
         # 16,
-        32,
-        # 64,
+        # 32,
+        64,
     ])
     symmetric_conv: List[Any] = field(default_factory=lambda: [
         # True,

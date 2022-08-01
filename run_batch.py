@@ -78,6 +78,9 @@ def main_batch(batch_dict_cfg: BatchConfig):
         if 'n_data' in batch_hyperparams:
             setattr(batch_cfg, 'n_data', max(batch_hyperparams['n_data']))
         main_mazes(batch_cfg)
+        batch_cfg.width = 32
+        batch_cfg.height = 32
+        main_mazes(batch_cfg)
         return
 
 

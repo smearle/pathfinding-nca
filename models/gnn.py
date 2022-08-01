@@ -111,10 +111,16 @@ class GNN(PathfindingNN):
         # x = self.layers[i](x, self.grid_edges).relu()
         # x = th.clip(self.layers[i](x, self.edges), 0, 1)
 
+        # FIXME: Hack. Refer to config instead.
+        self.edges = self.edges.cuda() if th.cuda.is_available() else self.edges
+        self.edge_feats = self.edge_feats.cuda() if th.cuda.is_available() else self.edge_feats
+        self.edge_feats = self.edge_feats.float()
+
         if self._use_edge_feats:
-            layer_kwargs = dict(edge_attr=self.edge_feats)
+            layer_kwargs = dict(edge_attr = self.edge_feats)
         else:
             layer_kwargs = {}
+
 
         x = self.layers[i](x, self.edges, **layer_kwargs).relu()
 
@@ -170,6 +176,7 @@ class GNN(PathfindingNN):
 
             if edge_feats is not None:
                 self.edge_feats = edge_feats
+                self.edge_feats = th.vstack(self.edge_feats)
             else:
                 assert not self._use_edge_feats
 

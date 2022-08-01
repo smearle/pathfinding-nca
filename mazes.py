@@ -42,6 +42,7 @@ def main_mazes(cfg: Config=None):
         user_input = input("File already exists. Overwrite? (y/n) ")
         while user_input not in ['y', 'n']:
             print(f"Invalid input '{user_input}'. Please enter 'y' or 'n'.")
+            user_input = input("File already exists. Overwrite? (y/n) ")
         if user_input != 'y':
             return
         
@@ -209,15 +210,16 @@ def get_graph(arr):
         elif arr[ux, uy] == Tiles.TRG:
             trg = u
         neighbs_xy = [(ux - 1, uy), (ux, uy-1), (ux+1, uy), (ux, uy+1)]
-        edge_feats = [(-1, 0), (0, -1), (1, 0), (0, 1)]
+        adj_feats = [(-1, 0), (0, -1), (1, 0), (0, 1)]
         neighbs = [x * width + y for x, y in neighbs_xy]
-        for v, (vx, vy), edge_feat in zip(neighbs, neighbs_xy, edge_feats):
+        for v, (vx, vy), edge_feat in zip(neighbs, neighbs_xy, adj_feats):
             if not 0 <= v < size or arr[vx, vy] == Tiles.WALL:
                 continue
             graph.add_edge(u, v)
             edges.append((u, v))
+            edge_feats.append(edge_feat)
         edges.append((u, u))
-        edge_feats.append(edge_feat)
+        edge_feats.append((0, 0))
     edges = th.Tensor(edges).long()
     edge_feats = th.Tensor(edge_feats).long()
     edges = rearrange(edges, 'e ij -> ij e')

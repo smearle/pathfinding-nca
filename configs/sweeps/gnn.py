@@ -7,7 +7,7 @@ from configs.sweeps.all import HyperSweepConfig
 
 
 @dataclass
-class ScratchSweep(HyperSweepConfig):
+class GNNSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
     name: str = 'scratch'
     exp_name: List[Any] = field(default_factory=lambda: [
@@ -34,7 +34,7 @@ class ScratchSweep(HyperSweepConfig):
     model: List[Any] = field(default_factory=lambda: [
         # "NCA",
         "GAT",
-        # "GCN",
+        "GCN",
         # "MLP",
         # "FixedBfsNCA",
         # "FixedDfsNCA",
@@ -44,7 +44,7 @@ class ScratchSweep(HyperSweepConfig):
         True,
     ])
     positional_edge_features: List[Any] = field(default_factory=lambda: [
-        # False,
+        False,
         True,
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [

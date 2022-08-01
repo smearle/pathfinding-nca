@@ -119,7 +119,7 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
             if "Fixed" not in cfg.model:
 
                 # FIXME: why are we resetting here??
-                model.reset(x0, e0=e0)
+                model.reset(x0, e0=e0, edge_feats=ef)
 
                 loss.backward()
 
@@ -143,8 +143,7 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                             symm_grad /= 4
                             p.grad[:, :, 1, 0] = p.grad[:, :, 0, 1] = p.grad[:, :, 1, 2] = p.grad[:, :, 2, 1] = symm_grad
 
-                        # TODO: Should we do the same thing for GAT? Need to understand GAT better to have intuition.
-                        elif isinstance(model, GCN):
+                        elif issubclass(type(model), GNN):
                             # Match the symmetric conv above.
                             p.grad /= 4
 

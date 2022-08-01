@@ -13,11 +13,11 @@ class HyperSweepConfig():
     # save_interval: List[Any] = field(default_factory=lambda: [
         # 10000,
     # ])
-    save_interval: int = 10000
+    save_interval: int = 100
     # log_interval: List[Any] = field(default_factory=lambda: [
         # 10000,
     # ])
-    log_interval: int = 10000
+    log_interval: int = 100
     # n_updates: List[Any] = field(default_factory=lambda: [
         # 50000,
     # ])
