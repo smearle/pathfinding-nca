@@ -21,6 +21,7 @@ import torchinfo
 import wandb
 import yaml
 
+from configs import helper as config_helper
 from configs.config import BatchConfig, Config
 from evaluate import evaluate
 from mazes import load_dataset, Mazes, render_discrete
@@ -38,7 +39,7 @@ def main_experiment_load_cfg(cfg_path: str = None):
     cfg = Config()
     load_cfg = OmegaConf.load(cfg_path)
     [setattr(cfg, k, v) for k, v in load_cfg.items() if not k.startswith('_')]
-    cfg.set_exp_name()
+    config_helper.set_exp_name(cfg)
     main_experiment(cfg=cfg)
 
 

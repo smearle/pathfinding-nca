@@ -278,17 +278,21 @@ def diameter(width, graph):
     return max_path_xy, max_connected_xy
 
 
-def get_rand_path(arr, passable=0, impassable=1):
+def get_rand_path(arr):
     width, height = arr.shape
-    graph, edges, edge_feats, _, trg = get_graph(arr)
-    srcs = th.argwhere(arr==passable)
-    src = srcs[np.random.randint(len(srcs))]
-    src = src[0] * width + src[1]
-    src = src.item()
+    graph, edges, edge_feats, src, trg = get_graph(arr)
+    # srcs = th.argwhere(arr==Tiles.EMPTY)
+    # src = srcs[np.random.randint(len(srcs))]
+    # src = src[0] * width + src[1]
+    # src = src.item()
     paths = dict(nx.shortest_path(graph, src))
-    trg, path = paths.popitem()
+    if trg in paths:
+        path = paths[trg]
+    else:
+        # trg, path = paths.popitem()
+        path = []
     path_xy = [(i // width, i % width) for i in path]
-    return path_xy
+    return path_xy, edges, edge_feats
 
 
 def gen_rand_mazes(n_data, cfg):
@@ -339,13 +343,10 @@ def gen_rand_mazes(n_data, cfg):
 def get_target_path(maze_discrete, cfg):
     if cfg.task == 'pathfinding':
         # TODO: need to constrain mutation of sources and targets for this task.
-        sol = get_rand_path(maze_discrete)
-        x, y = sol[0]
-        maze_discrete[x, y] = Tiles.SRC
+        sol, edges, edge_feats = get_rand_path(maze_discrete)
         # for (x, y) in sol:
             # offspring_target_paths[mi, x, y] = 1
-        maze_discrete[x, y] = Tiles.TRG
-        return sol
+        return sol, edges, edge_feats
 
 
 def get_target_diam(maze_discrete, cfg):

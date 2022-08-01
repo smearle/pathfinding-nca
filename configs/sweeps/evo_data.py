@@ -37,15 +37,15 @@ class EvoDataSweep(HyperSweepConfig):
         # "GCN",
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
-        # True,
-        False,
+        True,
+        # False,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
     #     # 4,
     #     # 8,
         # 32,
 
-        48,
+        # 48,
         96,
         # 128,
 
@@ -61,8 +61,8 @@ class EvoDataSweep(HyperSweepConfig):
     #     # 4,
     #     # 8,
     #     # 16,
-        32,
-        # 64,
+        # 32,
+        64,
     ])
     symmetric_conv: List[Any] = field(default_factory=lambda: [
         # True,

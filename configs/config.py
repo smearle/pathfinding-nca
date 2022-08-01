@@ -12,6 +12,7 @@ import torch
 from configs.sweeps.all import HyperSweepConfig
 from configs.sweeps.all_scratch import ScratchSweep
 from configs.sweeps.cut_corners import CutCornerSweep
+from configs.sweeps.gnn import GNNSweep
 from configs.sweeps.handcoded import HandcodedSweep
 from configs.sweeps.kernel import KernelSweep
 from configs.sweeps.maxpool import MaxPoolSweep
@@ -155,7 +156,7 @@ cs.store(name="config", node=Config)
 cs.store(name="batch_config", node=BatchConfig)
 cs.store(group="sweep", name="default", node=HyperSweepConfig)
 cs.store(group="sweep", name="models", node=ModelSweep)
-cs.store(group="sweep", name="gnn", node=)
+cs.store(group="sweep", name="gnn", node=GNNSweep)
 cs.store(group="sweep", name="loss_interval", node=LossIntervalSweep)
 cs.store(group="sweep", name="n_hid_chan", node=HidChanSweep)
 cs.store(group="sweep", name="evo_data", node=EvoDataSweep)

@@ -16,7 +16,7 @@ import wandb
 from configs.config import Config
 from configs.env_gen import EnvGeneration
 from evaluate import evaluate
-from mazes import Mazes, bfs_grid, diameter, get_rand_path, get_target_diam, get_target_path, render_discrete
+from mazes import Mazes, Tiles, bfs_grid, diameter, get_rand_path, get_target_diam, get_target_path, render_discrete
 from models.gnn import GCN, GNN
 from models.nn import PathfindingNN
 from utils import count_parameters, get_discrete_loss, get_mse_loss, Logger, to_path, save
@@ -167,6 +167,8 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                         "mazes_discrete": mazes_onehot.argmax(dim=1),
                         "target_paths": target_paths,
                         "maze_ims": maze_ims,
+                        "edges": edges,
+                        "edge_feats": edge_feats,
                     })
                     with open(os.path.join(cfg.log_dir, "evo_mazes.pkl"), "wb") as f:
                         pickle.dump(maze_data, f)
@@ -226,7 +228,11 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 # offspring_maze_walls = mazes_onehot[:env_gen_cfg.evo_batch_size, :2].argmax(1)
 
                 # Select random k for mutation.
-                offspring_maze_walls = mazes_onehot[th.randint(cfg.n_data, (env_gen_cfg.evo_batch_size,)), :2].argmax(1)
+                mut_idxs = th.randint(cfg.n_data, (env_gen_cfg.evo_batch_size,))
+                offspring_mazes = mazes_onehot[mut_idxs]
+                offspring_maze_walls = mazes_onehot[mut_idxs, Tiles.WALL]
+                src_idxs = th.where(offspring_mazes[:, Tiles.SRC] == 1)
+                trg_idxs = th.where(offspring_mazes[:, Tiles.TRG] == 1)
 
                 # Mutate the mazes (except at the border walls).
                 disc_noise = th.randint(1, 2, offspring_maze_walls.shape)
@@ -235,13 +241,17 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 disc_noise[:, 0, :] = disc_noise[:, -1] = 0
                 disc_noise[:, :, 0] = disc_noise[:, :, -1] = 0
                 offspring_maze_walls = (offspring_maze_walls + disc_noise) % 2
+                # Assuming src/trg tiles are empty
                 offspring_mazes = offspring_maze_walls
+                offspring_mazes[src_idxs] = Tiles.SRC
+                offspring_mazes[trg_idxs] = Tiles.TRG
 
                 # Get their solutions.
                 offspring_target_paths = th.zeros_like(offspring_maze_walls[:])
                 if cfg.task == 'pathfinding':
                     # sols = pool.map(get_target_path, [maze_discrete for maze_discrete in offspring_mazes.cpu()])
-                    sols = [get_target_path(maze_discrete, cfg) for maze_discrete in offspring_mazes.cpu()]
+                    sols_edges_feats = [get_target_path(maze_discrete, cfg) for maze_discrete in offspring_mazes.cpu()]
+                    sols, edges_o, edges_feats_o = zip(*sols_edges_feats)
                 elif cfg.task == 'diameter':
                     # sols = pool.map(get_target_diam, [maze_discrete for maze_discrete in offspring_mazes.cpu()])
                     sols = [get_target_diam(maze_discrete, cfg) for maze_discrete in offspring_mazes.cpu()]
@@ -249,12 +259,15 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                     raise Exception
 
                 for si, sol in enumerate(sols):
+                    if len(sol) == 0:
+                        continue
                     sol = th.Tensor(sol).long()
                     offspring_target_paths[si, sol[:, 0], sol[:, 1]] = 1
 
                 # for mi, maze_discrete in enumerate(offspring_mazes):
                     # get_target_path(maze_discrete)
 
+                offspring_mazes = offspring_mazes.type(th.int64)
                 offspring_mazes_onehot = th.zeros(env_gen_cfg.evo_batch_size, cfg.n_in_chan, *offspring_mazes.shape[-2:])
                 offspring_mazes_onehot.scatter_(1, offspring_mazes[:,None,...], 1)
 
@@ -284,6 +297,9 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                     np.concatenate((maze_ims, offspring_maze_ims), axis=0), \
                     th.cat((target_paths, offspring_target_paths), dim=0)
 
+                edges += edges_o
+                edge_feats += edges_feats_o
+
                 env_losses = env_losses.cpu()
 
                 kick_idxs = th.topk(env_losses, env_gen_cfg.evo_batch_size, largest=False, sorted=False)[1]
@@ -300,6 +316,8 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 mazes_onehot = mazes_onehot[remain_idxs]
                 maze_ims = maze_ims[remain_idxs]
                 target_paths = target_paths[remain_idxs]
+                edges = [edges[i] for i in remain_idxs]
+                edge_feats = [edge_feats[i] for i in remain_idxs]
                 # env_losses, mazes_onehot, maze_ims, target_paths = env_losses[remain_idxs], mazes_onehot[remain_idxs], \
                     # maze_ims[remain_idxs], target_paths[remain_idxs]
 
