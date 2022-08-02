@@ -109,8 +109,11 @@ class FixedBfsNCA(PathfindingNN):
         x[:, self.flood_chan] = clamp(x[:, self.flood_chan], 0., 1.)
 
         # Are the directional path activation channels equal to -1?
-        path_activs = x[:, self.path_chan + 1: self.path_chan + 1 + len(self.adjs)] == -1.0
-        path_activs = th.max(path_activs, dim=1)[0]
+        # path_activs = x[:, self.path_chan + 1: self.path_chan + 1 + len(self.adjs)] == -1.0
+        path_activs = sawtooth_relu(x[:, self.path_chan + 1: self.path_chan + 1 + len(self.adjs)], -1)
+        # path_activs = th.max(path_activs, dim=1)[0]
+        path_activs = clamp(th.sum(path_activs, dim=1), 0, 1)
+        # path_activs = clamp_relu(path_activs, 0, 1)[0]
         # If any one of them is, then make the path channel at that cell equal to 1.
         x[:, self.path_chan] += path_activs.float()
         x[:, self.path_chan] = clamp(x[:, self.path_chan], 0., 1.)
@@ -127,6 +130,12 @@ class FixedBfsNCA(PathfindingNN):
 def clamp_relu(x, min_val, max_val):
     """Essentially `th.clamp(x, min_val, max_val)`, but differentiable."""
     return -th.relu(-(th.relu(x - min_val) + min_val) + max_val) + max_val
+
+
+def sawtooth_relu(x, a):
+    """Returns 1 when x = a. Assume slope is 1. TODO: make this an argument, `m`."""
+    # The upward slope. This is 0 when x <= a - 1
+    return th.relu(x - a + 1) - 2 * th.relu(x - a) + th.relu(x - a - 1)
 
 
 clamp = clamp_relu

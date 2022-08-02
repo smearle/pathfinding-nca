@@ -113,10 +113,10 @@ def count_parameters(model: PathfindingNN, cfg: Config):
                 n_params += p.numel()
 
         # Some models have a mix of learnable weights and a handcoded "oracle", with potentially frozen weights.
-        if ("Bfs" in cfg.model or "Dfs" in cfg.model) and "oracle" in name:
-            assert not p.requires_grad
-        else:
-            assert p.requires_grad
+        # if ("Bfs" in cfg.model or "Dfs" in cfg.model) and "oracle" in name:
+            # assert not p.requires_grad
+        # else:
+            # assert p.requires_grad
 
     return n_params
 

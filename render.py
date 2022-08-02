@@ -16,7 +16,7 @@ from models.nn import PathfindingNN
 
 
 RENDER_TYPE = 0
-N_RENDER_CHANS = 1
+N_RENDER_CHANS = None
 RENDER_BORDER = False
 SAVE_GIF = True
 SAVE_PNGS = True

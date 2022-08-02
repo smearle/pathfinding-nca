@@ -128,8 +128,10 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 for name, p in model.named_parameters():
 
                     if p.grad is None:
-                        assert cfg.model == "BfsNCA", f"Gradient of parameter {name} should not be None."
+                        # assert cfg.model == "BfsNCA", f"Gradient of parameter {name} should not be None."
+                        print(f"Gradient of parameter {name} is None.")
                         continue
+                    # print(f"Gradient of parameter {name} has shape {p.grad.shape}.")
 
                     if "weight" in name:
                         # If this is a graph neural net, we are already ignoring the corners (they are not neighbors as

@@ -10,6 +10,8 @@ from configs.sweeps.all import HyperSweepConfig
 class ScratchSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
     name: str = 'scratch'
+    log_interval = 100
+    save_interval = 100
     exp_name: List[Any] = field(default_factory=lambda: [
         # "2",
         # "3",
@@ -33,19 +35,20 @@ class ScratchSweep(HyperSweepConfig):
     ])
     model: List[Any] = field(default_factory=lambda: [
         # "NCA",
-        "GAT",
+        # "GAT",
         # "GCN",
         # "MLP",
+        "BfsNCA",
         # "FixedBfsNCA",
         # "FixedDfsNCA",
     ])
     traversable_edges_only: List[Any] = field(default_factory=lambda: [
-        # False,
-        True,
+        False,
+        # True,
     ])
     positional_edge_features: List[Any] = field(default_factory=lambda: [
-        # False,
-        True,
+        False,
+        # True,
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
         True,
@@ -56,14 +59,14 @@ class ScratchSweep(HyperSweepConfig):
         False,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
-    # #     # 4,
-    # #     # 8,
+        14,
+        # 8,
         # 16,
         # 24,
     # #     # 32,
         # 48,
         # 96,
-        128,
+        # 128,
         # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
