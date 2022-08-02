@@ -54,6 +54,8 @@ def validate(cfg: Config):
         cfg.cut_conv_corners = True
     if cfg.task == "diameter":
         cfg.n_in_chan = 2
+    if cfg.task == "traveling":
+        cfg.n_in_chan = 3
     if cfg.model == "FixedBfsNCA":
         assert cfg.task != "diameter", "No hand-coded model implemented for diameter task."
         # self.path_chan = self.n_in_chan + 1  # wait why is this??

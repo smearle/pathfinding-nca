@@ -86,10 +86,12 @@ class FixedBfsNCA(PathfindingNN):
     def hid_forward(self, x):
         self.n_batches = n_batches = x.shape[0]
         # agent_pos = (input.shape[2] // 2, input.shape[3] // 2)
-        trg_pos = th.where(x[:, self.trg_chan, ...] == 1)
-        if trg_pos[0].shape[0] == 0:
-            trg_pos = th.zeros(n_batches, 3, dtype=th.int64)
-            trg_pos = tuple([trg_pos[:, i] for i in range(3)])
+
+        # trg_pos = th.where(x[:, self.trg_chan, ...] == 1)
+        # if trg_pos[0].shape[0] == 0:
+        #     trg_pos = th.zeros(n_batches, 3, dtype=th.int64)
+        #     trg_pos = tuple([trg_pos[:, i] for i in range(3)])
+
         # trg_pos = (trg_pos[1].item(), trg_pos[2].item())
         # batch_dones = self.get_dones(x, trg_pos)
         # if not batch_dones.all().item():

@@ -21,10 +21,17 @@ path_chan = 4
 
 
 class Tiles:
+    # Base traversible.
     EMPTY = 0
     WALL = 1
+    # Player start.
     SRC = 2
+    # Exit.
     TRG = 3
+    # TSP destinations.
+    DEST = 4
+
+    MAX = DEST
 
 
 def get_maze_name_suffix(cfg: Config):
@@ -39,12 +46,12 @@ def main_mazes(cfg: Config=None):
     val_fname = f"{maze_fname}_val.pk"
     test_fname = f"{maze_fname}_test.pk"
     if np.any([os.path.exists(fname) for fname in [train_fname, val_fname, test_fname]]):
-        user_input = input("File already exists. Overwrite? (y/n) ")
-        while user_input not in ['y', 'n']:
-            print(f"Invalid input '{user_input}'. Please enter 'y' or 'n'.")
-            user_input = input("File already exists. Overwrite? (y/n) ")
-        if user_input != 'y':
-            return
+    #     user_input = input("File already exists. Overwrite? (y/n) ")
+    #     while user_input not in ['y', 'n']:
+    #         print(f"Invalid input '{user_input}'. Please enter 'y' or 'n'.")
+    #         user_input = input("File already exists. Overwrite? (y/n) ")
+    #     if user_input != 'y':
+    #         return
         
         print('Overwriting existing dataset...')
 
@@ -94,7 +101,7 @@ class Mazes():
     def __init__(self, cfg: Config, evo_mazes={}):
         if len(evo_mazes) == 0:
             width, height = cfg.width, cfg.height
-            self.mazes_discrete, self.mazes_onehot, self.edges, self.edge_feats, self.target_paths, self.target_diameters = gen_rand_mazes(cfg.n_data, cfg)
+            self.gen_rand_mazes(cfg.n_data, cfg)
             self.maze_ims = th.Tensor(np.array(
                 [render_discrete(maze_discrete[None,], cfg)[0] for maze_discrete in self.mazes_discrete]
             ))
@@ -107,20 +114,83 @@ class Mazes():
             self.mazes_onehot.to(device), self.target_paths.to(device)
         return self
 
+    def gen_rand_mazes(self, n_data, cfg):
+        # Generate new random mazes until we get enough solvable ones.
+        n_data = cfg.n_data
+        solvable_mazes_onehot = []
+        solvable_mazes_discrete = []
+        solvable_mazes_edges = []
+        solvable_mazes_edge_feats = []
+        target_paths = []
+        target_diameters = []
+        target_travelings = []
+        i = 0
+        j = 0
+        for i in tqdm(range(n_data)):
+            sol = None
+            target_traveling = None
+            # Generate random mazes until we get a solvable one.
+            while not sol:
+                rand_maze_onehot = generate_random_maze(cfg)
+                rand_maze_discrete = rand_maze_onehot.argmax(axis=1)
+                graph, edges, edge_feats, src, trg = get_graph(rand_maze_discrete[0], rand_maze_onehot[0])
+                # sol = bfs_grid(rand_maze_discrete[0].cpu().numpy())
+                width = rand_maze_discrete.shape[1]
+                sol = bfs_nx(width, graph, src, trg)
+                j += 1
+                if sol is None:
+                    continue
+
+            # print(f'Adding maze {i}.')
+            solvable_mazes_discrete.append(rand_maze_discrete)
+            # solvable_mazes_edges.append(get_traversable_grid_edges(rand_maze_onehot[0, Tiles.WALL] == 0))
+            solvable_mazes_edges.append(edges)
+            solvable_mazes_edge_feats.append(edge_feats)
+            target_path = th.zeros_like(rand_maze_discrete)
+            for x, y in sol:
+                    target_path[0, x, y] = 1
+            target_paths.append(target_path)
+            # For convenience, we use the same maze in the dataset for the diameter problem.
+            diam_xy, connected, traveling_xy, dests_xy = diameter(width, graph, traveling=True)
+            rand_maze_onehot[0, Tiles.DEST, dests_xy[:, 0], dests_xy[:, 1]] = 1
+            diam_xy = np.array(diam_xy)
+            target_diameter = th.zeros_like(rand_maze_discrete)
+            target_diameter[0, diam_xy[:, 0], diam_xy[:, 1]] = 1
+            traveling_xy = np.array(traveling_xy)
+            target_traveling = th.zeros_like(rand_maze_discrete)
+            target_traveling[0, traveling_xy[:, 0], traveling_xy[:, 1]] = 1
+            target_diameters.append(target_diameter)
+            solvable_mazes_onehot.append(rand_maze_onehot)
+            target_travelings.append(target_traveling)
+            i += 1
+        print(f'Generated {j} random mazes to produce {n_data} solvable mazes.')
+
+        self.mazes_discrete, self.mazes_onehot, self.edges, self.edge_feats, self.target_paths, self.target_diameters, self.target_travelings = \
+            th.vstack(solvable_mazes_discrete), th.vstack(solvable_mazes_onehot), solvable_mazes_edges, \
+            solvable_mazes_edge_feats, th.vstack(target_paths), th.vstack(target_diameters), th.vstack(target_travelings)
+
+    def get_tiles(self, tiles):
+        """Need to give *all* tiles not to be left in maze in in_tiles."""
+        mask = th.zeros(self.mazes_onehot.shape)
+        mask[:, np.array(tiles)] = 1
+        mazes_onehot = self.mazes_onehot * mask
+        self.mazes_discrete = th.argmax(mazes_onehot, axis=1)
+        self.mazes_onehot = self.mazes_onehot[:, np.array(tiles)]
+
+
     def get_subset(self, cfg: Config):
         self.mazes_discrete, self.mazes_onehot = self.mazes_discrete[:cfg.n_data], \
             self.mazes_onehot[:cfg.n_data]
         if cfg.task == 'pathfinding':
             self.target_paths = self.target_paths[:cfg.n_data]
+            self.get_tiles([Tiles.EMPTY, Tiles.WALL, Tiles.SRC, Tiles.TRG])
         elif cfg.task == 'diameter':
             self.target_paths = self.target_diameters[:cfg.n_data]
+            self.get_tiles([Tiles.EMPTY, Tiles.WALL])
+        elif cfg.task == 'traveling':
+            self.target_paths = self.target_travelings[:cfg.n_data]
+            self.get_tiles([Tiles.EMPTY, Tiles.WALL, Tiles.DEST])
 
-            # Remove source and targets.
-            self.mazes_discrete = th.where(
-                    (self.mazes_discrete == Tiles.SRC) | (self.mazes_discrete == Tiles.TRG), 
-                Tiles.EMPTY, self.mazes_discrete)
-            assert Tiles.EMPTY == 0 and Tiles.WALL == 1 and Tiles.SRC == 2
-            self.mazes_onehot = self.mazes_onehot[:, :Tiles.SRC]
         else:
             raise Exception
 
@@ -131,7 +201,7 @@ def generate_random_maze(cfg):
     empty_chan, wall_chan, src_chan, trg_chan = Tiles.EMPTY, Tiles.WALL, Tiles.SRC, Tiles.TRG
 
     # Generate empty room with with borders.
-    rand_maze_onehot = th.zeros((batch_size, 4, width + 2, height + 2), dtype=int)
+    rand_maze_onehot = th.zeros((batch_size, Tiles.MAX + 1, width + 2, height + 2), dtype=int)
     rand_maze_onehot[:, wall_chan, [0, -1], :] = 1
     rand_maze_onehot[:, wall_chan, :, [0, -1]] = 1
 
@@ -145,14 +215,20 @@ def generate_random_maze(cfg):
     src_ys, trg_ys = th.randint(0, height, (2, batch_size)) + 1
 
     # Remove wall/empty tiles at location of source/target.
-    rand_maze_onehot[th.arange(batch_size), empty_chan, src_xs, src_ys] = 0
-    rand_maze_onehot[th.arange(batch_size), wall_chan, src_xs, src_ys] = 0
-    rand_maze_onehot[th.arange(batch_size), empty_chan, trg_xs, trg_ys] = 0
-    rand_maze_onehot[th.arange(batch_size), wall_chan, trg_xs, trg_ys] = 0
+    rand_maze_onehot[:, empty_chan, src_xs, src_ys] = 0
+    rand_maze_onehot[:, wall_chan, src_xs, src_ys] = 0
+    rand_maze_onehot[:, empty_chan, trg_xs, trg_ys] = 0
+    rand_maze_onehot[:, wall_chan, trg_xs, trg_ys] = 0
 
     # Add sources and targets.
-    rand_maze_onehot[th.arange(batch_size), src_chan, src_xs, src_ys] = 1
-    rand_maze_onehot[th.arange(batch_size), trg_chan, trg_xs, trg_ys] = 1
+    rand_maze_onehot[:, src_chan, src_xs, src_ys] = 1
+    rand_maze_onehot[:, trg_chan, trg_xs, trg_ys] = 1
+
+    # Add TSP destinations.
+    n_dest = 4
+    dest_idxs = th.randint(0, width, (2, n_dest, batch_size))
+    rand_maze_onehot[:, Tiles.WALL, dest_idxs[0], dest_idxs[1]] = 1
+    rand_maze_onehot[:, Tiles.DEST, dest_idxs[0], dest_idxs[1]] = 1
 
     return rand_maze_onehot
 
@@ -163,9 +239,11 @@ def render_discrete(arr, cfg):
     wall_color = th.Tensor([0.0, 0.0, 0.0])
     src_color = th.Tensor([1.0, 1.0, 0.0])
     trg_color = th.Tensor([0.0, 1.0, 0.0])
+    dest_color = th.Tensor([0.0, 0.0, 1.0])
     path_color = th.Tensor([1.0, 0.0, 0.0])
-    colors = {empty_chan: empty_color, wall_chan: wall_color, path_chan: path_color}
+    colors = {empty_chan: empty_color, wall_chan: wall_color, Tiles.DEST: dest_color}
     colors.update({src_chan: src_color, trg_chan: trg_color, })
+    # colors.update({path_chan: path_color, })
     batch_size, height, width = arr.shape
     im = th.zeros((batch_size, height, width, 3), dtype=th.float32)
 
@@ -174,8 +252,10 @@ def render_discrete(arr, cfg):
         im[idxs[0], idxs[1], idxs[2], :] = color
 
     im = im.cpu().numpy()
+    TT()
 
     return im
+
 
 
 # rand_maze_onehot = generate_random_maze()
@@ -192,10 +272,11 @@ adj_coords_2d = np.array([
 ])
 
 
-def get_graph(arr):
+def get_graph(disc, onehot):
+    # TODO: can all be onehot
     src, trg = None, None
     graph = nx.Graph()
-    width, height = arr.shape
+    width, height = disc.shape
     size = width * height
     graph.add_nodes_from(range(size))
     edges = []
@@ -203,17 +284,17 @@ def get_graph(arr):
     # ret = scipy.sparse.csgraph.floyd_warshall(dist)
     for u in range(size):
         ux, uy = u // width, u % width
-        if arr[ux, uy] == Tiles.WALL:
+        if disc[ux, uy] == Tiles.WALL:
             continue
-        elif arr[ux, uy] == Tiles.SRC:
+        elif disc[ux, uy] == Tiles.SRC:
             src = u
-        elif arr[ux, uy] == Tiles.TRG:
+        elif disc[ux, uy] == Tiles.TRG:
             trg = u
         neighbs_xy = [(ux - 1, uy), (ux, uy-1), (ux+1, uy), (ux, uy+1)]
         adj_feats = [(-1, 0), (0, -1), (1, 0), (0, 1)]
         neighbs = [x * width + y for x, y in neighbs_xy]
         for v, (vx, vy), edge_feat in zip(neighbs, neighbs_xy, adj_feats):
-            if not 0 <= v < size or arr[vx, vy] == Tiles.WALL:
+            if not 0 <= v < size or disc[vx, vy] == Tiles.WALL:
                 continue
             graph.add_edge(u, v)
             edges.append((u, v))
@@ -263,7 +344,7 @@ def bfs_nx(width, graph, src, trg):
     return None if trg not in shortest_paths else [(u // width, u % width) for u in shortest_paths[trg]]
 
 
-def diameter(width, graph):
+def diameter(width, graph, traveling=True):
     shortest_paths = dict(nx.all_pairs_shortest_path(graph))
     max_connected = []
     max_path = []
@@ -275,12 +356,20 @@ def diameter(width, graph):
                 max_path = path
     max_connected_xy = [(u // width, u % width) for u in max_connected]
     max_path_xy = [(u // width, u % width) for u in max_path]
-    return max_path_xy, max_connected_xy
+
+    # Place destinations in largest connected component.
+    target_traveling, dests_xy = None, None
+    if traveling:
+        dests = [max_connected.popitem()[0] for i in range(min(len(max_connected), 10))]
+        target_traveling = nx.algorithms.approximation.traveling_salesman_problem(graph, nodes=dests)
+        traveling_xy = [(u // width, u % width) for u in target_traveling]
+        dests_xy = np.array([(u // width, u % width) for u in dests])
+    return max_path_xy, max_connected_xy, traveling_xy, dests_xy
 
 
 def get_rand_path(arr):
     width, height = arr.shape
-    graph, edges, edge_feats, src, trg = get_graph(arr)
+    graph, edges, edge_feats, src, trg, dests = get_graph(arr)
     # srcs = th.argwhere(arr==Tiles.EMPTY)
     # src = srcs[np.random.randint(len(srcs))]
     # src = src[0] * width + src[1]
@@ -295,51 +384,6 @@ def get_rand_path(arr):
     return path_xy, edges, edge_feats
 
 
-def gen_rand_mazes(n_data, cfg):
-    # Generate new random mazes until we get enough solvable ones.
-    n_data = cfg.n_data
-    solvable_mazes_onehot = []
-    solvable_mazes_discrete = []
-    solvable_mazes_edges = []
-    solvable_mazes_edge_feats = []
-    target_paths = []
-    target_diameters = []
-    i = 0
-    j = 0
-    for i in tqdm(range(n_data)):
-        sol = None
-        # Generate random mazes until we get a solvable one.
-        while not sol:
-            rand_maze_onehot = generate_random_maze(cfg)
-            rand_maze_discrete = rand_maze_onehot.argmax(axis=1)
-            graph, edges, edge_feats, src, trg = get_graph(rand_maze_discrete[0])
-            # sol = bfs_grid(rand_maze_discrete[0].cpu().numpy())
-            width = rand_maze_discrete.shape[1]
-            sol = bfs_nx(width, graph, src, trg)
-            j += 1
-        # print(f'Adding maze {i}.')
-        solvable_mazes_onehot.append(rand_maze_onehot)
-        solvable_mazes_discrete.append(rand_maze_discrete)
-        # solvable_mazes_edges.append(get_traversable_grid_edges(rand_maze_onehot[0, Tiles.WALL] == 0))
-        solvable_mazes_edges.append(edges)
-        solvable_mazes_edge_feats.append(edge_feats)
-        target_path = th.zeros_like(rand_maze_discrete)
-        for x, y in sol:
-                target_path[0, x, y] = 1
-        target_paths.append(target_path)
-        # For convenience, we use the same maze in the dataset for the diameter problem.
-        target_diameter = th.zeros_like(rand_maze_discrete)
-        diam, connected = diameter(width, graph)
-        for x, y in diam:
-            target_diameter[0, x, y] = 1
-        target_diameters.append(target_diameter)
-        i += 1
-    print(f'Generated {j} random mazes to produce {n_data} solvable mazes.')
-
-    return th.vstack(solvable_mazes_discrete), th.vstack(solvable_mazes_onehot), solvable_mazes_edges, \
-        solvable_mazes_edge_feats, th.vstack(target_paths), th.vstack(target_diameters)
-
-
 def get_target_path(maze_discrete, cfg):
     if cfg.task == 'pathfinding':
         # TODO: need to constrain mutation of sources and targets for this task.
@@ -350,10 +394,10 @@ def get_target_path(maze_discrete, cfg):
 
 
 def get_target_diam(maze_discrete, cfg):
-    diam, connected = diameter(maze_discrete.cpu().numpy(), cfg.n_in_chan)
+    diam, connected, traveling, dests_xy = diameter(maze_discrete.cpu().numpy(), cfg.n_in_chan, traveling=cfg.problem=='traveling')
     # for (x, y) in diam:
         # offspring_target_paths[mi, x, y] = 1
-    return diam
+    return diam, traveling
 
 
 if __name__ == "__main__":

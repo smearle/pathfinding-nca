@@ -26,19 +26,20 @@ class ScratchSweep(HyperSweepConfig):
         None,
     ])
     task: List[Any] = field(default_factory=lambda: [
-        "pathfinding",
+        # "pathfinding",
         # "diameter",
+        "traveling",
     ])
     max_pooling: List[Any] = field(default_factory=lambda: [
         # True,
         False,
     ])
     model: List[Any] = field(default_factory=lambda: [
-        # "NCA",
+        "NCA",
         # "GAT",
         # "GCN",
         # "MLP",
-        "BfsNCA",
+        # "BfsNCA",
         # "FixedBfsNCA",
         # "FixedDfsNCA",
     ])

@@ -150,7 +150,7 @@ def main_experiment(cfg: Config = None, cfg_path: str = None):
     mazes_onehot, mazes_discrete, maze_ims, target_paths = \
         (maze_data_train.mazes_onehot, maze_data_train.mazes_discrete, maze_data_train.maze_ims, maze_data_train.target_paths)
 
-    assert cfg.path_chan == mazes_discrete.max() + 1  # Wait we don't even use this??
+    # assert cfg.path_chan == mazes_discrete.max() + 1  # Wait we don't even use this??
     assert cfg.n_in_chan == mazes_onehot.shape[1]
 
     if cfg.render:

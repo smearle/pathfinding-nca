@@ -32,6 +32,8 @@ def render_trained(model: PathfindingNN, maze_data, cfg: Config, pyplot_animatio
     model.eval()
     mazes_onehot, mazes_discrete, edges, edge_feats, target_paths = maze_data.mazes_onehot, maze_data.mazes_discrete, \
         maze_data.edges, maze_data.edge_feats, maze_data.target_paths
+    if cfg.task == 'traveling':
+        target_paths = maze_data.target_travelings
     if N_RENDER_CHANS is None:
         n_render_chans = model.n_out_chan
     else:
