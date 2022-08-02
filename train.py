@@ -19,7 +19,7 @@ from evaluate import evaluate
 from mazes import Mazes, Tiles, bfs_grid, diameter, get_rand_path, get_target_diam, get_target_path, render_discrete
 from models.gnn import GCN, GNN
 from models.nn import PathfindingNN
-from utils import count_parameters, get_discrete_loss, get_mse_loss, Logger, to_path, save
+from utils import backup_file, count_parameters, delete_backup, get_discrete_loss, get_mse_loss, Logger, to_path, save
 
 
 def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_data_val: Mazes, 
@@ -27,6 +27,7 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
     tb_writer = SummaryWriter(log_dir=cfg.log_dir)
     mazes_onehot, edges, edge_feats, maze_ims = maze_data.mazes_onehot, maze_data.edges, maze_data.edge_feats, \
         maze_data.maze_ims
+    print("Done unpacking mazes.")
     minibatch_size = min(cfg.minibatch_size, cfg.n_data)
     lr_sched = th.optim.lr_scheduler.MultiStepLR(opt, [10000], 0.1)
     logger.last_time = timer()
@@ -170,10 +171,16 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                         "edges": edges,
                         "edge_feats": edge_feats,
                     })
-                    with open(os.path.join(cfg.log_dir, "evo_mazes.pkl"), "wb") as f:
+                    evolved_data_path = os.path.join(cfg.log_dir, "evo_mazes.pkl")
+                    evolved_data_losses_path = os.path.join(cfg.log_dir, "env_losses.pkl")
+                    backup_file(evolved_data_path)
+                    backup_file(evolved_data_losses_path)
+                    with open(evolved_data_path, "wb") as f:
                         pickle.dump(maze_data, f)
-                    with open(os.path.join(cfg.log_dir, "env_losses.pkl"), "wb") as f:
+                    with open(evolved_data_losses_path, "wb") as f:
                         pickle.dump(env_losses, f)
+                    delete_backup(evolved_data_path)
+                    delete_backup(evolved_data_losses_path)
 
             if i % cfg.eval_interval == 0:
                 val_stats = evaluate(model, maze_data_val, cfg.val_batch_size, "validate", cfg)
@@ -213,8 +220,7 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
             if i == cfg.n_updates - 1:
                 vis_train(logger, render_maze_ims, render_paths, target_path_ims, render_batch_idx, cfg)
 
-            if env_gen_cfg is not None \
-                    and loss < 1e-2 and last_evo >= env_gen_cfg.gen_interval:
+            if env_gen_cfg is not None and loss < 1e-2 and last_evo >= env_gen_cfg.gen_interval:
             # if True:
                 last_evo = 0
                 # and i % env_gen_cfg.gen_interval == 0 \
@@ -228,23 +234,33 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 # offspring_maze_walls = mazes_onehot[:env_gen_cfg.evo_batch_size, :2].argmax(1)
 
                 # Select random k for mutation.
-                mut_idxs = th.randint(cfg.n_data, (env_gen_cfg.evo_batch_size,))
-                offspring_mazes = mazes_onehot[mut_idxs]
+                evo_batch_size = env_gen_cfg.evo_batch_size
+                mut_idxs = th.randint(cfg.n_data, (evo_batch_size,))
+                offspring_mazes_onehot = mazes_onehot[mut_idxs]
                 offspring_maze_walls = mazes_onehot[mut_idxs, Tiles.WALL]
-                src_idxs = th.where(offspring_mazes[:, Tiles.SRC] == 1)
-                trg_idxs = th.where(offspring_mazes[:, Tiles.TRG] == 1)
 
-                # Mutate the mazes (except at the border walls).
+                # Mutate the maze walls (except at the border).
                 disc_noise = th.randint(1, 2, offspring_maze_walls.shape)
-                mut_mask = th.rand(offspring_maze_walls.shape) < .1
-                disc_noise *= mut_mask
+                wall_mut_mask = th.rand(offspring_maze_walls.shape) < .1
+                disc_noise *= wall_mut_mask
                 disc_noise[:, 0, :] = disc_noise[:, -1] = 0
                 disc_noise[:, :, 0] = disc_noise[:, :, -1] = 0
                 offspring_maze_walls = (offspring_maze_walls + disc_noise) % 2
-                # Assuming src/trg tiles are empty
                 offspring_mazes = offspring_maze_walls
-                offspring_mazes[src_idxs] = Tiles.SRC
-                offspring_mazes[trg_idxs] = Tiles.TRG
+
+                if cfg.task == "pathfinding":
+                    # Mutate the source and target positions
+                    src_idxs = th.where(offspring_mazes_onehot[:, Tiles.SRC] == 1)
+                    trg_idxs = th.where(offspring_mazes_onehot[:, Tiles.TRG] == 1)
+                    src_mut_mask = th.rand(evo_batch_size) < 0.05
+                    trg_mut_mask = th.rand(evo_batch_size) < 0.05
+                    src_mut = th.randint(0, max(cfg.width, cfg.height), (2, evo_batch_size)) * src_mut_mask
+                    src_idxs_o = (src_idxs[0], (src_idxs[1] + src_mut[0]) % cfg.width, (src_idxs[2] + src_mut[1]) % cfg.height)
+                    trg_mut = th.randint(0, max(cfg.width, cfg.height), (2, evo_batch_size)) * trg_mut_mask
+                    trg_idxs_o = (trg_idxs[0], (trg_idxs[1] + trg_mut[0]) % cfg.width, (trg_idxs[2] + trg_mut[1]) % cfg.height)
+
+                    offspring_mazes[src_idxs_o] = Tiles.SRC
+                    offspring_mazes[trg_idxs_o] = Tiles.TRG
 
                 # Get their solutions.
                 offspring_target_paths = th.zeros_like(offspring_maze_walls[:])

@@ -11,13 +11,15 @@ class GNNSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
     name: str = 'scratch'
     exp_name: List[Any] = field(default_factory=lambda: [
-        # "2",
+        "0",
+        "1",
+        "2",
         # "3",
         # "4",
         # "10",
         # "11",
         # "12",
-        "scratch",
+        # "scratch",
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
         # EnvGeneration(),
@@ -25,7 +27,7 @@ class GNNSweep(HyperSweepConfig):
     ])
     task: List[Any] = field(default_factory=lambda: [
         "pathfinding",
-        # "diameter",
+        "diameter",
     ])
     max_pooling: List[Any] = field(default_factory=lambda: [
         # True,
@@ -40,7 +42,7 @@ class GNNSweep(HyperSweepConfig):
         # "FixedDfsNCA",
     ])
     traversable_edges_only: List[Any] = field(default_factory=lambda: [
-        # False,
+        False,
         True,
     ])
     positional_edge_features: List[Any] = field(default_factory=lambda: [
@@ -67,9 +69,9 @@ class GNNSweep(HyperSweepConfig):
         # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
-        # 16,
+        16,
     # #     # 48,
-        64,
+        # 64,
     #     # 96,
     # #     # 128,
     ])

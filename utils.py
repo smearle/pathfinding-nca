@@ -1,8 +1,10 @@
 import base64
 import io
 import json
+import os
 from pdb import set_trace as TT
 import pickle
+import shutil
 import requests
 
 from moviepy.video.io.ffmpeg_writer import FFMPEG_VideoWriter
@@ -42,9 +44,25 @@ opt_state_fname = 'opt_state_dict.pt'
 logger_fname = 'logger.pk'
 
 
+def backup_file(fname):
+    if os.path.isfile(fname):
+        shutil.copyfile(fname, fname + '.bkp')
+
+
+def delete_backup(fname):
+    if os.path.isfile(fname + '.bkp'):
+        os.remove(fname + '.bkp')
+
+
 def save(ca, opt, logger, cfg):
-    torch.save(ca.state_dict(), f'{cfg.log_dir}/{ca_state_fname}')
-    torch.save(opt.state_dict(), f'{cfg.log_dir}/{opt_state_fname}')
+    model_path = f'{cfg.log_dir}/{ca_state_fname}'
+    optimizer_path = f'{cfg.log_dir}/{opt_state_fname}'
+    backup_file(model_path)
+    backup_file(optimizer_path)
+    torch.save(ca.state_dict(), model_path)
+    torch.save(opt.state_dict(), optimizer_path)
+    delete_backup(model_path)
+    delete_backup(optimizer_path)
     with open(f'{cfg.log_dir}/{logger_fname}', 'wb') as f:
         pickle.dump(logger, f)
 
@@ -54,8 +72,12 @@ def load(model, opt, cfg):
         map_location = torch.device('cpu')
     else:
         map_location = None
-    model.load_state_dict(torch.load(f'{cfg.log_dir}/{ca_state_fname}', map_location=map_location))
-    opt.load_state_dict(torch.load(f'{cfg.log_dir}/{opt_state_fname}', map_location=map_location))
+    try:
+        model.load_state_dict(torch.load(f'{cfg.log_dir}/{ca_state_fname}', map_location=map_location))
+        opt.load_state_dict(torch.load(f'{cfg.log_dir}/{opt_state_fname}', map_location=map_location))
+    except Exception:  #FIXME: lol
+        model.load_state_dict(torch.load(f'{cfg.log_dir}/{opt_state_fname}', map_location=map_location))
+        opt.load_state_dict(torch.load(f'{cfg.log_dir}/{ca_state_fname}', map_location=map_location))
     logger = pickle.load(open(f'{cfg.log_dir}/{logger_fname}', 'rb'))
     print(f'Loaded CA and optimizer state dict, maze archive, and logger from {cfg.log_dir}.')
 

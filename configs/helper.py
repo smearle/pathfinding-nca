@@ -41,7 +41,6 @@ def set_exp_name(cfg: Config):
 
 def validate(cfg: Config):
     cfg.device = "cuda" if th.cuda.is_available() else "cpu"
-    print(cfg.model)
     model_cls = getattr(models, cfg.model)
     if not issubclass(model_cls, models.GNN):
         assert (cfg.traversable_edges_only is False and cfg.positional_edge_features is False), "Hyperparameters " \

@@ -7,7 +7,7 @@ from typing import Any, List, Optional
 
 import hydra
 from hydra.core.config_store import ConfigStore
-import torch
+import torch as th
 
 from configs.sweeps.all import HyperSweepConfig
 from configs.sweeps.all_scratch import ScratchSweep
@@ -22,6 +22,7 @@ from configs.sweeps.models import ModelSweep
 from configs.sweeps.n_hid_chan import HidChanSweep
 from configs.sweeps.evo_data import EvoDataSweep
 from configs.sweeps.weight_sharing import WeightSharingSweep
+from configs.sweeps.gnn import GNNSweep
 
 
 @dataclass
@@ -75,7 +76,8 @@ class Config():
     # Size of minibatch for rendering images and animations.
     render_minibatch_size: int = 1
 
-    device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device: str = 'cuda' if th.cuda.is_available() else 'cpu'
+    # device: str = 'cuda'
 
     learning_rate: float= 1e-4
 

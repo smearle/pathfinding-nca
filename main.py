@@ -81,11 +81,13 @@ def main_experiment(cfg: Config = None, cfg_path: str = None):
     # param_n = sum(p.numel() for p in model.parameters())
     # print('model param count:', param_n)
     opt = th.optim.Adam(model.parameters(), cfg.learning_rate)
+    print("Loading data...")
     try:
         maze_data_train, maze_data_val, maze_data_test = load_dataset(cfg)
     except FileNotFoundError as e:
         print("No maze data files found. Run `python mazes.py` to generate the dataset.")
         raise
+    print("Done loading data.")
     # maze_data_val.get_subset(cfg.n_val_data)
   # cfg.n_data = maze_data_train.mazes_onehot.shape[0]
 
@@ -94,6 +96,7 @@ def main_experiment(cfg: Config = None, cfg_path: str = None):
     if cfg.shared_weights:
         cfg_32.n_layers = cfg.n_layers * 2
     maze_data_test_32 = load_dataset(cfg_32, test_only=True)
+    print("Done loading 32x32 mazes.")
 
     loaded = False
     if cfg.load:
@@ -156,6 +159,7 @@ def main_experiment(cfg: Config = None, cfg_path: str = None):
             render_trained(model, maze_data_test_32, cfg_32, name="_32")
 
     else:
+        print("Beginning to train.")
         train(model, opt, maze_data_train, maze_data_val, maze_data_test_32, target_paths, logger, cfg, cfg_32)
 
     if cfg.wandb:

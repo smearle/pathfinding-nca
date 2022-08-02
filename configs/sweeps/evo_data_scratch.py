@@ -37,8 +37,8 @@ class EvoDataScratchSweep(HyperSweepConfig):
     #     # 4,
     #     # 8,
         # 32,
+        # 48,
         96,
-        48,
         # 128,
     #     # 256,
     ])
@@ -52,8 +52,8 @@ class EvoDataScratchSweep(HyperSweepConfig):
     #     # 4,
     #     # 8,
     #     # 16,
-        32,
-        # 64,
+        # 32,
+        64,
     ])
     symmetric_conv: List[Any] = field(default_factory=lambda: [
         # True,
