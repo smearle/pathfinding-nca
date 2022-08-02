@@ -147,7 +147,7 @@ class BatchConfig(Config):
     gen_new_data: bool = False
     load_all: bool = False
     filter_by_config: bool = False
-    selective_table: bool = False
+    # selective_table: bool = False
     load_pickle: bool = False
     n_updates: int = 50000
     overwrite_evals: bool = False

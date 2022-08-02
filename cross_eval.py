@@ -25,6 +25,8 @@ names_to_hyperparams = {
     'batch': [
         "task",
         "model",
+        "traversable_edges_only",
+        "positional_edge_features",
         "env_generation",
         "n_layers",
         "max_pool",
@@ -136,7 +138,7 @@ col_renaming = {
 }
 
 
-def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str):
+def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str, selective_table: bool = False):
     """
     Visualize the results of a set of experiments.
 
@@ -171,7 +173,7 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str):
         
         batch_exp_cfgs = filtered_exp_cfgs
         
-        if batch_cfg.selective_table:
+        if selective_table:
             if name in names_to_cols:
                 col_headers = names_to_cols[name]
             else:
@@ -185,7 +187,7 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str):
         for exp_stats in batch_exp_stats:
             data_rows.append([exp_stats[k] if k in exp_stats else None for k in col_headers])
 
-        if batch_cfg.selective_table and name in names_to_hyperparams:
+        if selective_table and name in names_to_hyperparams:
             hyperparams = names_to_hyperparams[name] + ['exp_name']
         else:
             hyperparams = names_to_hyperparams['batch']
@@ -230,14 +232,16 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str):
         df = pd.DataFrame(data_rows, columns=col_indices, index=row_indices)
         df.sort_index(inplace=True)
 
-        csv_name_multi = os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval_multi.csv')
         csv_name = os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval.csv')
-        # csv_name = r"{}/cross_eval_multi.csv".format(EVAL_DIR)
-        html_name_multi = os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval_multi.html')
         html_name = os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval.html')
-        # html_name = r"{}/cross_eval_multi.html".format(EVAL_DIR)
-        df.to_csv(csv_name_multi)
-        df.to_html(html_name_multi)
+
+        if not selective_table:
+            csv_name_multi = os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval_multi.csv')
+            # csv_name = r"{}/cross_eval_multi.csv".format(EVAL_DIR)
+            html_name_multi = os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval_multi.html')
+            # html_name = r"{}/cross_eval_multi.html".format(EVAL_DIR)
+            df.to_csv(csv_name_multi)
+            df.to_html(html_name_multi)
 
         for k in col_indices:
             if k in df:
@@ -297,7 +301,7 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str):
                                 col_name=k)
             )
     
-    raw_tbl_tex_name = f'{task}_{name}_cross_eval{("_selective" if batch_cfg.selective_table else "")}.tex'
+    raw_tbl_tex_name = f'{task}_{batch_cfg.sweep_name}_cross_eval{("_selective" if selective_table else "")}.tex'
 
     # df.to_latex(os.path.join(EVAL_DIR, 'cross_eval.tex'), multirow=True)
     pandas_to_latex(
@@ -322,7 +326,7 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str):
     # Replace the template input with path to file
     temp = temp.replace('INPUT', raw_tbl_tex_name)
 
-    tables_tex_name = f"{task}_{name}_table{('_selective' if batch_cfg.selective_table else '')}.tex"
+    tables_tex_name = f"{task}_{name}_table{('_selective' if selective_table else '')}.tex"
 
     # Write the output to a file.
     with open(os.path.join(proj_dir, EVAL_DIR, tables_tex_name), 'w') as f:

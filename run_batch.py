@@ -177,7 +177,9 @@ def main_batch(batch_dict_cfg: BatchConfig):
                 tasks[ec.task].append(ec)
 
         for task, exp_configs in tasks.items():
-            vis_cross_eval(exp_configs, batch_cfg, task)
+            vis_cross_eval(exp_configs, batch_cfg, task, selective_table=False)
+            vis_cross_eval(exp_configs, batch_cfg, task, selective_table=True)
+
 
         return
 
