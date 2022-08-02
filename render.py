@@ -42,6 +42,10 @@ def render_trained(model: PathfindingNN, maze_data, cfg: Config, pyplot_animatio
     render_minibatch_size = min(cfg.render_minibatch_size, mazes_onehot.shape[0])
     path_lengths = target_paths.sum((1, 2))
     path_chan = mazes_discrete[0].max() + 1
+    mazes_discrete = mazes_discrete.cpu()
+    target_paths = target_paths.cpu()
+    path_chan = path_chan.cpu()
+    # mazes_discrete = th.where((mazes_discrete != Tiles.DEST) & (target_paths == 1), path_chan, mazes_discrete)
     mazes_discrete = th.where((mazes_discrete == Tiles.EMPTY) & (target_paths == 1), path_chan, mazes_discrete)
 
     # Render most complex mazes first.
@@ -147,9 +151,9 @@ def render_trained(model: PathfindingNN, maze_data, cfg: Config, pyplot_animatio
                 im = im.permute(2, 1, 0)
                 im = th.vstack([wi for wi in im])
                 im = (im - im.min()) / (im.max() - im.min())
-                im = PIL.Image.fromarray(im.cpu().numpy() * 255)
-                im.show()
-                im.save(open(os.path.join(cfg.log_dir, 'weights.png')))
+                # im = PIL.Image.fromarray(im.cpu().numpy() * 255)
+                # im.show()
+                # im.save(open(os.path.join(cfg.log_dir, 'weights.png')))
         return
 
     # Render live and indefinitely using cv2.

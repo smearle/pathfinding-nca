@@ -19,7 +19,7 @@ def set_exp_name(cfg: Config):
     # In the meantime, using the presence of a hyphen to mean we have set the full `exp_name`:
     cfg.full_exp_name = ''.join([
         f"{cfg.model}",
-        ("_diameter" if cfg.task == "diameter" else ""),
+        (f"_{cfg.task}" if cfg.task != "pathfinding" else ""),
         ("_evoData" if cfg.env_generation is not None else ""),
         ("_noShared" if not cfg.shared_weights else ""),
         ("_noSkip" if not cfg.skip_connections else ""),

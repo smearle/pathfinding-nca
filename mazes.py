@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from pdb import set_trace as TT
 import pickle
+import PIL
 from einops import rearrange
 
 import hydra
@@ -80,14 +81,17 @@ def load_dataset(cfg: Config, test_only: bool = False):
     if not test_only:
         with open(train_fname, 'rb') as f:
             maze_data_train: Mazes = pickle.load(f)
+            maze_data_train.to(cfg.device)
         maze_data_train.get_subset(cfg)
 
         with open(val_fname, 'rb') as f:
             maze_data_val: Mazes = pickle.load(f)
+            maze_data_val.to(cfg.device)
         maze_data_val.get_subset(cfg)
 
     with open(test_fname, 'rb') as f:
         maze_data_test: Mazes = pickle.load(f)
+        maze_data_test.to(cfg.device)
     maze_data_test.get_subset(cfg)
 
     if not test_only:
@@ -172,7 +176,7 @@ class Mazes():
     def get_tiles(self, tiles):
         """Need to give *all* tiles not to be left in maze in in_tiles."""
         mask = th.zeros(self.mazes_onehot.shape)
-        mask[:, np.array(tiles)] = 1
+        mask[:, th.Tensor(tiles).long()] = 1
         mazes_onehot = self.mazes_onehot * mask
         self.mazes_discrete = th.argmax(mazes_onehot, axis=1)
         self.mazes_onehot = self.mazes_onehot[:, np.array(tiles)]
@@ -239,20 +243,24 @@ def render_discrete(arr, cfg):
     wall_color = th.Tensor([0.0, 0.0, 0.0])
     src_color = th.Tensor([1.0, 1.0, 0.0])
     trg_color = th.Tensor([0.0, 1.0, 0.0])
-    dest_color = th.Tensor([0.0, 0.0, 1.0])
+    dest_color = th.Tensor([0.0, 1.0, 1.0])
     path_color = th.Tensor([1.0, 0.0, 0.0])
     colors = {empty_chan: empty_color, wall_chan: wall_color, Tiles.DEST: dest_color}
     colors.update({src_chan: src_color, trg_chan: trg_color, })
-    # colors.update({path_chan: path_color, })
+    colors.update({path_chan: path_color, })
     batch_size, height, width = arr.shape
     im = th.zeros((batch_size, height, width, 3), dtype=th.float32)
+
+    # img = PIL.Image.fromarray(np.uint8(im[0].cpu().numpy()))
+    # Save image
+    # img.save(cfg.log_dir + '/' + 'maze.png')
+    # TT()
 
     for chan, color in colors.items():
         idxs = th.where(arr == chan)
         im[idxs[0], idxs[1], idxs[2], :] = color
 
     im = im.cpu().numpy()
-    TT()
 
     return im
 
@@ -361,7 +369,7 @@ def diameter(width, graph, traveling=True):
     target_traveling, dests_xy = None, None
     if traveling:
         dests = [max_connected.popitem()[0] for i in range(min(len(max_connected), 10))]
-        target_traveling = nx.algorithms.approximation.traveling_salesman_problem(graph, nodes=dests)
+        target_traveling = nx.algorithms.approximation.traveling_salesman_problem(graph, nodes=dests, cycle=True)
         traveling_xy = [(u // width, u % width) for u in target_traveling]
         dests_xy = np.array([(u // width, u % width) for u in dests])
     return max_path_xy, max_connected_xy, traveling_xy, dests_xy
