@@ -137,13 +137,11 @@ class Mazes():
             while not sol:
                 rand_maze_onehot = generate_random_maze(cfg)
                 rand_maze_discrete = rand_maze_onehot.argmax(axis=1)
-                graph, edges, edge_feats, src, trg = get_graph(rand_maze_discrete[0], rand_maze_onehot[0])
+                graph, edges, edge_feats, src, trg = get_graph(rand_maze_onehot[0])
                 # sol = bfs_grid(rand_maze_discrete[0].cpu().numpy())
                 width = rand_maze_discrete.shape[1]
                 sol = bfs_nx(width, graph, src, trg)
                 j += 1
-                if sol is None:
-                    continue
 
             # print(f'Adding maze {i}.')
             solvable_mazes_discrete.append(rand_maze_discrete)
@@ -151,12 +149,19 @@ class Mazes():
             solvable_mazes_edges.append(edges)
             solvable_mazes_edge_feats.append(edge_feats)
             target_path = th.zeros_like(rand_maze_discrete)
-            for x, y in sol:
-                    target_path[0, x, y] = 1
+            sol = np.array(sol)
+            target_path[0, sol[:, 0], sol[:, 1]] = 1
+            if not th.all(th.conv2d(weight=th.Tensor([[[[1,1],[1,1]]]]).float(), input=target_path.float(), bias=th.Tensor([-4])) < 0):
+                TT()
             target_paths.append(target_path)
             # For convenience, we use the same maze in the dataset for the diameter problem.
             diam_xy, connected, traveling_xy, dests_xy = diameter(width, graph, traveling=True)
+
+            # Weirdly adding destinations outside the relevant function :)
             rand_maze_onehot[0, Tiles.DEST, dests_xy[:, 0], dests_xy[:, 1]] = 1
+            # rand_maze_onehot[0, Tiles.WALL, dests_xy[:, 0], dests_xy[:, 1]] = 0 
+            # rand_maze_onehot[0, Tiles.EMPTY, dests_xy[:, 0], dests_xy[:, 1]] = 0
+
             diam_xy = np.array(diam_xy)
             target_diameter = th.zeros_like(rand_maze_discrete)
             target_diameter[0, diam_xy[:, 0], diam_xy[:, 1]] = 1
@@ -217,6 +222,9 @@ def generate_random_maze(cfg):
     # Randomly generate sources/targets.
     src_xs, trg_xs = th.randint(0, width, (2, batch_size)) + 1
     src_ys, trg_ys = th.randint(0, height, (2, batch_size)) + 1
+    while th.any(src_xs == trg_xs & src_ys == trg_ys):
+        src_xs, trg_xs = th.randint(0, width, (2, batch_size)) + 1
+        src_ys, trg_ys = th.randint(0, height, (2, batch_size)) + 1
 
     # Remove wall/empty tiles at location of source/target.
     rand_maze_onehot[:, empty_chan, src_xs, src_ys] = 0
@@ -229,10 +237,10 @@ def generate_random_maze(cfg):
     rand_maze_onehot[:, trg_chan, trg_xs, trg_ys] = 1
 
     # Add TSP destinations.
-    n_dest = 4
-    dest_idxs = th.randint(0, width, (2, n_dest, batch_size))
-    rand_maze_onehot[:, Tiles.WALL, dest_idxs[0], dest_idxs[1]] = 1
-    rand_maze_onehot[:, Tiles.DEST, dest_idxs[0], dest_idxs[1]] = 1
+    # n_dest = 4
+    # dest_idxs = th.randint(0, width, (2, n_dest, batch_size))
+    # rand_maze_onehot[:, Tiles.WALL, dest_idxs[0], dest_idxs[1]] = 1
+    # rand_maze_onehot[:, Tiles.DEST, dest_idxs[0], dest_idxs[1]] = 1
 
     return rand_maze_onehot
 
@@ -280,11 +288,11 @@ adj_coords_2d = np.array([
 ])
 
 
-def get_graph(disc, onehot):
+def get_graph(onehot):
     # TODO: can all be onehot
     src, trg = None, None
     graph = nx.Graph()
-    width, height = disc.shape
+    width, height = onehot.shape[1:]
     size = width * height
     graph.add_nodes_from(range(size))
     edges = []
@@ -292,23 +300,25 @@ def get_graph(disc, onehot):
     # ret = scipy.sparse.csgraph.floyd_warshall(dist)
     for u in range(size):
         ux, uy = u // width, u % width
-        if disc[ux, uy] == Tiles.WALL:
+        if onehot[Tiles.WALL, ux, uy] == 1:
             continue
-        elif disc[ux, uy] == Tiles.SRC:
+        if onehot[Tiles.SRC, ux, uy] == 1:
             src = u
-        elif disc[ux, uy] == Tiles.TRG:
+        if onehot[Tiles.TRG, ux, uy] == 1:
             trg = u
         neighbs_xy = [(ux - 1, uy), (ux, uy-1), (ux+1, uy), (ux, uy+1)]
         adj_feats = [(-1, 0), (0, -1), (1, 0), (0, 1)]
         neighbs = [x * width + y for x, y in neighbs_xy]
         for v, (vx, vy), edge_feat in zip(neighbs, neighbs_xy, adj_feats):
-            if not 0 <= v < size or disc[vx, vy] == Tiles.WALL:
+            if not 0 <= v < size or onehot[Tiles.WALL, vx, vy] == 1:
                 continue
             graph.add_edge(u, v)
             edges.append((u, v))
             edge_feats.append(edge_feat)
         edges.append((u, u))
         edge_feats.append((0, 0))
+    if src is None and src == trg:
+        TT()
     edges = th.Tensor(edges).long()
     edge_feats = th.Tensor(edge_feats).long()
     edges = rearrange(edges, 'e ij -> ij e')
@@ -375,9 +385,9 @@ def diameter(width, graph, traveling=True):
     return max_path_xy, max_connected_xy, traveling_xy, dests_xy
 
 
-def get_rand_path(arr):
-    width, height = arr.shape
-    graph, edges, edge_feats, src, trg, dests = get_graph(arr)
+def get_rand_path(onehot):
+    width, height = onehot.shape[1:]
+    graph, edges, edge_feats, src, trg, dests = get_graph(onehot)
     # srcs = th.argwhere(arr==Tiles.EMPTY)
     # src = srcs[np.random.randint(len(srcs))]
     # src = src[0] * width + src[1]
