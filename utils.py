@@ -12,11 +12,36 @@ from moviepy.video.io.ffmpeg_writer import FFMPEG_VideoWriter
 # import moviepy.editor as mvp
 import numpy as np
 import PIL
-import torch
+import torch as th
 from configs.config import Config
 from models.gnn import GCN
 
 from models.nn import PathfindingNN
+
+
+corner_idxs_3x3 = th.Tensor([
+    [0, 0],
+    [0, -1],
+    [-1, 0],
+    [-1, -1],
+]).long()
+
+# Here we cut the corners and the tiles directly adjacent to the corner. Our hand-coded DFS doesn't use these tiles.
+# This is the most tiles we can exclude while keeping the weight symmetric.
+corner_idxs_5x5 = th.Tensor([
+    [0, 0],
+    [1, 0],
+    [0, 1],
+    [0, -1],
+    [0, -2],
+    [1, -1],
+    [-1, 0],
+    [-2, 0],
+    [-1, 1],
+    [-1, -1],
+    [-2, -1],
+    [-1, -2],
+]).long()
 
 
 class Logger():
@@ -59,8 +84,8 @@ def save(ca, opt, logger, cfg):
     optimizer_path = f'{cfg.log_dir}/{opt_state_fname}'
     backup_file(model_path)
     backup_file(optimizer_path)
-    torch.save(ca.state_dict(), model_path)
-    torch.save(opt.state_dict(), optimizer_path)
+    th.save(ca.state_dict(), model_path)
+    th.save(opt.state_dict(), optimizer_path)
     delete_backup(model_path)
     delete_backup(optimizer_path)
     with open(f'{cfg.log_dir}/{logger_fname}', 'wb') as f:
@@ -68,16 +93,16 @@ def save(ca, opt, logger, cfg):
 
 
 def load(model, opt, cfg):
-    if not torch.cuda.is_available():
-        map_location = torch.device('cpu')
+    if not th.cuda.is_available():
+        map_location = th.device('cpu')
     else:
         map_location = None
     try:
-        model.load_state_dict(torch.load(f'{cfg.log_dir}/{ca_state_fname}', map_location=map_location))
-        opt.load_state_dict(torch.load(f'{cfg.log_dir}/{opt_state_fname}', map_location=map_location))
+        model.load_state_dict(th.load(f'{cfg.log_dir}/{ca_state_fname}', map_location=map_location))
+        opt.load_state_dict(th.load(f'{cfg.log_dir}/{opt_state_fname}', map_location=map_location))
     except Exception:  #FIXME: lol
-        model.load_state_dict(torch.load(f'{cfg.log_dir}/{opt_state_fname}', map_location=map_location))
-        opt.load_state_dict(torch.load(f'{cfg.log_dir}/{ca_state_fname}', map_location=map_location))
+        model.load_state_dict(th.load(f'{cfg.log_dir}/{opt_state_fname}', map_location=map_location))
+        opt.load_state_dict(th.load(f'{cfg.log_dir}/{ca_state_fname}', map_location=map_location))
     logger = pickle.load(open(f'{cfg.log_dir}/{logger_fname}', 'rb'))
     print(f'Loaded CA and optimizer state dict, maze archive, and logger from {cfg.log_dir}.')
 
@@ -99,9 +124,11 @@ def count_parameters(model: PathfindingNN, cfg: Config):
     for name, p in model.named_parameters():
         if "weight" in name:
             if not isinstance(model, GCN) and cfg.cut_conv_corners:
-                # Don't count the corners. (Assume 3x3 convolutional kernels).
-                assert p.shape[-2:] == (3, 3)
-                n_ps = p.numel() * 5/9
+                # Don't count the corners.
+                if p.shape[-2:] == (3, 3):
+                    n_ps = p.numel() * (9 - corner_idxs_3x3.shape[0])/9
+                elif p.shape[-2:] == (5, 5):
+                    n_ps = p.numel() * (25 - corner_idxs_5x5.shape[0])/25
                 assert n_ps % 1 == 0
                 n_params += int(n_ps)
             elif cfg.symmetric_conv:
