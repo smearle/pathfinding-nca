@@ -19,7 +19,8 @@ from evaluate import evaluate
 from mazes import Mazes, Tiles, bfs_grid, diameter, get_rand_path, get_target_diam, get_target_path, render_discrete
 from models.gnn import GCN, GNN
 from models.nn import PathfindingNN
-from utils import backup_file, count_parameters, delete_backup, get_discrete_loss, get_mse_loss, Logger, to_path, save
+from utils import (backup_file, corner_idxs_3x3, corner_idxs_5x5, count_parameters, delete_backup, get_discrete_loss, 
+    get_mse_loss, Logger, to_path, save)
 
 
 def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_data_val: Mazes, 
@@ -138,7 +139,10 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                         # defined by our grid representation of the maze).
                         if not isinstance(model, GNN) and cfg.cut_conv_corners:
                             # Zero out all the corners
-                            p.grad[:, :, 0, 0] = p.grad[:, :, -1, -1] = p.grad[:, :, -1, 0] = p.grad[:, :, 0, -1] = 0
+                            if p.shape[-2:] == (3, 3):
+                                p.grad[:, :, corner_idxs_3x3[:, 0], corner_idxs_3x3[:, 1]] = 0
+                            elif p.shape[-2:] == (5, 5):
+                                p.grad[:, :, corner_idxs_5x5[:, 0], corner_idxs_5x5[:, 1]] = 0
 
                         if cfg.symmetric_conv:
                             # Force the NCA to behave equivalently to a GCN (this is a sanity check).
