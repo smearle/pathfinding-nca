@@ -81,10 +81,30 @@ names_to_hyperparams = {
         'env_generation',
         'n_hid_chan',
     ],
+    'gnn': [
+        "task",
+        "model",
+        "traversable_edges_only",
+        "positional_edge_features",
+        # "env_generation",
+        "n_layers",
+        # "max_pool",
+        # "kernel_size",
+        # "loss_interval",
+        "n_hid_chan",
+        "shared_weights",
+        # "skip_connections",
+        # "cut_conv_corners",
+        # "sparse_update",
+        # "n_data",
+        "learning_rate",
+        "exp_name",
+    ]
 }
 names_to_cols = {
     'default': [
         'n_params',
+        'n_updates',
         'TRAIN_pct_complete',
         # 'TRAIN_completion_time',
         'TEST_pct_complete',
