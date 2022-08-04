@@ -24,7 +24,7 @@ import yaml
 from configs import helper as config_helper
 from configs.config import BatchConfig, Config
 from evaluate import evaluate
-from mazes import load_dataset, Mazes, render_discrete
+from mazes import load_dataset
 from models import BfsNCA, FixedBfsNCA, FixedDfsNCA, GAT, GCN, MLP, NCA
 from models.nn import PathfindingNN
 from render import render_trained

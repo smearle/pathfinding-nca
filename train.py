@@ -16,7 +16,7 @@ import wandb
 from configs.config import Config
 from configs.env_gen import EnvGeneration
 from evaluate import evaluate
-from mazes import Mazes, Tiles, bfs_grid, diameter, get_rand_path, get_target_diam, get_target_path, render_discrete
+from mazes import Mazes, Tiles, bfs_grid, diameter, get_rand_path, get_target_diam, get_target_path, render_multihot
 from models.gnn import GCN, GNN
 from models.nn import PathfindingNN
 from utils import (backup_file, corner_idxs_3x3, corner_idxs_5x5, count_parameters, delete_backup, get_discrete_loss, 
@@ -293,7 +293,7 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 offspring_mazes_onehot = th.zeros(env_gen_cfg.evo_batch_size, cfg.n_in_chan, *offspring_mazes.shape[-2:])
                 offspring_mazes_onehot.scatter_(1, offspring_mazes[:,None,...], 1)
 
-                offspring_maze_ims = render_discrete(offspring_mazes, cfg)
+                offspring_maze_ims = render_multihot(offspring_mazes_onehot, cfg)
                 offspring_env_losses = th.zeros(env_gen_cfg.evo_batch_size)
 
                 # TODO: Get edges of evolved mazes.

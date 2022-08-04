@@ -10,7 +10,7 @@ from matplotlib import animation, pyplot as plt
 import numpy as np
 import torch as th
 from configs.config import Config
-from mazes import Tiles, render_discrete
+from mazes import Tiles, Tilesets, render_multihot
 
 from models.nn import PathfindingNN
 
@@ -60,7 +60,7 @@ def render_trained(model: PathfindingNN, maze_data, cfg: Config, pyplot_animatio
         N_RENDER_EPISODES = len(batch_idxs)
 
     def reset(bi):
-        batch_idx = batch_idxs[th.arange(render_minibatch_size) + bi]
+        batch_idx: int = batch_idxs[th.arange(render_minibatch_size) + bi]
         pool = model.seed(batch_size=mazes_onehot.shape[0], width=cfg.width, height=cfg.height,)
         x = pool[batch_idx]
         x0 = mazes_onehot[batch_idx]
@@ -71,7 +71,8 @@ def render_trained(model: PathfindingNN, maze_data, cfg: Config, pyplot_animatio
         if cfg.positional_edge_features:
             ef = [edge_feats[i] for i in batch_idx]
         model.reset(x0, e0=e0, edge_feats=ef, new_batch_size=True)
-        maze_imgs = np.hstack(render_discrete(mazes_discrete[batch_idx], cfg))
+        # maze_imgs = np.hstack(render_discrete(mazes_discrete[batch_idx], cfg))
+        maze_imgs = np.hstack(render_multihot(arr=mazes_onehot[batch_idx], target_path=target_paths[batch_idx], tileset=cfg.tileset))
         bi = (bi + render_minibatch_size) % mazes_onehot.shape[0]
 
         return x, maze_imgs, bi

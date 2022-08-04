@@ -3,7 +3,7 @@ import numpy as np
 from pdb import set_trace as TT
 import torch as th
 from configs.config import Config
-from mazes import Mazes, render_discrete
+from mazes import Mazes
 from models.nn import PathfindingNN
 
 from utils import Logger, get_discrete_loss, get_mse_loss, to_path

@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from pdb import set_trace as TT
 import pickle
+from typing import Iterable
 import PIL
 from einops import rearrange
 
@@ -12,8 +13,8 @@ import numpy as np
 import scipy
 import torch as th
 from tqdm import tqdm
+from configs.config import Config
 
-from configs.config import BatchConfig, Config
 from grid_to_graph import get_traversable_grid_edges
 
 
@@ -33,6 +34,23 @@ class Tiles:
     DEST = 4
 
     MAX = DEST
+
+class Tilesets:
+
+    class Tileset():
+        # This determines rendering order
+        tiles = []
+        def __init__(self):
+            self.tile_idxs = {tile: i for i, tile in enumerate(self.tiles)}
+
+    class PATHFINDING(Tileset):
+        tiles = [Tiles.EMPTY, Tiles.WALL, Tiles.SRC, Tiles.TRG]
+
+    class DIAMETER(Tileset):
+        tiles = [Tiles.EMPTY, Tiles.WALL]
+
+    class TRAVELING(Tileset):
+        tiles = [Tiles.EMPTY, Tiles.WALL, Tiles.DEST]
 
 
 def get_maze_name_suffix(cfg: Config):
@@ -107,7 +125,8 @@ class Mazes():
             width, height = cfg.width, cfg.height
             self.gen_rand_mazes(cfg.n_data, cfg)
             self.maze_ims = th.Tensor(np.array(
-                [render_discrete(maze_discrete[None,], cfg)[0] for maze_discrete in self.mazes_discrete]
+                # [render_discrete(maze_discrete[None,], cfg)[0] for maze_discrete in self.mazes_discrete]
+                [render_multihot(maze_onehot[None,], cfg)[0] for maze_onehot in self.mazes_onehot]
             ))
         else:
             for k, v in evo_mazes.items():
@@ -192,16 +211,15 @@ class Mazes():
             self.mazes_onehot[:cfg.n_data]
         if cfg.task == 'pathfinding':
             self.target_paths = self.target_paths[:cfg.n_data]
-            self.get_tiles([Tiles.EMPTY, Tiles.WALL, Tiles.SRC, Tiles.TRG])
         elif cfg.task == 'diameter':
             self.target_paths = self.target_diameters[:cfg.n_data]
-            self.get_tiles([Tiles.EMPTY, Tiles.WALL])
         elif cfg.task == 'traveling':
             self.target_paths = self.target_travelings[:cfg.n_data]
-            self.get_tiles([Tiles.EMPTY, Tiles.WALL, Tiles.DEST])
 
         else:
             raise Exception
+
+        self.get_tiles(cfg.tileset.tiles)
 
 
 def generate_random_maze(cfg):
@@ -245,7 +263,58 @@ def generate_random_maze(cfg):
     return rand_maze_onehot
 
 
+def render_multihot(arr, tileset: Tilesets.Tileset, target_path: th.Tensor = None):
+    """_summary_
+
+    Args:
+        arr (th.Tensor): A multi-hot array representing a map in the given domain. May have a variable number of 
+            channels depending on what tile types are relevant.
+        tiles (Iterable[int]): A list of tile types. Where the position of a tile type in the list corresponds to the 
+            position of its channel in the multihot array.
+        target_pa
+
+    Returns:
+        np.ndarray: An array corresponding to an RGB rendering of the map.
+    """
+    # TODO: Pull this out into a global variable or some such.
+    empty_chan, wall_chan, src_chan, trg_chan = Tiles.EMPTY, Tiles.WALL, Tiles.SRC, Tiles.TRG
+    empty_color = th.Tensor([1.0, 1.0, 1.0])
+    wall_color = th.Tensor([0.0, 0.0, 0.0])
+    src_color = th.Tensor([1.0, 1.0, 0.0])
+    trg_color = th.Tensor([0.0, 1.0, 0.0])
+    dest_color = th.Tensor([1.0, 1.0, 0.0])
+    path_color = th.Tensor([1.0, 0.0, 0.0])
+    colors = {empty_chan: empty_color, wall_chan: wall_color, Tiles.DEST: dest_color}
+    colors.update({src_chan: src_color, trg_chan: trg_color, })
+    colors.update({path_chan: path_color, })
+    batch_size, n_chan, height, width = arr.shape
+    im = th.zeros((batch_size, height, width, 3), dtype=th.float32)
+
+    # img = PIL.Image.fromarray(np.uint8(im[0].cpu().numpy()))
+    # Save image
+    # img.save(cfg.log_dir + '/' + 'maze.png')
+
+    render_path = target_path.clone()
+
+    for tile in tileset.tiles:
+        idxs = th.where(arr[:, tileset.tile_idxs[tile], ...] == 1)
+        im[idxs[0], idxs[1], idxs[2], :] = colors[tile]
+
+        # Path will not overwrite e.g. sources, destinations
+        if tile != Tiles.EMPTY:
+            render_path[idxs[0], idxs[1], idxs[2]] = 0
+
+    idxs = th.where(render_path == 1)
+    im[idxs[0], idxs[1], idxs[2], :] = src_color
+
+
+    im = im.cpu().numpy()
+
+    return im
+
+
 def render_discrete(arr, cfg):
+    # DEPRECATED
     empty_chan, wall_chan, src_chan, trg_chan = Tiles.EMPTY, Tiles.WALL, Tiles.SRC, Tiles.TRG
     empty_color = th.Tensor([1.0, 1.0, 1.0])
     wall_color = th.Tensor([0.0, 0.0, 0.0])

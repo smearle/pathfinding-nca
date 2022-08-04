@@ -4,6 +4,7 @@ from pathlib import Path
 import torch as th
 
 from configs.config import Config
+from mazes import Tilesets
 import models
 
 
@@ -38,6 +39,12 @@ def set_exp_name(cfg: Config):
         f"_{cfg.exp_name}",
     ])
     cfg.log_dir = os.path.join(Path(__file__).parent.parent, "runs", cfg.full_exp_name)
+
+    # Initialize the Tileset object and attach it to the global config.
+    cfg.tileset=getattr(
+            Tilesets, cfg.task.upper(),
+        )()
+
 
 def validate(cfg: Config):
     cfg.device = "cuda" if th.cuda.is_available() else "cpu"

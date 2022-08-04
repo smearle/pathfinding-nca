@@ -128,6 +128,9 @@ class Config():
     # Load a config from a file at this path. Will override all other config options.
     load_config_path: Any = None
 
+    # Actually needs to be a Tileset
+    tileset = None
+
     ### For GNNs only -- grid to graph conversion ###
     # TODO: Make this a separate sub-config, active only when we are using GNNs?
     # If False, feed the GNN the entire grid. If True, feed it only traversable nodes and edges.
