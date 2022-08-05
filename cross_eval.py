@@ -17,6 +17,14 @@ from mazes import load_dataset
 
 EVAL_DIR = os.path.join(Path(__file__).parent, 'runs_eval')
 
+# Are we collecting stats over multiple trials? If so, take standard deviation of metrics over these trials. Otherwise,
+# use standard deviation of the metric from evaluation of the single trial's model.
+MULTI_TRIAL = False
+
+def newline(t0, t1, align="r"):
+    assert align in ["l", "r", "c"]
+    return "\\begin{tabular}["+align+"]{@{}"+align+"@{}}" + t0 + "\\\ " + t1 + "\\end{tabular}"
+
 model_stat_keys = set({
     'n params'
 })
@@ -64,6 +72,7 @@ names_to_hyperparams = {
         'model',
         'n_layers',
         'n_hid_chan',
+        'traversable_edges_only',
     ],
     'max_pool': [
         'model',
@@ -81,30 +90,36 @@ names_to_hyperparams = {
         'env_generation',
         'n_hid_chan',
     ],
-    'gnn': [
-        "task",
+    'gnn_grid_rep': [
         "model",
         "traversable_edges_only",
-        "positional_edge_features",
+        "n_layers",
+        "n_hid_chan",
+    ],
+    'gnn': [
+        # "task",
+        "model",
+        "traversable_edges_only",
+        # "positional_edge_features",
         # "env_generation",
         "n_layers",
         # "max_pool",
         # "kernel_size",
         # "loss_interval",
         "n_hid_chan",
-        "shared_weights",
+        # "shared_weights",
         # "skip_connections",
         # "cut_conv_corners",
         # "sparse_update",
         # "n_data",
-        "learning_rate",
-        "exp_name",
-    ]
+        # "learning_rate",
+        # "exp_name",
+    ],
 }
 names_to_cols = {
     'default': [
         'n_params',
-        'n_updates',
+        # 'n_updates',
         'TRAIN_pct_complete',
         # 'TRAIN_completion_time',
         'TEST_pct_complete',
@@ -148,7 +163,9 @@ names_to_cols = {
 }
 hyperparam_renaming = {
     'n hid chan': 'n. hid chan',
+    'n layers': 'n. layers',
     'cut conv corners': 'cut corners',
+    'traversable edges only': newline('traversable', 'edges only'),
 }
 col_renaming = {
     'n params': 'n. params',
@@ -271,33 +288,34 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str, se
                                     col_name=k)
                 )
 
-        # Take mean/std over multiple runs with the same relevant hyperparameters
-        new_rows = []
-        new_row_names = []
-        # Get some p-values for statistical significance
-        for i in range(df.shape[0]):
-            row = df.iloc[i]
-            row_name = row.name
-            if row_name[:-1] in new_row_names:
-                continue
-            new_row_names.append(row_name[:-1])
-            repeat_exps = df.loc[row_name[:-1]]
-            mean_exp = repeat_exps.mean(axis=0)
-            std_exp = repeat_exps.std(axis=0)
-            mean_exp = [(i, e) for i, e in zip(mean_exp, std_exp)]
-            new_rows.append(mean_exp)
-        ndf = pd.DataFrame()
-        ndf = ndf.append(new_rows)
-        new_col_indices = pd.MultiIndex.from_tuples(df.columns)
-        new_row_indices = pd.MultiIndex.from_tuples(new_row_names)
-        ndf.index = new_row_indices
-        ndf.columns = new_col_indices
-        ndf.index.names = df.index.names[:-1]
-        ndf = ndf
-        ndf.to_csv(csv_name)
-        ndf.to_html(html_name)
+        if MULTI_TRIAL:
+            # Take mean/std over multiple runs with the same relevant hyperparameters
+            new_rows = []
+            new_row_names = []
+            # Get some p-values for statistical significance
+            for i in range(df.shape[0]):
+                row = df.iloc[i]
+                row_name = row.name
+                if row_name[:-1] in new_row_names:
+                    continue
+                new_row_names.append(row_name[:-1])
+                repeat_exps = df.loc[row_name[:-1]]
+                mean_exp = repeat_exps.mean(axis=0)
+                std_exp = repeat_exps.std(axis=0)
+                mean_exp = [(i, e) for i, e in zip(mean_exp, std_exp)]
+                new_rows.append(mean_exp)
+            ndf = pd.DataFrame()
+            ndf = ndf.append(new_rows)
+            new_col_indices = pd.MultiIndex.from_tuples(df.columns)
+            new_row_indices = pd.MultiIndex.from_tuples(new_row_names)
+            ndf.index = new_row_indices
+            ndf.columns = new_col_indices
+            ndf.index.names = df.index.names[:-1]
+            ndf = ndf
+            ndf.to_csv(csv_name)
+            ndf.to_html(html_name)
 
-        df = ndf
+            df = ndf
 
 
         # df.to_csv(os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval.csv'))
@@ -371,8 +389,11 @@ def preprocess_values(data, col_name=None):
     if col_name[-1] not in set({"completion time", "n_params"}):
         data *= 100
         err *= 100
-    # return data, err
-    return data
+    if MULTI_TRIAL:
+        # Then we don't care about this intra-trial standard deviation
+        return data
+    else:
+        return data, err
 
 
 def bold_extreme_values(data, data_max=-1, col_name=None):
@@ -381,7 +402,9 @@ def bold_extreme_values(data, data_max=-1, col_name=None):
     # hack
     
     if col_name[-1] in set({"n. params", "n. updates"}):
-        data, err = data
+        if MULTI_TRIAL:
+            # Here we've ended up with a meaningless (?) standard deviation over these metrics, which *should* be constant.
+            data, err = data
         return '{:,}'.format(int(data))
 
     if isinstance(data, int):

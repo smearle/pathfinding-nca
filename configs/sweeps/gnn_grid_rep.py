@@ -7,9 +7,9 @@ from configs.sweeps.all import HyperSweepConfig
 
 
 @dataclass
-class GNNSweep(HyperSweepConfig):
+class GNNGridRepSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
-    name: str = 'gnn'
+    name: str = 'gnn_grid_rep'
     exp_name: List[Any] = field(default_factory=lambda: [
         # "0",
         # "1",
@@ -39,14 +39,14 @@ class GNNSweep(HyperSweepConfig):
     ])
     model: List[Any] = field(default_factory=lambda: [
         # "NCA",
-        "GAT",
+        # "GAT",
         "GCN",
         # "MLP",
         # "FixedBfsNCA",
         # "FixedDfsNCA",
     ])
     traversable_edges_only: List[Any] = field(default_factory=lambda: [
-        # False,
+        False,
         True,
     ])
     positional_edge_features: List[Any] = field(default_factory=lambda: [
@@ -69,8 +69,8 @@ class GNNSweep(HyperSweepConfig):
     # #     # 32,
         # 48,
         96,
-        # 128,
-        256,
+        128,
+        # 256,
         # 512,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [

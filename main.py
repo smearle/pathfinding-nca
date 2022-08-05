@@ -114,13 +114,13 @@ def main_experiment(cfg: Config = None, cfg_path: str = None):
             else:
                 print("Attempting to start experiment from scratch (not overwriting).")
 
-        if cfg.evaluate:
-            log_stats(model, logger, cfg)
-            evaluate(model, maze_data_train, cfg.val_batch_size, "train", cfg, is_eval=True)
-            evaluate(model, maze_data_test, cfg.val_batch_size, "test", cfg, is_eval=True)
-            if cfg.model != "MLP":
-                evaluate(model, maze_data_test_32, cfg.val_batch_size, "test_32", cfg_32, is_eval=True)
-            return
+    if cfg.evaluate:
+        log_stats(model, logger, cfg)
+        evaluate(model, maze_data_train, cfg.val_batch_size, "train", cfg, is_eval=True)
+        evaluate(model, maze_data_test, cfg.val_batch_size, "test", cfg, is_eval=True)
+        if cfg.model != "MLP":
+            evaluate(model, maze_data_test_32, cfg.val_batch_size, "test_32", cfg_32, is_eval=True)
+        return
 
     if not loaded:
         if cfg.overwrite and os.path.exists(cfg.log_dir):

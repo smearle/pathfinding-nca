@@ -10,7 +10,7 @@ from configs.sweeps.all import HyperSweepConfig
 @dataclass
 class KernelSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
-    n_updates: int = 100000
+    n_updates: int = 50000
 
     name: str = 'kernel'
 
@@ -19,18 +19,20 @@ class KernelSweep(HyperSweepConfig):
         # "3",
         # "4",
         # "5",
+        # "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
         # "debug",
 
-        # "8",
-        # "9",
-        # "10",
-        # "11",
         # "12",
         # "13"
-        "scratch"
+        # "scratch"
     ])
-    cut_corners: List[Any] = field(default_factory=lambda: [
-        # True,
+    cut_conv_corners: List[Any] = field(default_factory=lambda: [
+        True,
         False,
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
@@ -50,7 +52,7 @@ class KernelSweep(HyperSweepConfig):
         3,
     ])
     max_pool: List[Any] = field(default_factory=lambda: [
-        # True,
+        True,
         False,
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
@@ -64,9 +66,9 @@ class KernelSweep(HyperSweepConfig):
 
         # 48,
         # 96,
-        # 128,
+        128,
 
-        256,
+        # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
         # 48,

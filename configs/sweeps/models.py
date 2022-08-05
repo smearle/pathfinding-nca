@@ -21,28 +21,33 @@ class ModelSweep(HyperSweepConfig):
         # "3",
         # "4",
         # "5",
+        "6",
 
-        "8",
-        "9",
-        "10",
-        "11",
-        "12",
+        # "8",
+        # "9",
+        # "10",
+        # "11",
+        # "12",
     ])
     task: List[Any] = field(default_factory=lambda: [
-        "diameter",
+        # "diameter",
         "pathfinding",
     ])
     shared_weights: List[bool] = field(default_factory=lambda: [
         True,
         # False
     ])
+    traversable_edges_only: List[bool] = field(default_factory=lambda: [
+        True,
+        False,
+    ])
     n_layers: List[Any] = field(default_factory=lambda: [
         # 4,
         # 8,
-        16,
+        # 16,
         # 24,
         # 32,
-        # 64,
+        64,
         # 96,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
@@ -52,20 +57,21 @@ class ModelSweep(HyperSweepConfig):
         # 32,
         # 48,
         96,
-        128,
+        # 128,
         256,
         # 512,
     ])
     loss_interval: List[Any] = field(default_factory=lambda: [
+        None,
         # 4,
         # 8,
-        16,
+        # 16,
         # 32,
         # 64,
     ])
     learning_rate: List[Any] = field(default_factory=lambda: [
-        # 0.0001,
-        0.00005,
+        0.0001,
+        # 0.00005,
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
         None,

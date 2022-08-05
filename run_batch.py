@@ -198,6 +198,10 @@ def main_batch(batch_dict_cfg: BatchConfig):
     # experiment_names = []
     for exp_cfg in exp_configs:
         if not batch_cfg.slurm:
+            if batch_cfg.load and batch_cfg.evaluate and not os.path.exists(exp_cfg.log_dir):
+                print(f"Experiment log directory does not exist: {exp_cfg.log_dir}")
+                print("Skipping experiment.")
+                continue
             try:
                 main_experiment(exp_cfg)
             except Exception as e:
