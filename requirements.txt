@@ -5,6 +5,7 @@ moviepy
 networkx
 numpy
 opencv-python
+pandas
 Pillow
 pyyaml
 scienceplots
