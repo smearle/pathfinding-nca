@@ -12,17 +12,19 @@ class WeightSharingSweep(HyperSweepConfig):
     name: str = 'shared_weights'
 
     exp_name: List[Any] = field(default_factory=lambda: [
-        # "2",
-        # "3",
-        # "4",
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
         # "5",
-
+        # "6",
         # "7",
-        "8",
-        "9",
-        "10",
-        "11",
-        "12",
+        # "8",
+        # "9",
+        # "10",
+        # "11",
+        # "12",
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
         None,
@@ -30,7 +32,7 @@ class WeightSharingSweep(HyperSweepConfig):
     ])
     task: List[Any] = field(default_factory=lambda: [
         "pathfinding",
-        "diameter",
+        # "diameter",
     ])
     model: List[Any] = field(default_factory=lambda: [
         "NCA",

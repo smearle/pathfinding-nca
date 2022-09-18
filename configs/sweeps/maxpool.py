@@ -14,16 +14,19 @@ class MaxPoolSweep(HyperSweepConfig):
     name: str = 'max_pool'
 
     exp_name: List[Any] = field(default_factory=lambda: [
-        # "2",
-        # "2_200k",
-        # "3",
-        # "debug",
-
-        "8",
-        "9",
-        "10",
-        "11",
-        "12",
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        # "5",
+        # "6",
+        # "7",
+        # "8",
+        # "9",
+        # "10",
+        # "11",
+        # "12",
     ])
     model: List[Any] = field(default_factory=lambda: [
         "NCA",
@@ -46,8 +49,8 @@ class MaxPoolSweep(HyperSweepConfig):
         False,
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
-        # True,
-        False,
+        True,
+        # False,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
         # 4,
@@ -70,8 +73,8 @@ class MaxPoolSweep(HyperSweepConfig):
         # 4,
         # 8,
         # 16,
-        32,
-        # 64,
+        # 32,
+        64,
     ])
     # symmetric_conv: List[Any] = field(default_factory=lambda: [
         # True,

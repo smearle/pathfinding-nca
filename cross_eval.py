@@ -19,7 +19,7 @@ EVAL_DIR = os.path.join(Path(__file__).parent, 'runs_eval')
 
 # Are we collecting stats over multiple trials? If so, take standard deviation of metrics over these trials. Otherwise,
 # use standard deviation of the metric from evaluation of the single trial's model.
-MULTI_TRIAL = False
+MULTI_TRIAL = True
 
 def newline(t0, t1, align="r"):
     assert align in ["l", "r", "c"]

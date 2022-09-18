@@ -76,6 +76,8 @@ def main_batch(batch_dict_cfg: BatchConfig):
 
     # Generate dataset of mazes if necessary.
     if batch_cfg.gen_new_data:
+        # To set tileset only!
+        config_helper.set_exp_name(batch_cfg)
         if 'n_data' in batch_hyperparams:
             setattr(batch_cfg, 'n_data', max(batch_hyperparams['n_data']))
         main_mazes(batch_cfg)

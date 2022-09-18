@@ -10,8 +10,8 @@ import models
 
 def set_exp_name(cfg: Config):
     # BACKWARD COMPATABILITY HACK. FIXME: Remove this when all experiments from before `full_exp_name` are obsolete.
-    if '-' in cfg.exp_name:
-        cfg.exp_name = cfg.exp_name.split('_')[-1]
+    # if '-' in cfg.exp_name:
+        # cfg.exp_name = cfg.exp_name.split('_')[-1]
 
     # assert '-' not in self.exp_name, "Cannot have hyphens in `exp_name` (to allow for a backward compatibility hack)"
     validate(cfg)

@@ -263,7 +263,7 @@ def generate_random_maze(cfg):
     return rand_maze_onehot
 
 
-def render_multihot(arr, tileset: Tilesets.Tileset, target_path: th.Tensor = None):
+def render_multihot(arr, cfg: Config, target_path: th.Tensor = None):
     """_summary_
 
     Args:
@@ -276,6 +276,7 @@ def render_multihot(arr, tileset: Tilesets.Tileset, target_path: th.Tensor = Non
     Returns:
         np.ndarray: An array corresponding to an RGB rendering of the map.
     """
+    tileset: Tilesets.Tileset = cfg.tileset
     # TODO: Pull this out into a global variable or some such.
     empty_chan, wall_chan, src_chan, trg_chan = Tiles.EMPTY, Tiles.WALL, Tiles.SRC, Tiles.TRG
     empty_color = th.Tensor([1.0, 1.0, 1.0])
@@ -294,18 +295,23 @@ def render_multihot(arr, tileset: Tilesets.Tileset, target_path: th.Tensor = Non
     # Save image
     # img.save(cfg.log_dir + '/' + 'maze.png')
 
-    render_path = target_path.clone()
+    if target_path is None:
+        render_path = None
+    else:
+        render_path = target_path.clone()
 
     for tile in tileset.tiles:
         idxs = th.where(arr[:, tileset.tile_idxs[tile], ...] == 1)
         im[idxs[0], idxs[1], idxs[2], :] = colors[tile]
 
         # Path will not overwrite e.g. sources, destinations
-        if tile != Tiles.EMPTY:
+        if tile != Tiles.EMPTY and render_path is not None:
             render_path[idxs[0], idxs[1], idxs[2]] = 0
 
-    idxs = th.where(render_path == 1)
-    im[idxs[0], idxs[1], idxs[2], :] = src_color
+    if render_path is not None:
+        idxs = th.where(render_path == 1)
+        # wtf?
+        im[idxs[0], idxs[1], idxs[2], :] = src_color
 
 
     im = im.cpu().numpy()
