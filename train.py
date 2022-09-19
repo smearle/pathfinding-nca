@@ -16,7 +16,7 @@ import wandb
 from configs.config import Config
 from configs.env_gen import EnvGeneration
 from evaluate import evaluate
-from mazes import Mazes, Tiles, bfs_grid, diameter, get_rand_path, get_target_diam, get_target_path, render_multihot
+from mazes import Mazes, Tiles, bfs_grid, diameter, get_shortest_path, get_target_diam, get_target_path, render_multihot
 from models.gnn import GCN, GNN
 from models.nn import PathfindingNN
 from utils import (backup_file, corner_idxs_3x3, corner_idxs_5x5, count_parameters, delete_backup, get_discrete_loss, 
@@ -25,6 +25,7 @@ from utils import (backup_file, corner_idxs_3x3, corner_idxs_5x5, count_paramete
 
 def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_data_val: Mazes, 
         maze_data_test_32: Mazes, target_paths: th.Tensor, logger: Logger, cfg: Config, cfg_32):
+    loss_fn = cfg.loss_fn
     tb_writer = SummaryWriter(log_dir=cfg.log_dir)
     mazes_onehot, edges, edge_feats, maze_ims = maze_data.mazes_onehot, maze_data.edges, maze_data.edge_feats, \
         maze_data.maze_ims
@@ -105,8 +106,8 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
 
             # loss += get_mse_loss(x, target_paths_mini_batch)
             out_paths = to_path(x)
-            err = (out_paths - target_paths_mini_batch).square()
-            batch_errs = err.mean(dim=(1, 2))
+            batch_errs = loss_fn(out_paths, target_paths_mini_batch)
+            # err = (out_paths - target_paths_mini_batch).square()
             loss = loss + batch_errs.mean()
 
             if cfg.env_generation:
@@ -226,7 +227,9 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
             if i == cfg.n_updates - 1:
                 vis_train(logger, render_maze_ims, render_paths, target_path_ims, render_batch_idx, cfg)
 
-            if env_gen_cfg is not None and loss < 1e-2 and last_evo >= env_gen_cfg.gen_interval:
+            evo_loss_thresh = 1e-2
+            # evo_loss_thresh = 1
+            if env_gen_cfg is not None and loss < evo_loss_thresh and last_evo >= env_gen_cfg.gen_interval:
             # if True:
                 last_evo = 0
                 # and i % env_gen_cfg.gen_interval == 0 \
@@ -256,30 +259,63 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
 
                 if cfg.task == "pathfinding":
                     # Mutate the source and target positions
-                    src_idxs = th.where(offspring_mazes_onehot[:, Tiles.SRC] == 1)
-                    trg_idxs = th.where(offspring_mazes_onehot[:, Tiles.TRG] == 1)
+                    src_idxs = th.argwhere(offspring_mazes_onehot[:, Tiles.SRC] == 1)
+                    trg_idxs = th.argwhere(offspring_mazes_onehot[:, Tiles.TRG] == 1)
+                    assert not th.any(th.sum(src_idxs == trg_idxs, 1) == 3)
+                    # Evolve 5% of sources, 5% of targets.
                     src_mut_mask = th.rand(evo_batch_size) < 0.05
                     trg_mut_mask = th.rand(evo_batch_size) < 0.05
-                    src_mut = th.randint(0, max(cfg.width, cfg.height), (2, evo_batch_size)) * src_mut_mask
-                    src_idxs_o = (src_idxs[0], (src_idxs[1] + src_mut[0]) % cfg.width, (src_idxs[2] + src_mut[1]) % cfg.height)
-                    trg_mut = th.randint(0, max(cfg.width, cfg.height), (2, evo_batch_size)) * trg_mut_mask
-                    trg_idxs_o = (trg_idxs[0], (trg_idxs[1] + trg_mut[0]) % cfg.width, (trg_idxs[2] + trg_mut[1]) % cfg.height)
+                    # Uniform randomly select new source/target locations.
+                    # We'll use this heatmap, prefering max values to be our new location.
+                    src_trg_loc_heat = th.rand((2, *offspring_mazes.shape))
+                    src_trg_loc_heat[:, :, :, 0] = src_trg_loc_heat[:, :, :, -1] = -1
+                    src_trg_loc_heat[:, :, 0, :] = src_trg_loc_heat[:, :, -1, :] = -1
+                    src_loc_heat, trg_loc_heat = src_trg_loc_heat
+                    # Don't let mutating sources overwrite old targets, in case we don't end up mutating the 
+                    # corresponding target.
+                    src_loc_heat[tuple(trg_idxs[:, i] for i in range(trg_idxs.shape[1]))] = -1
+                    # New sources can be anywhere.
+                    src_idxs_o = (src_loc_heat == 
+                        th.max(src_loc_heat, dim=-2, keepdim=True)[0].max(dim=-1, keepdim=True)[0]).nonzero()
+                    src_idxs[src_mut_mask] = src_idxs_o[src_mut_mask]
+                    # Going from `argwhere` type indices to `where` type ones (tuples)
+                    src_idxs = tuple(src_idxs[:, i] for i in range(src_idxs.shape[1]))
+                    # We mask out the new sources to ensure new targets don't overlap.
+                    trg_loc_heat[src_idxs] = -1
+                    trg_idxs_o = (trg_loc_heat == 
+                        th.max(trg_loc_heat, dim=-2, keepdim=True)[0].max(dim=-1, keepdim=True)[0]).nonzero()
+                    trg_idxs[trg_mut_mask] = trg_idxs_o[trg_mut_mask]
+                    trg_idxs = tuple(trg_idxs[:, i] for i in range(trg_idxs.shape[1]))
 
-                    offspring_mazes[src_idxs_o] = Tiles.SRC
-                    offspring_mazes[trg_idxs_o] = Tiles.TRG
+                    # src_mut = th.randint(0, max(cfg.width, cfg.height), (2, evo_batch_size)) * src_mut_mask
+                    # src_idxs_o = (src_idxs[0], (src_idxs[1] + src_mut[0]) % cfg.width, (src_idxs[2] + src_mut[1]) % cfg.height)
+                    # trg_mut = th.randint(0, max(cfg.width, cfg.height), (2, evo_batch_size)) * trg_mut_mask
+                    # trg_idxs_o = (trg_idxs[0], (trg_idxs[1] + trg_mut[0]) % cfg.width, (trg_idxs[2] + trg_mut[1]) % cfg.height)
+
+                    # Place source and target inside borders.
+                    offspring_mazes[src_idxs] = Tiles.SRC
+                    offspring_mazes[trg_idxs] = Tiles.TRG
+                    n_src = th.sum(offspring_mazes == Tiles.SRC)
+                    assert not (n_src != th.sum(offspring_mazes == Tiles.TRG) or n_src != evo_batch_size)
+                    # assert th.sum(offspring_mazes == Tiles.SRC) == th.sum(offspring_mazes == Tiles.TRG) == evo_batch_size
+
+                offspring_mazes = offspring_mazes.type(th.int64)
+                offspring_mazes_onehot = th.zeros(env_gen_cfg.evo_batch_size, cfg.n_in_chan, *offspring_mazes.shape[-2:])
+                offspring_mazes_onehot.scatter_(1, offspring_mazes[:,None,...], 1)
 
                 # Get their solutions.
                 offspring_target_paths = th.zeros_like(offspring_maze_walls[:])
                 if cfg.task == 'pathfinding':
                     # sols = pool.map(get_target_path, [maze_discrete for maze_discrete in offspring_mazes.cpu()])
-                    sols_edges_feats = [get_target_path(maze_discrete, cfg) for maze_discrete in offspring_mazes.cpu()]
+                    sols_edges_feats = [get_target_path(maze_onehot, cfg) for maze_onehot in offspring_mazes_onehot.cpu()]
                     sols, edges_o, edges_feats_o = zip(*sols_edges_feats)
                 elif cfg.task == 'diameter':
                     # sols = pool.map(get_target_diam, [maze_discrete for maze_discrete in offspring_mazes.cpu()])
-                    sols = [get_target_diam(maze_discrete, cfg) for maze_discrete in offspring_mazes.cpu()]
+                    sols = [get_target_diam(maze_onehot, cfg) for maze_onehot in offspring_mazes.cpu()]
                 else:
                     raise Exception
 
+                # Encode the solutions as 2D binary path arrays in either case.
                 for si, sol in enumerate(sols):
                     if len(sol) == 0:
                         continue
@@ -288,10 +324,6 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
 
                 # for mi, maze_discrete in enumerate(offspring_mazes):
                     # get_target_path(maze_discrete)
-
-                offspring_mazes = offspring_mazes.type(th.int64)
-                offspring_mazes_onehot = th.zeros(env_gen_cfg.evo_batch_size, cfg.n_in_chan, *offspring_mazes.shape[-2:])
-                offspring_mazes_onehot.scatter_(1, offspring_mazes[:,None,...], 1)
 
                 offspring_maze_ims = render_multihot(offspring_mazes_onehot, cfg)
                 offspring_env_losses = th.zeros(env_gen_cfg.evo_batch_size)
@@ -305,8 +337,8 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                         x = model(x)
 
                     out_paths = to_path(x)
-                    err = (out_paths - offspring_target_paths).square()
-                    batch_errs = err.mean(dim=(1, 2))
+                    batch_errs = loss_fn(out_paths, offspring_target_paths)
+                    # err = (out_paths - offspring_target_paths).square()
                     offspring_env_losses += batch_errs
 
                 offspring_env_losses /= n_subepisodes

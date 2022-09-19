@@ -18,6 +18,10 @@ from configs.config import Config
 from grid_to_graph import get_traversable_grid_edges
 
 
+# TODO: We should generate and store data for pathfinding, diameter, TSP separately, in case we want different types of
+#  mazes for different tasks. (For now, we generate multi-hot mazes that share walls.)
+
+
 maze_data_fname = os.path.join(Path(__file__).parent, os.path.join("data", "maze_data"))
 path_chan = 4
 
@@ -51,6 +55,9 @@ class Tilesets:
 
     class TRAVELING(Tileset):
         tiles = [Tiles.EMPTY, Tiles.WALL, Tiles.DEST]
+
+    MAZE_GEN = DIAMETER
+    PATHFINDING_SOLNFREE = PATHFINDING
 
 
 def get_maze_name_suffix(cfg: Config):
@@ -157,6 +164,7 @@ class Mazes():
                 rand_maze_onehot = generate_random_maze(cfg)
                 rand_maze_discrete = rand_maze_onehot.argmax(axis=1)
                 graph, edges, edge_feats, src, trg = get_graph(rand_maze_onehot[0])
+                assert not src == trg:
                 # sol = bfs_grid(rand_maze_discrete[0].cpu().numpy())
                 width = rand_maze_discrete.shape[1]
                 sol = bfs_nx(width, graph, src, trg)
@@ -215,6 +223,15 @@ class Mazes():
             self.target_paths = self.target_diameters[:cfg.n_data]
         elif cfg.task == 'traveling':
             self.target_paths = self.target_travelings[:cfg.n_data]
+        elif cfg.task == 'maze_gen':
+            pass
+            # tp = th.zeros_like(self.mazes_discrete)
+            # tp[:, :, 4] = 1
+            # tp[:, 4, :] = 1
+            # self.target_paths = tp
+        elif cfg.task == 'pathfinding_solnfree':
+            # Inside the loss function, we'll compute path length.
+            pass  
 
         else:
             raise Exception
@@ -240,7 +257,7 @@ def generate_random_maze(cfg):
     # Randomly generate sources/targets.
     src_xs, trg_xs = th.randint(0, width, (2, batch_size)) + 1
     src_ys, trg_ys = th.randint(0, height, (2, batch_size)) + 1
-    while th.any(src_xs == trg_xs & src_ys == trg_ys):
+    while th.any((src_xs == trg_xs) & (src_ys == trg_ys)):
         src_xs, trg_xs = th.randint(0, width, (2, batch_size)) + 1
         src_ys, trg_ys = th.randint(0, height, (2, batch_size)) + 1
 
@@ -392,8 +409,9 @@ def get_graph(onehot):
             edge_feats.append(edge_feat)
         edges.append((u, u))
         edge_feats.append((0, 0))
-    if src is None and src == trg:
-        TT()
+    assert not (src is None and src == trg)
+    # if src is None and src == trg:
+        # TT()
     edges = th.Tensor(edges).long()
     edge_feats = th.Tensor(edge_feats).long()
     edges = rearrange(edges, 'e ij -> ij e')
@@ -460,9 +478,9 @@ def diameter(width, graph, traveling=True):
     return max_path_xy, max_connected_xy, traveling_xy, dests_xy
 
 
-def get_rand_path(onehot):
+def get_shortest_path(onehot):
     width, height = onehot.shape[1:]
-    graph, edges, edge_feats, src, trg, dests = get_graph(onehot)
+    graph, edges, edge_feats, src, trg = get_graph(onehot)
     # srcs = th.argwhere(arr==Tiles.EMPTY)
     # src = srcs[np.random.randint(len(srcs))]
     # src = src[0] * width + src[1]
@@ -477,10 +495,10 @@ def get_rand_path(onehot):
     return path_xy, edges, edge_feats
 
 
-def get_target_path(maze_discrete, cfg):
+def get_target_path(maze_onehot, cfg):
     if cfg.task == 'pathfinding':
         # TODO: need to constrain mutation of sources and targets for this task.
-        sol, edges, edge_feats = get_rand_path(maze_discrete)
+        sol, edges, edge_feats = get_shortest_path(maze_onehot)
         # for (x, y) in sol:
             # offspring_target_paths[mi, x, y] = 1
         return sol, edges, edge_feats

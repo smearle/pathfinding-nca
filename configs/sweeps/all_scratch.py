@@ -2,17 +2,19 @@ from dataclasses import dataclass, field
 from typing import Any, List
 import hydra
 
-from configs.env_gen import EnvGeneration
+from configs.env_gen import EnvGeneration, EnvGeneration2
 from configs.sweeps.all import HyperSweepConfig
 
 
 @dataclass
 class ScratchSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
-    name: str = 'scratch'
-    log_interval = 100
-    save_interval = 100
+    exp_name: str = 'scratch'
+    log_interval = 2
+    save_interval = 2
     exp_name: List[Any] = field(default_factory=lambda: [
+        # "0",
+        # "1",
         # "2",
         # "3",
         # "4",
@@ -22,13 +24,15 @@ class ScratchSweep(HyperSweepConfig):
         "scratch",
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
-        # EnvGeneration(),
-        None,
+        EnvGeneration2(),
+        # None,
     ])
     task: List[Any] = field(default_factory=lambda: [
-        # "pathfinding",
+        "pathfinding",
+        # "pathfinding_solnfree",
         # "diameter",
-        "traveling",
+        # "traveling",
+        # "maze_gen",
     ])
     max_pooling: List[Any] = field(default_factory=lambda: [
         # True,
@@ -60,22 +64,22 @@ class ScratchSweep(HyperSweepConfig):
         False,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
-        14,
+        # 14,
         # 8,
         # 16,
         # 24,
-    # #     # 32,
-        # 48,
+        # 32,
+        48,
         # 96,
         # 128,
         # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
         # 16,
-    # #     # 48,
+        # 48,
         64,
-    #     # 96,
-    # #     # 128,
+        # 96,
+        # 128,
     ])
     # loss_interval: List[Any] = field(default_factory=lambda: [
         # 4,

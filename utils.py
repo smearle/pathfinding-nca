@@ -14,7 +14,9 @@ import numpy as np
 import PIL
 import torch as th
 from configs.config import Config
+from mazes import Tiles
 from models.gnn import GCN
+from render import N_RENDER_CHANS, render_ep_cv2
 
 from models.nn import PathfindingNN
 
@@ -152,20 +154,73 @@ def to_path(x):
     return x[:, -1, :, :]
 
 
-def get_mse_loss(x, target_paths):
-    paths = to_path(x)
-    # overflow_loss = (x-x.clamp(-1.0, 1.0)).abs().sum()
-    err = paths - target_paths
-    # err = (paths - paths.min(dim)) / (paths.max() - paths.min()) - path_targets
-    loss = err.square().mean()    #+ overflow_loss
-    return loss
+def get_mse_loss(paths, target_paths, cfg=None):
+    # Assuming dimension 0 is batch dimension.
+    err = (paths - target_paths).square().mean(dim=(1, 2))
+    return err
 
 
-def get_discrete_loss(x, target_paths):
+def get_discrete_loss(x, target_paths, cfg=None):
     paths = to_path(x).round()
     err = paths - target_paths
     loss = err.square()  #.float().mean()    #+ overflow_loss
     return loss
+
+
+def solnfree_pathfinding_loss(paths, target_paths, hillclimbing_model):
+    x = th.zeros((paths.shape[0], hillclimbing_model.n_in_chan, paths.shape[1], paths.shape[2]), device=paths.device)
+    x[:, Tiles.WALL] = paths
+    x[:, Tiles.SRC, 0, 0] = 1
+    x[:, Tiles.SRC, -1, -1] = 1
+    hillclimbing_model.reset(initial_maze=x)
+    x = th.zeros((paths.shape[0], hillclimbing_model.n_hid_chan, paths.shape[1], paths.shape[2]), device=paths.device)
+    for i in range(64):
+        x = hillclimbing_model(x)
+    return x[:, hillclimbing_model.path_chan, :, :].sum(dim=(-1, -2))
+
+
+def test_maze_gen_loss(wall_empty, target_paths, pathfinding_mode, cfg):
+    print('fuzziness', th.mean(th.abs(wall_empty - 0.5)).item())
+    # return 1 - th.mean(th.abs(wall_empty - 0.5))
+    fuzziness_loss = .5 - th.mean(th.abs(wall_empty - 0.5))
+    # return fuzziness_loss
+    pct_wall_loss = abs(.5 - th.mean(wall_empty))
+    print('pct_wall', th.mean(wall_empty).item())
+    # return pct_wall_loss
+    return 1.1 * fuzziness_loss + 1 * pct_wall_loss
+
+
+def maze_gen_loss(wall_empty, target_paths, pathfinding_model, cfg):
+    # return fuzziness_pct_wall_loss
+
+    # FIXME: Hard-coding src/trg for now. Should probably get these from initial maze instead?
+    x0 = th.zeros((wall_empty.shape[0], pathfinding_model.n_in_chan, wall_empty.shape[1], wall_empty.shape[2]), device=wall_empty.device)
+    wall_empty = th.stack([wall_empty, 1-wall_empty], dim=1)
+    # Take the softmax over empty/wall to encourage near-binary output here.
+    wall_empty = th.softmax(wall_empty, dim=1)
+    fuzziness_pct_wall_loss = test_maze_gen_loss(wall_empty[:, 1], target_paths, pathfinding_model, cfg)
+    x0[:, (Tiles.WALL, Tiles.EMPTY)] = wall_empty
+    x0[:, (Tiles.SRC, Tiles.EMPTY), 4, 4] = 1
+    x0[:, Tiles.WALL, 4, 4] = 0
+    x0[:, (Tiles.TRG, Tiles.EMPTY), 8, 8] = 1
+    x0[:, Tiles.WALL, 8, 8] = 0
+    pathfinding_model.reset(initial_maze=x0)
+    x = th.zeros((wall_empty.shape[0], pathfinding_model.n_hid_chan, wall_empty.shape[-2], wall_empty.shape[-1]), device=wall_empty.device)
+    # NOTE: This limits amount of pathfinding we can do to find paths of ~32. Is there a better way, other than increasing
+    #   the number of iterations?
+    TT()
+    if cfg.render:
+        render_ep_cv2(0, pathfinding_model, mazes_onehot=x0, target_paths=target_paths, cfg=cfg, batch_idxs=np.arange(x0.shape[0]),
+            n_render_chans=N_RENDER_CHANS, render_dir=None, model_has_oracle=False, frame_i=0, window_name='aux model')
+    for i in range(64):
+        x = pathfinding_model(x)
+    sol_path = x[:, :, :, :]
+    mean_path_len = th.mean(sol_path.sum(dim=(-2, -1)))
+    trg_path_len = 100
+    print('mean_path_len', mean_path_len.item())
+    # Note that this punishes over- and under-long paths.
+    path_len_loss = abs(trg_path_len - mean_path_len) / trg_path_len 
+    return 1.2 * path_len_loss + fuzziness_pct_wall_loss
 
 
 def imread(url, max_size=None, mode=None):

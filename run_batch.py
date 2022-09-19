@@ -70,6 +70,8 @@ def main_batch(batch_dict_cfg: BatchConfig):
     batch_cfg: BatchConfig = BatchConfig()
     [setattr(batch_cfg, k, v) for k, v in batch_dict_cfg.items() if k != 'sweep']
     batch_cfg.sweep_name = batch_dict_cfg.sweep.name
+    # If we have overwritten experiment config parameters in the command line, update the sweep config accordingly.
+    [setattr(batch_dict_cfg.sweep, k, v) for k, v in batch_dict_cfg.items() if hasattr(batch_cfg.sweep, k)]
     # Time to request for each slurm job, in hours.
     job_time = 2
     batch_hyperparams = batch_dict_cfg.sweep

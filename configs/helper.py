@@ -6,12 +6,18 @@ import torch as th
 from configs.config import Config
 from mazes import Tilesets
 import models
+from utils import get_mse_loss, maze_gen_loss, solnfree_pathfinding_loss
 
 
 def set_exp_name(cfg: Config):
     # BACKWARD COMPATABILITY HACK. FIXME: Remove this when all experiments from before `full_exp_name` are obsolete.
     # if '-' in cfg.exp_name:
         # cfg.exp_name = cfg.exp_name.split('_')[-1]
+
+    # Initialize the Tileset object and attach it to the global config.
+    cfg.tileset=getattr(
+            Tilesets, cfg.task.upper(),
+        )()
 
     # assert '-' not in self.exp_name, "Cannot have hyphens in `exp_name` (to allow for a backward compatibility hack)"
     validate(cfg)
@@ -40,11 +46,6 @@ def set_exp_name(cfg: Config):
     ])
     cfg.log_dir = os.path.join(Path(__file__).parent.parent, "runs", cfg.full_exp_name)
 
-    # Initialize the Tileset object and attach it to the global config.
-    cfg.tileset=getattr(
-            Tilesets, cfg.task.upper(),
-        )()
-
 
 def validate(cfg: Config):
     cfg.device = "cuda" if th.cuda.is_available() else "cpu"
@@ -59,10 +60,7 @@ def validate(cfg: Config):
         cfg.max_pool = False
     if cfg.symmetric_conv:
         cfg.cut_conv_corners = True
-    if cfg.task == "diameter":
-        cfg.n_in_chan = 2
-    if cfg.task == "traveling":
-        cfg.n_in_chan = 3
+    cfg.n_in_chan = len(cfg.tileset.tiles)
     if cfg.model == "FixedBfsNCA":
         assert cfg.task != "diameter", "No hand-coded model implemented for diameter task."
         # self.path_chan = self.n_in_chan + 1  # wait why is this??
@@ -99,3 +97,10 @@ def validate(cfg: Config):
     if cfg.render:
         cfg.wandb = False
         # self.render_minibatch_size = 1
+
+    if cfg.task == "pathfinding_solnfree":
+        cfg.loss_fn = solnfree_pathfinding_loss
+    elif cfg.task == "maze_gen":
+        cfg.loss_fn = maze_gen_loss
+    else:
+        cfg.loss_fn = get_mse_loss

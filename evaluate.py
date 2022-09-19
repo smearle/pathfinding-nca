@@ -6,7 +6,7 @@ from configs.config import Config
 from mazes import Mazes
 from models.nn import PathfindingNN
 
-from utils import Logger, get_discrete_loss, get_mse_loss, to_path
+from utils import Logger, get_discrete_loss, to_path
             
 
 def evaluate_train(model, cfg):
@@ -24,6 +24,7 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
         is_eval (bool): Whether we are evaluating after training, in which case we collect more stats. (Otherwise, we 
             are validating during training, and compute less expensive metrics.)
     """
+    loss_fn = cfg.loss_fn
     mazes_onehot, mazes_discrete, edges, edge_feats, target_paths = maze_data.mazes_onehot, maze_data.mazes_discrete, \
         maze_data.edges, maze_data.edge_feats, maze_data.target_paths
 
@@ -78,9 +79,10 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
 
                 if j == cfg.n_layers - 1:
                     if is_eval:
-                        baseline_loss = get_mse_loss(th.zeros_like(x), target_paths_minibatch).item()
+                        baseline_loss = loss_fn(th.zeros_like(x), target_paths_minibatch).item()
                         baseline_losses.append(baseline_loss)
-                    eval_loss = get_mse_loss(x_clipped, target_paths_minibatch).item()
+                    out_paths = to_path(x_clipped)
+                    eval_loss = loss_fn(out_paths, target_paths_minibatch).mean().item()
                     # print(baseline_loss, eval_loss)
                     eval_discrete_loss = get_discrete_loss(x_clipped, target_paths_minibatch).cpu().numpy()
                     eval_pct_complete = np.sum(eval_discrete_loss.reshape(batch_size, -1).sum(1) == 0) / batch_size

@@ -2,6 +2,7 @@
 #%tensorflow_version 2.x
 
 import copy
+from functools import partial
 import json
 import math
 import os
@@ -25,11 +26,12 @@ from configs import helper as config_helper
 from configs.config import BatchConfig, Config
 from evaluate import evaluate
 from mazes import load_dataset
-from models import BfsNCA, FixedBfsNCA, FixedDfsNCA, GAT, GCN, MLP, NCA
+from models import BfsNCA, FixedBfsNCA, FixedDfsNCA, GAT, GCN, HillClimbingNCA, MLP, NCA
+from models.fuzzy_pathfinding_nca import FuzzyPathfindingNCA
 from models.nn import PathfindingNN
 from render import render_trained
 from train import train
-from utils import Logger, VideoWriter, get_discrete_loss, get_mse_loss, log_stats, to_path, load
+from utils import Logger, VideoWriter, get_discrete_loss, log_stats, to_path, load
 
 
 np.set_printoptions(threshold=sys.maxsize, linewidth=np.inf)
@@ -65,6 +67,11 @@ def main_experiment(cfg: Config = None, cfg_path: str = None):
             print('Not using GPU/CUDA, using CPU.')
         
     model_cls = globals()[cfg.model]
+
+    if cfg.task == 'pathfinding_solnfree':
+        cfg.loss_fn = partial(cfg.loss_fn, pathfinding_model=HillClimbingNCA(cfg=cfg), cfg=cfg)
+    elif cfg.task == 'maze_gen':
+        cfg.loss_fn = partial(cfg.loss_fn, pathfinding_model=FuzzyPathfindingNCA(cfg=cfg), cfg=cfg)
 
     print(f"Running experiment with config:\n {OmegaConf.to_yaml(cfg)}")
     

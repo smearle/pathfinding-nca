@@ -325,7 +325,7 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str, se
             pickle.dump(df, f)
 
     else: 
-        with open(os.path.join(EVAL_DIR, f'{batch_cfg.batch_hyperparams}_cross_eval.pkl'), 'rb') as f:
+        with open(os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval.pkl'), 'rb') as f:
             df = pickle.load(f)
         col_indices = df.columns
 
