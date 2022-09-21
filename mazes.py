@@ -164,7 +164,7 @@ class Mazes():
                 rand_maze_onehot = generate_random_maze(cfg)
                 rand_maze_discrete = rand_maze_onehot.argmax(axis=1)
                 graph, edges, edge_feats, src, trg = get_graph(rand_maze_onehot[0])
-                assert not src == trg:
+                assert not src == trg
                 # sol = bfs_grid(rand_maze_discrete[0].cpu().numpy())
                 width = rand_maze_discrete.shape[1]
                 sol = bfs_nx(width, graph, src, trg)
@@ -395,8 +395,10 @@ def get_graph(onehot):
         if onehot[Tiles.WALL, ux, uy] == 1:
             continue
         if onehot[Tiles.SRC, ux, uy] == 1:
+            assert src is None
             src = u
         if onehot[Tiles.TRG, ux, uy] == 1:
+            assert trg is None
             trg = u
         neighbs_xy = [(ux - 1, uy), (ux, uy-1), (ux+1, uy), (ux, uy+1)]
         adj_feats = [(-1, 0), (0, -1), (1, 0), (0, 1)]

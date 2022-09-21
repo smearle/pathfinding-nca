@@ -187,18 +187,21 @@ def test_maze_gen_loss(wall_empty, target_paths, pathfinding_mode, cfg):
     pct_wall_loss = abs(.5 - th.mean(wall_empty))
     print('pct_wall', th.mean(wall_empty).item())
     # return pct_wall_loss
-    return 1.1 * fuzziness_loss + 1 * pct_wall_loss
+    return 1. * fuzziness_loss + 1.1 * pct_wall_loss
 
 
 def maze_gen_loss(wall_empty, target_paths, pathfinding_model, cfg):
     # return fuzziness_pct_wall_loss
 
+    print('min', wall_empty.min().item(), 'max', wall_empty.max().item())
     # FIXME: Hard-coding src/trg for now. Should probably get these from initial maze instead?
     x0 = th.zeros((wall_empty.shape[0], pathfinding_model.n_in_chan, wall_empty.shape[1], wall_empty.shape[2]), device=wall_empty.device)
+    # wall_empty = th.sigmoid(wall_empty)
     wall_empty = th.stack([wall_empty, 1-wall_empty], dim=1)
     # Take the softmax over empty/wall to encourage near-binary output here.
     wall_empty = th.softmax(wall_empty, dim=1)
     fuzziness_pct_wall_loss = test_maze_gen_loss(wall_empty[:, 1], target_paths, pathfinding_model, cfg)
+    return fuzziness_pct_wall_loss
     x0[:, (Tiles.WALL, Tiles.EMPTY)] = wall_empty
     x0[:, (Tiles.SRC, Tiles.EMPTY), 4, 4] = 1
     x0[:, Tiles.WALL, 4, 4] = 0
@@ -208,7 +211,6 @@ def maze_gen_loss(wall_empty, target_paths, pathfinding_model, cfg):
     x = th.zeros((wall_empty.shape[0], pathfinding_model.n_hid_chan, wall_empty.shape[-2], wall_empty.shape[-1]), device=wall_empty.device)
     # NOTE: This limits amount of pathfinding we can do to find paths of ~32. Is there a better way, other than increasing
     #   the number of iterations?
-    TT()
     if cfg.render:
         render_ep_cv2(0, pathfinding_model, mazes_onehot=x0, target_paths=target_paths, cfg=cfg, batch_idxs=np.arange(x0.shape[0]),
             n_render_chans=N_RENDER_CHANS, render_dir=None, model_has_oracle=False, frame_i=0, window_name='aux model')

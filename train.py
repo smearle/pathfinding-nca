@@ -259,6 +259,8 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
 
                 if cfg.task == "pathfinding":
                     # Mutate the source and target positions
+                    n_src = th.sum(offspring_mazes_onehot[:, Tiles.SRC])
+                    assert (n_src == evo_batch_size) and (n_src == th.sum(offspring_mazes_onehot[:, Tiles.TRG]))
                     src_idxs = th.argwhere(offspring_mazes_onehot[:, Tiles.SRC] == 1)
                     trg_idxs = th.argwhere(offspring_mazes_onehot[:, Tiles.TRG] == 1)
                     assert not th.any(th.sum(src_idxs == trg_idxs, 1) == 3)
@@ -274,16 +276,25 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                     # Don't let mutating sources overwrite old targets, in case we don't end up mutating the 
                     # corresponding target.
                     src_loc_heat[tuple(trg_idxs[:, i] for i in range(trg_idxs.shape[1]))] = -1
-                    # New sources can be anywhere.
-                    src_idxs_o = (src_loc_heat == 
-                        th.max(src_loc_heat, dim=-2, keepdim=True)[0].max(dim=-1, keepdim=True)[0]).nonzero()
+                    # Get new source locations.
+                    flat_src_idxs_o = th.argmax(src_loc_heat.view(src_loc_heat.shape[0], -1), 1)
+                    # NOTE: this is specific to 2D, could copy np.unravel_index type method to make it more general.
+                    src_idxs_o = th.stack((th.arange(evo_batch_size), 
+                        th.div(flat_src_idxs_o, src_loc_heat.shape[-2], rounding_mode='trunc'),
+                        flat_src_idxs_o % src_loc_heat.shape[-2]), dim=1)
+                    # src_idxs_o = (src_loc_heat == 
+                    #     th.max(src_loc_heat, dim=-2, keepdim=True)[0].max(dim=-1, keepdim=True)[0]).nonzero()
                     src_idxs[src_mut_mask] = src_idxs_o[src_mut_mask]
                     # Going from `argwhere` type indices to `where` type ones (tuples)
                     src_idxs = tuple(src_idxs[:, i] for i in range(src_idxs.shape[1]))
                     # We mask out the new sources to ensure new targets don't overlap.
                     trg_loc_heat[src_idxs] = -1
-                    trg_idxs_o = (trg_loc_heat == 
-                        th.max(trg_loc_heat, dim=-2, keepdim=True)[0].max(dim=-1, keepdim=True)[0]).nonzero()
+                    # trg_idxs_o = (trg_loc_heat == 
+                    #     th.max(trg_loc_heat, dim=-2, keepdim=True)[0].max(dim=-1, keepdim=True)[0]).nonzero()
+                    flat_trg_idxs_o = th.argmax(trg_loc_heat.view(trg_loc_heat.shape[0], -1), 1)
+                    trg_idxs_o = th.stack((th.arange(evo_batch_size), 
+                        th.div(flat_trg_idxs_o, trg_loc_heat.shape[-2], rounding_mode='trunc'),
+                        flat_trg_idxs_o % trg_loc_heat.shape[-2]), dim=1)
                     trg_idxs[trg_mut_mask] = trg_idxs_o[trg_mut_mask]
                     trg_idxs = tuple(trg_idxs[:, i] for i in range(trg_idxs.shape[1]))
 

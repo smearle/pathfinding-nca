@@ -1,4 +1,3 @@
-
 from dataclasses import dataclass, field
 from typing import Any, List
 import hydra
@@ -80,4 +79,8 @@ class MaxPoolSweep(HyperSweepConfig):
         # True,
         # False,
     # ])
+    learning_rate: List[Any] = field(default_factory=lambda: [
+        # 0.0001,
+        0.00005,
+    ])
     

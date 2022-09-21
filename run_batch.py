@@ -65,7 +65,7 @@ def dump_config(exp_name, exp_cfg):
         json.dump(exp_cfg, f, indent=4)
 
 
-@hydra.main(config_path=None, config_name="batch_config")
+@hydra.main(config_path=None, config_name="batch_config", version_base="1.2")
 def main_batch(batch_dict_cfg: BatchConfig):
     batch_cfg: BatchConfig = BatchConfig()
     [setattr(batch_cfg, k, v) for k, v in batch_dict_cfg.items() if k != 'sweep']
@@ -73,7 +73,7 @@ def main_batch(batch_dict_cfg: BatchConfig):
     # If we have overwritten experiment config parameters in the command line, update the sweep config accordingly.
     [setattr(batch_dict_cfg.sweep, k, v) for k, v in batch_dict_cfg.items() if hasattr(batch_cfg.sweep, k)]
     # Time to request for each slurm job, in hours.
-    job_time = 2
+    job_time = 5
     batch_hyperparams = batch_dict_cfg.sweep
 
     # Generate dataset of mazes if necessary.
@@ -192,6 +192,7 @@ def main_batch(batch_dict_cfg: BatchConfig):
     for exp_cfg in exp_configs:
         if not batch_cfg.overwrite_evals and batch_cfg.evaluate and not batch_cfg.vis_cross_eval \
             and os.path.exists(os.path.join(exp_cfg.log_dir, 'test_stats.json')):
+            print("Already evaluated experiment, specify `overwrite_evals=True` to re-evaluate: ", exp_cfg.log_dir)
             # and os.path.exists(os.path.join(RUNS_DIR, exp_dir, 'test_stats.json')):
             continue
 

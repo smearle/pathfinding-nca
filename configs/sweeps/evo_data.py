@@ -12,17 +12,19 @@ class EvoDataSweep(HyperSweepConfig):
     name: str = 'evo_data'
 
     exp_name: List[Any] = field(default_factory=lambda: [
-        # "2",
-        # "3",
-        # "4",
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
         # "5",
 
         # "7",
-        "8",
-        "9",
-        "10",
-        "11",
-        "12",
+        # "8",
+        # "9",
+        # "10",
+        # "11",
+        # "12",
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
         None,
@@ -30,7 +32,7 @@ class EvoDataSweep(HyperSweepConfig):
     ])
     task: List[Any] = field(default_factory=lambda: [
         "pathfinding",
-        "diameter",
+        # "diameter",
     ])
     model: List[Any] = field(default_factory=lambda: [
         "NCA",
@@ -41,31 +43,33 @@ class EvoDataSweep(HyperSweepConfig):
         # False,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
-    #     # 4,
-    #     # 8,
+        # 4,
+        # 8,
         # 32,
 
-        # 48,
+        48,
         96,
-        # 128,
-
-    #     # 256,
+        128,
+        # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
-    #     # 48,
+        # 48,
         64,
         # 96,
-    #     # 128,
+        # 128,
     ])
     loss_interval: List[Any] = field(default_factory=lambda: [
-    #     # 4,
-    #     # 8,
-    #     # 16,
+        # 4,
+        # 8,
+        # 16,
         # 32,
         64,
     ])
-    symmetric_conv: List[Any] = field(default_factory=lambda: [
-        # True,
-        False,
+    # symmetric_conv: List[Any] = field(default_factory=lambda: [
+    #     # True,
+    #     False,
+    # ])
+    learning_rate: List[Any] = field(default_factory=lambda: [
+        0.0001,
+        0.00005,
     ])
-    

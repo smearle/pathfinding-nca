@@ -80,8 +80,12 @@ class CutCornerSweep(HyperSweepConfig):
         64,
 
     ])
-    symmetric_conv: List[Any] = field(default_factory=lambda: [
-        # True,
-        False,
+    # symmetric_conv: List[Any] = field(default_factory=lambda: [
+    #     # True,
+    #     False,
+    # ])
+    learning_rate: List[Any] = field(default_factory=lambda: [
+        # 0.0001,
+        0.00005,
     ])
     

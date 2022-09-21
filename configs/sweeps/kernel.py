@@ -15,21 +15,18 @@ class KernelSweep(HyperSweepConfig):
     name: str = 'kernel'
 
     exp_name: List[Any] = field(default_factory=lambda: [
-        # "2",
-        # "3",
-        # "4",
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
         # "5",
         # "6",
-        "7",
-        "8",
-        "9",
-        "10",
-        "11",
-        # "debug",
-
-        # "12",
-        # "13"
-        # "scratch"
+        # "7",
+        # "8",
+        # "9",
+        # "10",
+        # "11",
     ])
     cut_conv_corners: List[Any] = field(default_factory=lambda: [
         True,
@@ -40,7 +37,7 @@ class KernelSweep(HyperSweepConfig):
         None,
     ])
     task: List[Any] = field(default_factory=lambda: [
-        # "pathfinding",
+        "pathfinding",
         "diameter",
     ])
     model: List[Any] = field(default_factory=lambda: [
@@ -48,11 +45,11 @@ class KernelSweep(HyperSweepConfig):
         # "GCN",
     ])
     kernel_size: List[Any] = field(default_factory=lambda: [
+        # 3,
         5,
-        3,
     ])
     max_pool: List[Any] = field(default_factory=lambda: [
-        True,
+        # True,
         False,
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
@@ -86,5 +83,9 @@ class KernelSweep(HyperSweepConfig):
     symmetric_conv: List[Any] = field(default_factory=lambda: [
         # True,
         False,
+    ])
+    learning_rate: List[Any] = field(default_factory=lambda: [
+        # 0.0001,
+        0.00005,
     ])
     

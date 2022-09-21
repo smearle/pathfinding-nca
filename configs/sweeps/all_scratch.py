@@ -12,6 +12,7 @@ class ScratchSweep(HyperSweepConfig):
     exp_name: str = 'scratch'
     log_interval = 2
     save_interval = 2
+    manual_log = True
     exp_name: List[Any] = field(default_factory=lambda: [
         # "0",
         # "1",
@@ -24,8 +25,8 @@ class ScratchSweep(HyperSweepConfig):
         "scratch",
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
-        EnvGeneration2(),
         # None,
+        EnvGeneration2(),
     ])
     task: List[Any] = field(default_factory=lambda: [
         "pathfinding",
