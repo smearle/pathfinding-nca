@@ -63,6 +63,7 @@ def main_experiment(cfg: Config = None, cfg_path: str = None):
     if th.cuda.is_available():
             print('Using GPU/CUDA.')
             th.set_default_tensor_type('torch.cuda.FloatTensor')
+            cfg.device = "cuda"
     else:
             print('Not using GPU/CUDA, using CPU.')
         

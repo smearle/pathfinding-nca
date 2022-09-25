@@ -79,7 +79,7 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
 
                 if j == cfg.n_layers - 1:
                     if is_eval:
-                        baseline_loss = loss_fn(th.zeros_like(x), target_paths_minibatch).item()
+                        baseline_loss = loss_fn(th.zeros_like(target_paths_minibatch, dtype=float), target_paths_minibatch).mean().item()
                         baseline_losses.append(baseline_loss)
                     out_paths = to_path(x_clipped)
                     eval_loss = loss_fn(out_paths, target_paths_minibatch).mean().item()
@@ -93,7 +93,8 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
                 if is_eval:
                     eval_discrete_loss = get_discrete_loss(x_clipped, target_paths_minibatch).cpu()
                     completion_times = np.where(eval_discrete_loss.reshape(batch_size, -1).sum(dim=1) == 0, j, completion_times)
-                    completion_times /= path_lengths
+                    # Clamp to avoid dividing by 0.
+                    completion_times /= np.clip(path_lengths, a_min=1, a_max=None)
                     eval_completion_times.append(np.nanmean(completion_times))
 
                     # fig, ax = plt.subplots(figsize=(10, 10))
