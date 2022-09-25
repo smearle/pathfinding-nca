@@ -11,6 +11,11 @@ class EvoDataSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
     name: str = 'evo_data'
 
+    # FIXME: We should be able to just make this an int, but then it gets ignored.
+    exp_name: List[Any] = field(default_factory=lambda: [
+        100000,
+    ])
+
     exp_name: List[Any] = field(default_factory=lambda: [
         "0",
         "1",

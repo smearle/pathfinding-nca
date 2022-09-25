@@ -12,11 +12,12 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from itertools import product
 import json
+import omegaconf
 import os
 from pdb import set_trace as TT
 import re
+import submitit
 import traceback
-import omegaconf
 import yaml
 
 from configs.config import BatchConfig
@@ -72,6 +73,9 @@ def main_batch(batch_dict_cfg: BatchConfig):
     batch_cfg.sweep_name = batch_dict_cfg.sweep.name
     # If we have overwritten experiment config parameters in the command line, update the sweep config accordingly.
     [setattr(batch_dict_cfg.sweep, k, v) for k, v in batch_dict_cfg.items() if hasattr(batch_cfg.sweep, k)]
+    executor = None
+    if batch_cfg.slurm:
+        executor = submitit.AutoExecutor(folder=os.path.join(RUNS_DIR, "submitit"))
     # Time to request for each slurm job, in hours.
     job_time = 5
     batch_hyperparams = batch_dict_cfg.sweep
@@ -201,8 +205,8 @@ def main_batch(batch_dict_cfg: BatchConfig):
     exp_configs = filtered_exp_configs
 
     # experiment_names = []
-    for exp_cfg in exp_configs:
-        if not batch_cfg.slurm:
+    if not batch_cfg.slurm:
+        for exp_cfg in exp_configs:
             if batch_cfg.load and batch_cfg.evaluate and not os.path.exists(exp_cfg.log_dir):
                 print(f"Experiment log directory does not exist: {exp_cfg.log_dir}")
                 print("Skipping experiment.")
@@ -215,32 +219,38 @@ def main_batch(batch_dict_cfg: BatchConfig):
                 print("Skipping experiment.")
                 continue
 
-        else:
-            exp_cfg_path = os.path.abspath(os.path.join(Path(__file__).parent, 'slurm', 'auto_configs', f'{exp_cfg.full_exp_name}.yaml'))
-            yaml.dump(OmegaConf.to_yaml(exp_cfg), open(exp_cfg_path, 'w'))
-            sbatch_file = os.path.join(Path(__file__).parent, 'slurm', 'run.sh')
-            submit_slurm_job(sbatch_file=sbatch_file, experiment_name=exp_cfg.full_exp_name, exp_cfg_path=exp_cfg_path, 
-                job_time=job_time, job_cpus=1, job_gpus=1, job_mem=16)
-        # elif not batch_cfg.load:
-        #     experiment_names.append(exp_cfg.exp_name)
-        #     dump_config(exp_cfg.exp_name, exp_cfg)
-        # else:
+    else:
+        executor.update_parameters(gpus_per_node=1, slurm_mem="16GB", cpus_per_task=1, slurm_time="5:00:00")
+        with executor.batch():
+            for exp_cfg in exp_configs:
+                exp_cfg_path = os.path.abspath(os.path.join(Path(__file__).parent, 'slurm', 'auto_configs', f'{exp_cfg.full_exp_name}.yaml'))
+                yaml.dump(OmegaConf.to_yaml(exp_cfg), open(exp_cfg_path, 'w'))
+                executor.submit(main_experiment, exp_cfg)
 
-        #     # Remove this eventually. Very ad hoc backward compatibility with broken experiment naming schemes:
-        #     found_save_dir = False
-        #     sd_i = 0
-        #     if not os.path.isdir(exp_cfg.exp_name):
-        #         print(f'No directory found for experiment at {exp_cfg.exp_name}.')
-        #     else:
-        #         exp_config['experiment_name'] = exp_cfg.exp_name
-        #         experiment_names.append(exp_cfg.exp_name)
-        #         dump_config(exp_cfg.exp_name, exp_config)
-        #         break
-        #     sd_i += 1
-        #     if not found_save_dir:
-        #         print('No save directory found for experiment. Skipping.')
-        #     else:
-        #         print('Found save dir: ', exp_cfg.exp_name)
+                # sbatch_file = os.path.join(Path(__file__).parent, 'slurm', 'run.sh')
+                # submit_slurm_job(sbatch_file=sbatch_file, experiment_name=exp_cfg.full_exp_name, exp_cfg_path=exp_cfg_path, 
+                #     job_time=job_time, job_cpus=1, job_gpus=1, job_mem=16)
+
+            # elif not batch_cfg.load:
+            #     experiment_names.append(exp_cfg.exp_name)
+            #     dump_config(exp_cfg.exp_name, exp_cfg)
+            # else:
+
+            #     # Remove this eventually. Very ad hoc backward compatibility with broken experiment naming schemes:
+            #     found_save_dir = False
+            #     sd_i = 0
+            #     if not os.path.isdir(exp_cfg.exp_name):
+            #         print(f'No directory found for experiment at {exp_cfg.exp_name}.')
+            #     else:
+            #         exp_config['experiment_name'] = exp_cfg.exp_name
+            #         experiment_names.append(exp_cfg.exp_name)
+            #         dump_config(exp_cfg.exp_name, exp_config)
+            #         break
+            #     sd_i += 1
+            #     if not found_save_dir:
+            #         print('No save directory found for experiment. Skipping.')
+            #     else:
+            #         print('Found save dir: ', exp_cfg.exp_name)
 
 
 if __name__ == '__main__':
