@@ -244,7 +244,7 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
 
                 # Select random k for mutation.
                 evo_batch_size = env_gen_cfg.evo_batch_size
-                mut_idxs = th.randint(cfg.n_data, (evo_batch_size,))
+                mut_idxs = th.randint(min(cfg.n_data, mazes_onehot.shape[0]), (evo_batch_size,))
                 offspring_mazes_onehot = mazes_onehot[mut_idxs]
                 offspring_maze_walls = mazes_onehot[mut_idxs, Tiles.WALL]
 

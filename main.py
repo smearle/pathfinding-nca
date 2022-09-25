@@ -77,6 +77,8 @@ def main_experiment(cfg: Config = None, cfg_path: str = None):
     
     # Setup training.
     model: PathfindingNN = model_cls(cfg)
+    if cfg.task == "maze_gen":
+        model.layers[-1].append(th.nn.Tanh())
     # Set a dummy initial maze state to probe model. Model will default to edges for full grid.
     x0 = th.zeros(cfg.minibatch_size, cfg.n_in_chan, cfg.width + 2, cfg.width + 2)
     model.reset(x0, is_torchinfo_dummy=True)

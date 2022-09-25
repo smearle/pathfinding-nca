@@ -25,15 +25,15 @@ class ScratchSweep(HyperSweepConfig):
         "scratch",
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
-        # None,
-        EnvGeneration2(),
+        None,
+        # EnvGeneration2(),
     ])
     task: List[Any] = field(default_factory=lambda: [
-        "pathfinding",
+        # "pathfinding",
         # "pathfinding_solnfree",
         # "diameter",
         # "traveling",
-        # "maze_gen",
+        "maze_gen",
     ])
     max_pooling: List[Any] = field(default_factory=lambda: [
         # True,
@@ -70,9 +70,9 @@ class ScratchSweep(HyperSweepConfig):
         # 16,
         # 24,
         # 32,
-        48,
+        # 48,
         # 96,
-        # 128,
+        128,
         # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
@@ -94,7 +94,8 @@ class ScratchSweep(HyperSweepConfig):
     #     # False,
     # # ])
     learning_rate: List[Any] = field(default_factory=lambda: [
-        0.0001,
+        # 0.0001,
         # 0.00005,
+        0.00001,
     ])
     

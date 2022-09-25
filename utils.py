@@ -180,26 +180,29 @@ def solnfree_pathfinding_loss(paths, target_paths, hillclimbing_model):
 
 
 def test_maze_gen_loss(wall_empty, target_paths, pathfinding_mode, cfg):
-    print('fuzziness', th.mean(th.abs(wall_empty - 0.5)).item())
+    # fuzziness = th.mean(th.abs(wall_empty - 0.5))
+    fuzziness = th.mean(th.abs(0.5 - th.abs(wall_empty - 0.5)))
+    print('fuzziness', fuzziness.item())
+    fuzziness_loss = fuzziness
     # return 1 - th.mean(th.abs(wall_empty - 0.5))
-    fuzziness_loss = .5 - th.mean(th.abs(wall_empty - 0.5))
     # return fuzziness_loss
-    pct_wall_loss = abs(.5 - th.mean(wall_empty))
-    print('pct_wall', th.mean(wall_empty).item())
+    pct_wall = th.mean(wall_empty)
+    print('pct_wall', pct_wall.item())
+    pct_wall_loss = abs(.5 - pct_wall)
     # return pct_wall_loss
-    return 1. * fuzziness_loss + 1.1 * pct_wall_loss
+    return 1 * fuzziness_loss + 2.0 * pct_wall_loss
 
 
 def maze_gen_loss(wall_empty, target_paths, pathfinding_model, cfg):
     # return fuzziness_pct_wall_loss
 
-    print('min', wall_empty.min().item(), 'max', wall_empty.max().item())
     # FIXME: Hard-coding src/trg for now. Should probably get these from initial maze instead?
     x0 = th.zeros((wall_empty.shape[0], pathfinding_model.n_in_chan, wall_empty.shape[1], wall_empty.shape[2]), device=wall_empty.device)
-    # wall_empty = th.sigmoid(wall_empty)
+    # wall_empty = th.tanh(wall_empty)
     wall_empty = th.stack([wall_empty, 1-wall_empty], dim=1)
     # Take the softmax over empty/wall to encourage near-binary output here.
-    wall_empty = th.softmax(wall_empty, dim=1)
+    # wall_empty = th.softmax(3*wall_empty, dim=1)
+    print('min', wall_empty.min().item(), 'max', wall_empty.max().item())
     fuzziness_pct_wall_loss = test_maze_gen_loss(wall_empty[:, 1], target_paths, pathfinding_model, cfg)
     return fuzziness_pct_wall_loss
     x0[:, (Tiles.WALL, Tiles.EMPTY)] = wall_empty
