@@ -170,6 +170,8 @@ def main_batch(batch_dict_cfg: BatchConfig):
             # else:
                 # ec.validate()
             filtered_exp_configs.append(ec)
+            # Checkpoint we are interested in evaluating (important if we have trained some runs longer than others.)
+            ec.iter_log_dir = os.path.join(ec.log_dir, f'iter_{ec.n_updates}')
         except AssertionError as e:
             print("Experiment config is invalid:", e)
             print("Skipping experiment.")

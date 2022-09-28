@@ -7,7 +7,7 @@ import re
 from typing import List
 
 import matplotlib.pyplot as plt
-import yaml
+import numpy as np
 from configs.config import BatchConfig, Config
 
 import pandas as pd
@@ -58,7 +58,7 @@ names_to_hyperparams = {
         'shared_weights',
         'loss_interval',
     ],
-    'weight_sharing': [
+    'shared_weights': [
         'model',
         'shared_weights',
         'n_hid_chan',
@@ -68,13 +68,24 @@ names_to_hyperparams = {
         'cut_conv_corners',
         'n_hid_chan',
     ],
+    'diam_cut_corners': [
+        'model',
+        'kernel_size',
+        'cut_conv_corners',
+        # 'n_hid_chan',
+    ],
     'models': [
         'model',
         'n_layers',
         'n_hid_chan',
-        'traversable_edges_only',
+        # 'traversable_edges_only',
     ],
     'max_pool': [
+        'model',
+        'max_pool',
+        'n_hid_chan',
+    ],
+    'diam_max_pool': [
         'model',
         'max_pool',
         'n_hid_chan',
@@ -82,13 +93,31 @@ names_to_hyperparams = {
     'kernel': [
         'model',
         'kernel_size',
-        'max_pool',
+        # 'max_pool',
         'n_hid_chan',
+        'cut_conv_corners',
     ],
     'evo_data': [
         'model',
         'env_generation',
+        'kernel_size',
+        'max_pool',
+        'shared_weights',
+        'cut_conv_corners',
         'n_hid_chan',
+        # 'learning_rate',
+    ],
+    'diam_evo_data': [
+        'model',
+        'env_generation',
+        'n_hid_chan',
+        # 'learning_rate',
+    ],
+    'pf_evo_data': [
+        'model',
+        'env_generation',
+        'n_hid_chan',
+        # 'learning_rate',
     ],
     'gnn_grid_rep': [
         "model",
@@ -120,22 +149,48 @@ names_to_cols = {
     'default': [
         'n_params',
         # 'n_updates',
-        'TRAIN_pct_complete',
-        # 'TRAIN_completion_time',
-        'TEST_pct_complete',
-        # 'TEST_completion_time',
-        'TEST_32_accs',
-        'TEST_32_pct_complete',
-    ],
-    'evo_data': [
-        'n_params',
-        'TRAIN_pct_complete',
+        'TRAIN_accs',
+        # 'TRAIN_pct_complete',
         # 'TRAIN_completion_time',
         'TEST_accs',
         'TEST_pct_complete',
         # 'TEST_completion_time',
         'TEST_32_accs',
-        'TEST_32_pct_complete',
+        # 'TEST_32_pct_complete',
+    ],
+    'diam_evo_data': [
+        'n_params',
+        'TRAIN_sol_len',
+        # 'TRAIN_pct_complete',
+        'TRAIN_accs',
+        # 'TRAIN_completion_time',
+        'TEST_accs',
+        # 'TEST_pct_complete',
+        # 'TEST_completion_time',
+        'TEST_32_accs',
+        # 'TEST_32_pct_complete',
+    ],
+    'pf_evo_data': [
+        'n_params',
+        'TRAIN_sol_len',
+        'TRAIN_accs',
+        # 'TRAIN_completion_time',
+        'TEST_accs',
+        'TEST_pct_complete',
+        # 'TEST_completion_time',
+        'TEST_32_accs',
+        # 'TEST_32_pct_complete',
+    ],
+    'evo_data': [
+        'n_params',
+        'TRAIN_sol_len',
+        'TRAIN_accs',
+        # 'TRAIN_completion_time',
+        'TEST_accs',
+        'TEST_pct_complete',
+        # 'TEST_completion_time',
+        'TEST_32_accs',
+        # 'TEST_32_pct_complete',
     ],
     'loss_interval': [
         'TRAIN_pct_complete',
@@ -146,19 +201,20 @@ names_to_cols = {
     'models': [
         'n_params',
         # 'TRAIN_accs',
-        'TRAIN_pct_complete',
+        'TRAIN_accs',
         'TEST_accs',
         'TEST_pct_complete',
-        'TEST_32_pct_complete',
+        'TEST_32_accs',
     ],
     'diam_max_pool': [
         'n_params',
-        'TRAIN_pct_complete',
+        'TRAIN_accs',
         # 'TRAIN_completion_time',
+        'TEST_accs',
         'TEST_pct_complete',
         # 'TEST_completion_time',
         'TEST_32_accs',
-        'TEST_32_pct_complete',
+        # 'TEST_32_pct_complete',
     ]
 }
 hyperparam_renaming = {
@@ -166,12 +222,16 @@ hyperparam_renaming = {
     'n layers': 'n. layers',
     'cut conv corners': 'cut corners',
     'traversable edges only': newline('traversable', 'edges only'),
+    'env generation': 'evo. data',
+    'max pool': 'max-pool',
+    'kernel size': 'kernel',
 }
 col_renaming = {
     'n params': 'n. params',
     'n updates': 'n. updates',
     'pct complete': 'pct. complete',
     'accs': 'accuracies',
+    'sol length': 'sol. length',
 }
 
 
@@ -187,19 +247,27 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str, se
         batch_exp_stats = []
         filtered_exp_cfgs = []
         for exp_cfg in exp_cfgs:
+            # Load results from relevant checkpoint if possible.
+            if os.path.isdir(exp_cfg.iter_log_dir):
+                log_dir = exp_cfg.iter_log_dir
+            else:
+                log_dir = exp_cfg.log_dir
             try:
                 with open(exp_cfg.log_dir + '/stats.json', 'r') as f:
                     exp_general_stats = json.load(f)
-                with open(exp_cfg.log_dir + '/test_stats.json', 'r') as f:
+                    if log_dir == exp_cfg.iter_log_dir:
+                        # HACK
+                        exp_general_stats['n_updates'] = exp_cfg.n_updates
+                with open(log_dir + '/test_stats.json', 'r') as f:
                     exp_test_stats = json.load(f)
                     exp_test_stats = {f'TEST_{k}': v for k, v in exp_test_stats.items()}
                 if exp_cfg.model != "MLP":
-                    with open(exp_cfg.log_dir + '/test_32_stats.json', 'r') as f:
+                    with open(log_dir + '/test_32_stats.json', 'r') as f:
                         exp_test_32_stats = json.load(f)
                         exp_test_32_stats = {f'TEST_32_{k}': v for k, v in exp_test_32_stats.items()}
                 else:
                     exp_test_32_stats = {}
-                with (open(exp_cfg.log_dir + '/train_stats.json', 'r')) as f:
+                with (open(log_dir + '/train_stats.json', 'r')) as f:
                     exp_train_stats = json.load(f)
                     exp_train_stats = {f'TRAIN_{k}': v for k, v in exp_train_stats.items()}
                 exp_stats = {**exp_general_stats, **exp_train_stats, **exp_test_stats, **exp_test_32_stats}
@@ -329,6 +397,13 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str, se
             df = pickle.load(f)
         col_indices = df.columns
 
+    # Make some custom plots for certain sweeps. Here we'll use n. params as the x axis.
+    if not selective_table:
+        if name == "shared_weights":
+            plot_by_n_params(df, task, 'shared weights')
+        elif name == "cut_corners":
+            plot_by_n_params(df, task, 'cut corners')
+
     for k in col_indices:
         if k in df:
             print(k[-1])
@@ -386,7 +461,7 @@ def preprocess_values(data, col_name=None):
     # Assume (mean, std)
     data, err = data
     # Other preprocessing here
-    if col_name[-1] not in set({"completion time", "n_params"}):
+    if col_name[-1] not in set({"completion time", "n_params", "sol len"}):
         data *= 100
         err *= 100
     if MULTI_TRIAL:
@@ -394,6 +469,44 @@ def preprocess_values(data, col_name=None):
         return data
     else:
         return data, err
+
+
+def plot_by_n_params(df, task, bool_param):
+    "Plot by n. params."
+
+    def plot_err(df_b, label, color, ecolor):
+        xs = list(df_b['model']['---']['n. params'])
+        # No variance in n. params
+        xs, _ = list(zip(*xs))
+        pct_complete = list(df_b[('test', '32x32', 'accuracies')])
+        y, yerr = list(zip(*pct_complete))
+        # to_omit = np.argwhere(np.array(xs) > 4e4)
+        # if len(to_omit) > 0:
+        #     to_omit = to_omit[0][0]
+        #     xs = xs[:to_omit]
+        #     y = y[:to_omit]
+            # yerr = yerr[:to_omit]
+        # plt.errorbar(xs, y, yerr=yerr, label=label)
+        plt.errorbar(xs, y, yerr=yerr, fmt='o', color=color,
+            ecolor=ecolor, elinewidth=3, capsize=0, label=label)
+        # plt.plot(y, xs)
+
+    hyperparam_name = bool_param.replace('_', ' ')
+
+    df_T = df.loc[df.index.get_level_values(hyperparam_name) == True]
+    plot_err(df_T, bool_param, color='blue', ecolor='lightblue')
+
+    df_F = df.loc[df.index.get_level_values(hyperparam_name) == False]
+    plot_err(df_F, 'no ' + bool_param, color='coral', ecolor='lightcoral')
+
+    plt.xlabel("n. params")
+    plt.ylabel("pct. complete")
+    # plt.ylim(0, 100)
+    plt.legend()
+    plt.title(f"{task}, {bool_param}")
+    plt.savefig(os.path.join(EVAL_DIR, f'{task}_{bool_param}_x_n_params.jpg'), dpi=2000)
+    plt.show()
+    plt.clf()
 
 
 def bold_extreme_values(data, data_max=-1, col_name=None):

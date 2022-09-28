@@ -164,7 +164,7 @@ def render_trained(model: PathfindingNN, maze_data, cfg: Config, pyplot_animatio
     mazes_discrete = th.where((mazes_discrete == Tiles.EMPTY) & (target_paths == 1), path_chan, mazes_discrete)
 
     # Render most complex mazes first.
-    batch_idxs = path_lengths.sort(descending=False)[1]
+    batch_idxs = path_lengths.sort(descending=True)[1]
     # batch_idxs = th.arange(mazes_onehot.shape[0])
 
     # batch_idx = np.random.choice(mazes_onehot.shape[0], render_minibatch_size, replace=False)

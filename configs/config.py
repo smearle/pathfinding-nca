@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from pdb import set_trace as TT
 from typing import Any, List, Optional
+from configs.sweeps.diam_evo_data import DiamEvoDataSweep
 
 import hydra
 from hydra.core.config_store import ConfigStore
@@ -12,6 +13,8 @@ import torch as th
 from configs.sweeps.all import HyperSweepConfig
 from configs.sweeps.all_scratch import ScratchSweep
 from configs.sweeps.cut_corners import CutCornerSweep
+from configs.sweeps.diam_cut_corners import DiamCutCornerSweep
+from configs.sweeps.diam_maxpool import DiamMaxPoolSweep
 from configs.sweeps.gnn import GNNSweep
 from configs.sweeps.gnn_grid_rep import GNNGridRepSweep
 from configs.sweeps.handcoded import HandcodedSweep
@@ -22,6 +25,7 @@ from configs.sweeps.loss_interval import LossIntervalSweep
 from configs.sweeps.models import ModelSweep
 from configs.sweeps.n_hid_chan import HidChanSweep
 from configs.sweeps.evo_data import EvoDataSweep
+from configs.sweeps.pf_evo_data import PFEvoDataSweep
 from configs.sweeps.weight_sharing import WeightSharingSweep
 from configs.sweeps.gnn import GNNSweep
 
@@ -167,8 +171,12 @@ cs.store(group="sweep", name="gnn_grid_rep", node=GNNGridRepSweep)
 cs.store(group="sweep", name="loss_interval", node=LossIntervalSweep)
 cs.store(group="sweep", name="n_hid_chan", node=HidChanSweep)
 cs.store(group="sweep", name="evo_data", node=EvoDataSweep)
+cs.store(group="sweep", name="diam_evo_data", node=DiamEvoDataSweep)
+cs.store(group="sweep", name="pf_evo_data", node=PFEvoDataSweep)
 cs.store(group="sweep", name="cut_corners", node=CutCornerSweep)
+cs.store(group="sweep", name="diam_cut_corners", node=DiamCutCornerSweep)
 cs.store(group="sweep", name="max_pool", node=MaxPoolSweep)
+cs.store(group="sweep", name="diam_max_pool", node=DiamMaxPoolSweep)
 cs.store(group="sweep", name="kernel", node=KernelSweep)
 cs.store(group="sweep", name="shared_weights", node=WeightSharingSweep)
 cs.store(group="sweep", name="handcoded", node=HandcodedSweep)
