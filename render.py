@@ -25,6 +25,39 @@ CV2_WAIT_KEY_TIME = 1
 RENDER_WEIGHTS = False
 CV2_IM_SIZE = (1500, 1500)
 
+class VideoWriter:
+    def __init__(self, filename='_autoplay.mp4', fps=30.0, **kw):
+        self.writer = None
+        self.params = dict(filename=filename, fps=fps, **kw)
+
+    def add(self, img):
+        img = np.asarray(img)
+        if self.writer is None:
+            h, w = img.shape[:2]
+            self.writer = FFMPEG_VideoWriter(size=(w, h), **self.params)
+        if img.dtype in [np.float32, np.float64]:
+            img = np.uint8(img.clip(0, 1)*255)
+        if len(img.shape) == 2:
+            img = np.repeat(img[..., None], 3, -1)
+        self.writer.write_frame(img)
+
+    def close(self):
+        if self.writer:
+            self.writer.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *kw):
+        self.close()
+        if self.params['filename'] == '_autoplay.mp4':
+            self.show()
+
+    def show(self, **kw):
+            self.close()
+            fn = self.params['filename']
+            display(mvp.ipython_display(fn, **kw))
+
 
 def get_imgs(x, n_render_chans, cfg, oracle_out=None, maze_imgs=None):
     # x_img = to_path(x[:cfg.render_minibatch_size]).cpu()
@@ -90,7 +123,7 @@ def get_imgs(x, n_render_chans, cfg, oracle_out=None, maze_imgs=None):
 
 def reset_ep_render(bi, model, mazes_onehot, target_paths, batch_idxs, render_minibatch_size, cfg, edges=None, 
         edge_feats=None):
-    batch_idx: int = batch_idxs[th.arange(render_minibatch_size) + bi]
+    batch_idx: int = batch_idxs[th.arange(render_minibatch_size) + bi].cpu()
     pool = model.seed(batch_size=mazes_onehot.shape[0], width=cfg.width, height=cfg.height,)
     x = pool[batch_idx]
     x0 = mazes_onehot[batch_idx]
@@ -114,12 +147,17 @@ def render_ep_cv2(bi, model, mazes_onehot, target_paths, batch_idxs, n_render_ch
         cfg, edges, edge_feats)
     oracle_out = model.oracle_out if model_has_oracle else None
     ims = get_imgs(x, n_render_chans, cfg, oracle_out=oracle_out, maze_imgs=maze_imgs)
-    imS = cv2.resize(ims, CV2_IM_SIZE)
-    cv2.imshow(window_name, imS)
+    if not cfg.headless:
+        imS = cv2.resize(ims, CV2_IM_SIZE)
+        cv2.imshow(window_name, imS)
     # Save image as png
     if SAVE_PNGS:
-        cv2.imwrite(os.path.join(render_dir, f"render_{frame_i}.png"), ims)
+        if not cfg.headless:
+            cv2.imwrite(os.path.join(render_dir, f"render_{frame_i}.png"), ims)
+        else:
+            print(ims.min(), ims.max())
     if writer:
+        # ims = ims.astype(np.uint8)
         writer.append_data(ims)
 
     # cv2.imshow('maze', maze_imgs)
@@ -131,13 +169,19 @@ def render_ep_cv2(bi, model, mazes_onehot, target_paths, batch_idxs, n_render_ch
         oracle_out = model.oracle_out if model_has_oracle else None
         # cv2.imshow('model', get_imgs(x, oracle_out=oracle_out))
         ims = get_imgs(x, n_render_chans, cfg, oracle_out=oracle_out, maze_imgs=maze_imgs)
-        imS = cv2.resize(ims, CV2_IM_SIZE)
-        cv2.imshow(window_name, imS)
+        if not cfg.headless:
+            imS = cv2.resize(ims, CV2_IM_SIZE)
+            cv2.imshow(window_name, imS)
         if SAVE_PNGS:
-            cv2.imwrite(os.path.join(render_dir, f"render_{frame_i}.png"), ims*255)
+            if not cfg.headless:
+                cv2.imwrite(os.path.join(render_dir, f"render_{frame_i}.png"), ims*255)
+            else:
+                pass
         if writer:
+            # ims = ims.astype(np.uint8)
             writer.append_data(ims)
-        cv2.waitKey(CV2_WAIT_KEY_TIME)
+        if not cfg.headless:
+            cv2.waitKey(CV2_WAIT_KEY_TIME)
     return bi, frame_i, x
 
 
@@ -199,7 +243,8 @@ def render_trained(model: PathfindingNN, maze_data, cfg: Config, pyplot_animatio
             # Create large window
             # cv2.namedWindow('maze', cv2.WINDOW_NORMAL)
             # cv2.namedWindow('model', cv2.WINDOW_NORMAL)
-            cv2.namedWindow('pathfinding', cv2.WINDOW_NORMAL)
+            if not cfg.headless:
+                cv2.namedWindow('pathfinding', cv2.WINDOW_NORMAL)
             render_dir = os.path.join(cfg.log_dir, f"render{name}")
             if SAVE_PNGS:
                 if os.path.exists(render_dir):

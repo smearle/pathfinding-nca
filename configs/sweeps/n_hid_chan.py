@@ -20,12 +20,12 @@ class HidChanSweep(HyperSweepConfig):
     n_hid_chan: List[Any] = field(default_factory=lambda: [
         # 4,
         # 8,
-        16,
-        38,
-        48,
+        # 16,
+        # 32,
+        # 48,
         96,
-        128,
-        256,
+        # 128,
+        # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
         64,
@@ -35,5 +35,9 @@ class HidChanSweep(HyperSweepConfig):
     env_generation: List[Any] = field(default_factory=lambda: [
         None,
         # EnvGeneration(),
+    ])
+    loss_fn: List[Any] = field(default_factory=lambda: [
+        # "mse",
+        "ce",
     ])
 

@@ -13,6 +13,8 @@ from moviepy.video.io.ffmpeg_writer import FFMPEG_VideoWriter
 import numpy as np
 import PIL
 import torch as th
+import torch.nn.functional as F
+
 from configs.config import Config
 from mazes import Tiles
 from models.gnn import GCN
@@ -81,16 +83,16 @@ def delete_backup(fname):
         os.remove(fname + '.bkp')
 
 
-def save(ca, opt, logger, cfg):
-    model_path = f'{cfg.log_dir}/{ca_state_fname}'
-    optimizer_path = f'{cfg.log_dir}/{opt_state_fname}'
+def save(ca, opt, logger, log_dir):
+    model_path = f'{log_dir}/{ca_state_fname}'
+    optimizer_path = f'{log_dir}/{opt_state_fname}'
     backup_file(model_path)
     backup_file(optimizer_path)
     th.save(ca.state_dict(), model_path)
     th.save(opt.state_dict(), optimizer_path)
     delete_backup(model_path)
     delete_backup(optimizer_path)
-    with open(f'{cfg.log_dir}/{logger_fname}', 'wb') as f:
+    with open(f'{log_dir}/{logger_fname}', 'wb') as f:
         pickle.dump(logger, f)
 
 
@@ -154,9 +156,14 @@ def to_path(x):
     return x[:, -1, :, :]
 
 
+def get_ce_loss(paths, target_paths, cfg=None):
+    loss = F.binary_cross_entropy(F.sigmoid(paths), target_paths.float())
+    return loss
+
+
 def get_mse_loss(paths, target_paths, cfg=None):
     # Assuming dimension 0 is batch dimension.
-    err = (paths - target_paths).square().mean(dim=(1, 2))
+    err = (F.relu(paths) - target_paths).square().mean(dim=(1, 2))
     return err
 
 
@@ -182,12 +189,12 @@ def solnfree_pathfinding_loss(paths, target_paths, hillclimbing_model):
 def test_maze_gen_loss(wall_empty, target_paths, pathfinding_mode, cfg):
     # fuzziness = th.mean(th.abs(wall_empty - 0.5))
     fuzziness = th.mean(th.abs(0.5 - th.abs(wall_empty - 0.5)))
-    print('fuzziness', fuzziness.item())
+    # print('fuzziness', fuzziness.item())
     fuzziness_loss = fuzziness
     # return 1 - th.mean(th.abs(wall_empty - 0.5))
     # return fuzziness_loss
     pct_wall = th.mean(wall_empty)
-    print('pct_wall', pct_wall.item())
+    # print('pct_wall', pct_wall.item())
     pct_wall_loss = abs(.5 - pct_wall)
     # return pct_wall_loss
     return 1 * fuzziness_loss + 2.0 * pct_wall_loss

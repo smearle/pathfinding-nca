@@ -30,6 +30,7 @@ from mazes import Mazes, main_mazes  # Weirdly need this to be able to load data
 
 PAR_DIR = Path(__file__).parent
 RUNS_DIR = os.path.join(PAR_DIR, 'runs')
+# RUNS_DIR = "/checkpoint/samearle/pathfinding-nca/runs"
 
 
 def submit_slurm_job(sbatch_file, experiment_name, exp_cfg_path, job_time, job_cpus, job_gpus, job_mem):
@@ -75,7 +76,7 @@ def main_batch(batch_dict_cfg: BatchConfig):
     [setattr(batch_dict_cfg.sweep, k, v) for k, v in batch_dict_cfg.items() if hasattr(batch_cfg.sweep, k)]
     executor = None
     if batch_cfg.slurm:
-        executor = submitit.AutoExecutor(folder=os.path.join(RUNS_DIR, "submitit"))
+        executor = submitit.AutoExecutor(folder=os.path.join(PAR_DIR, "submitit"))
     # Time to request for each slurm job, in hours.
     job_time = 5
     batch_hyperparams = batch_dict_cfg.sweep
@@ -196,8 +197,11 @@ def main_batch(batch_dict_cfg: BatchConfig):
     # Only perform missing evals.
     filtered_exp_configs: List[BatchConfig] = []  # this shouldn't really be a `BatcConfig` eh?
     for exp_cfg in exp_configs:
-        if not batch_cfg.overwrite_evals and batch_cfg.evaluate and not batch_cfg.vis_cross_eval \
-            and os.path.exists(os.path.join(exp_cfg.log_dir, 'test_stats.json')):
+        if (not batch_cfg.overwrite_evals and batch_cfg.evaluate and not batch_cfg.vis_cross_eval 
+            # Have already evaluated key checkpoint, or...
+            and (os.path.isdir(exp_cfg.iter_log_dir) and os.path.exists(os.path.join(exp_cfg.iter_log_dir, 'test_stats.json')) or  
+                # ...have already evaluated (presumable) latest checkpoint.
+                not os.path.isdir(exp_cfg.iter_log_dir) and os.path.exists(os.path.join(exp_cfg.log_dir, 'test_stats.json')))):
             print("Already evaluated experiment, specify `overwrite_evals=True` to re-evaluate: ", exp_cfg.log_dir)
             # and os.path.exists(os.path.join(RUNS_DIR, exp_dir, 'test_stats.json')):
             continue
@@ -222,10 +226,20 @@ def main_batch(batch_dict_cfg: BatchConfig):
                 continue
 
     else:
-        executor.update_parameters(gpus_per_node=1, slurm_mem="16GB", cpus_per_task=1, slurm_time="5:00:00")
+        job_name = batch_cfg.sweep_name
+        if batch_cfg.evaluate:
+            slurm_time='5:00'
+            job_name += '_eval'
+        else:
+            slurm_time='5:00:00'
+        executor.update_parameters(slurm_job_name=job_name, gpus_per_node=1, slurm_mem="16GB", cpus_per_task=1, 
+            slurm_time=slurm_time, slurm_array_parallelism=200)
         with executor.batch():
             for exp_cfg in exp_configs:
-                exp_cfg_path = os.path.abspath(os.path.join(Path(__file__).parent, 'slurm', 'auto_configs', f'{exp_cfg.full_exp_name}.yaml'))
+                exp_cfg_path = os.path.abspath(os.path.join(Path(__file__).parent, 'slurm', 'auto_configs', f'{exp_cfg.full_exp_name}'))
+                if not os.path.exists(exp_cfg_path):
+                    os.makedirs(exp_cfg_path)
+                exp_cfg_path += 'autoconf.yaml'
                 yaml.dump(OmegaConf.to_yaml(exp_cfg), open(exp_cfg_path, 'w'))
                 executor.submit(main_experiment, exp_cfg)
 

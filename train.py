@@ -25,8 +25,8 @@ from utils import (backup_file, corner_idxs_3x3, corner_idxs_5x5, count_paramete
 
 def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_data_val: Mazes, 
         maze_data_test_32: Mazes, target_paths: th.Tensor, logger: Logger, cfg: Config, cfg_32):
+    tb_writer = None
     loss_fn = cfg.loss_fn
-    tb_writer = SummaryWriter(log_dir=cfg.log_dir)
     mazes_onehot, edges, edge_feats, maze_ims = maze_data.mazes_onehot, maze_data.edges, maze_data.edge_feats, \
         maze_data.maze_ims
     print("Done unpacking mazes.")
@@ -37,7 +37,6 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
 
     n_params = count_parameters(model, cfg)
     print(f'Number of learnable model parameters: {n_params}')
-    tb_writer.add_scalar('model/n_params', n_params, 0)
     if cfg.wandb:
         if logger.n_step == 0:
             wandb.log({'n_params': n_params}, step=0)
@@ -57,6 +56,10 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
             env_losses.fill_(-np.inf)
 
     for i in tqdm(range(logger.n_step, cfg.n_updates)):
+        if tb_writer is None:
+            tb_writer = SummaryWriter(log_dir=cfg.log_dir)
+        if i == 0:
+            tb_writer.add_scalar('model/n_params', n_params, 0)
         with th.no_grad():
             # Randomly select indices of data-points on which to train during this update step (i.e., minibatch)
             batch_idx = np.random.choice(hid_states.shape[0], minibatch_size, replace=False)
@@ -69,10 +72,10 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
 
             e0 = None
             if cfg.traversable_edges_only:
-                e0 = [edges[i] for i in batch_idx]
+                e0 = [edges[i].to(cfg.device) for i in batch_idx]
             ef = None
             if cfg.positional_edge_features:
-                ef = [edge_feats[i] for i in batch_idx]
+                ef = [edge_feats[i].to(cfg.device) for i in batch_idx]
             model.reset(x0, e0=e0, edge_feats=ef)
 
         # TODO: move initial auxiliary state to model? Probably a better way...
@@ -166,9 +169,16 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 wandb.log({"training/loss": loss.item()}, step=i)
             logger.log(loss=loss.item(), discrete_loss=discrete_loss.item())
                     
-            if i % cfg.save_interval == 0 or i == cfg.n_updates - 1:
-                save(model, opt, logger, cfg)
-                # print(f'Saved CA and optimizer state dicts and maze archive to {cfg.log_dir}')
+            key_ckp_step = ((i > 0) and (i % 50000 == 0))
+            last_step = (i == cfg.n_updates - 1)
+            if i % cfg.save_interval == 0 or last_step or key_ckp_step:
+                log_dir = cfg.log_dir
+                if key_ckp_step:
+                    log_dir = os.path.join(cfg.log_dir, f"iter_{i}")
+                    if not os.path.exists(log_dir):
+                        os.makedirs(log_dir)
+                save(model, opt, logger, log_dir)
+                # print(f'Saved CA and optimizer state dicts and maze archive to {log_dir}')
                 if env_gen_cfg is not None:
                     maze_data = Mazes(cfg, evo_mazes={
                         "mazes_onehot": mazes_onehot,
@@ -178,8 +188,8 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                         "edges": edges,
                         "edge_feats": edge_feats,
                     })
-                    evolved_data_path = os.path.join(cfg.log_dir, "evo_mazes.pkl")
-                    evolved_data_losses_path = os.path.join(cfg.log_dir, "env_losses.pkl")
+                    evolved_data_path = os.path.join(log_dir, "evo_mazes.pkl")
+                    evolved_data_losses_path = os.path.join(log_dir, "env_losses.pkl")
                     backup_file(evolved_data_path)
                     backup_file(evolved_data_losses_path)
                     with open(evolved_data_path, "wb") as f:
@@ -204,15 +214,15 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                         if cfg.wandb:
                             wandb.log({f"validation/32x32/mean_{k}": v[0]}, step=i)
 
-            if i % cfg.log_interval == 0 or i == cfg.n_updates - 1:
+            if i % cfg.log_interval == 0 or last_step:
                 log(logger, lr_sched, cfg)
             
-            if i % cfg.log_interval == 0 or i == cfg.n_updates - 1:
+            if i % cfg.log_interval == 0 or last_step:
                 render_paths = np.hstack(to_path(x[:cfg.render_minibatch_size]).cpu())
                 render_maze_ims = np.hstack(maze_ims[render_batch_idx])
                 target_path_ims = np.hstack(target_paths[render_batch_idx].cpu())
-                if cfg.manual_log:
-                    vis_train(logger, render_maze_ims, render_paths, target_path_ims, render_batch_idx, cfg)
+                if cfg.manual_log or last_step or key_ckp_step:
+                    vis_train(logger, render_maze_ims, render_paths, target_path_ims, render_batch_idx, cfg.log_dir)
                 images = np.vstack((
                     render_maze_ims*255, 
                     np.tile(render_paths[...,None], (1, 1, 3))*255, 
@@ -223,9 +233,6 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 if cfg.wandb:
                     images = wandb.Image(images, caption="Top: Input, Middle: Output, Bottom: Target")
                     wandb.log({"examples": images}, step=i)
-
-            if i == cfg.n_updates - 1:
-                vis_train(logger, render_maze_ims, render_paths, target_path_ims, render_batch_idx, cfg)
 
             evo_loss_thresh = 1e-2
             # evo_loss_thresh = 1
@@ -322,9 +329,13 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                     sols, edges_o, edges_feats_o = zip(*sols_edges_feats)
                 elif cfg.task == 'diameter':
                     # sols = pool.map(get_target_diam, [maze_discrete for maze_discrete in offspring_mazes.cpu()])
-                    sols = [get_target_diam(maze_onehot, cfg) for maze_onehot in offspring_mazes.cpu()]
+                    diam_tsp_edges_feats = [get_target_diam(maze_onehot, cfg) for maze_onehot in offspring_mazes_onehot.cpu()]
+                    sols, _, edges_o, edges_feats_o = zip(*diam_tsp_edges_feats)
+                elif cfg.task == 'traveling':
+                    diam_tsp_edges_feats = [get_target_diam(maze_onehot, cfg) for maze_onehot in offspring_mazes_onehot.cpu()]
+                    _, sols, edges_o, edges_feats_o = zip(*diam_tsp_edges_feats)
                 else:
-                    raise Exception
+                    raise NotImplementedError
 
                 # Encode the solutions as 2D binary path arrays in either case.
                 for si, sol in enumerate(sols):
@@ -416,7 +427,7 @@ def log(logger, lr_sched, cfg):
         ' lr:', lr_sched.get_last_lr(), # end=''
         )
 
-def vis_train(logger, render_maze_ims, render_path_ims, target_path_ims, render_batch_idx, cfg):
+def vis_train(logger, render_maze_ims, render_path_ims, target_path_ims, render_batch_idx, log_dir):
     fig, ax = plt.subplots(2, 4, figsize=(20, 10))
     plt.subplot(411)
     # smooth_loss_log = smooth(logger.loss_log, 10)
@@ -448,7 +459,7 @@ def vis_train(logger, render_maze_ims, render_path_ims, target_path_ims, render_
         # plt.imshow(np.hstack(x[...,-2:-1,:,:].permute([0,2,3,1]).cpu()))
         # plt.imshow(np.hstack(ca.x0[...,0:1,:,:].permute([0,2,3,1]).cpu()))
         # print(f'path activation min: {render_paths.min()}, max: {render_paths.max()}')
-    plt.savefig(f'{cfg.log_dir}/training_progress.png')
+    plt.savefig(f'{log_dir}/training_progress.png')
     plt.close()
     logger.last_time = timer()
 

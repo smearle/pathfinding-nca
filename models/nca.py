@@ -57,11 +57,16 @@ class NCA(PathfindingNN):
             modules = [nn.Sequential(OrderedDict([
                 (f'conv_{i}', _make_conv()), 
                 *[(f'supp_{i}', s()) for i, s in enumerate(supp_modules)],
-                (f'relu_{i}', nn.ReLU())])) for i in range(cfg.n_layers)
+                (f'relu_{i}', nn.ReLU())])) for i in range(cfg.n_layers - 1)
             ]
+            modules += [nn.Sequential(OrderedDict([
+                (f'conv_{cfg.n_layers - 1}', _make_conv()),
+                *[(f'supp_{cfg.n_layers - 1}', s()) for i, s in enumerate(supp_modules)],
+            ]))]
         else:
             conv_0 = _make_conv()
-            modules = [nn.Sequential(conv_0, *(s() for s in supp_modules), nn.ReLU()) for _ in range(cfg.n_layers)]
+            modules = [nn.Sequential(conv_0, *(s() for s in supp_modules), nn.ReLU()) for _ in range(cfg.n_layers - 1)]
+            modules += [nn.Sequential(conv_0, *(s() for s in supp_modules))]
 
         self.layers = nn.ModuleList(modules)
 

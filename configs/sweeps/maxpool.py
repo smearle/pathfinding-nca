@@ -18,6 +18,7 @@ class MaxPoolSweep(HyperSweepConfig):
         "2",
         "3",
         "4",
+
         # "5",
         # "6",
         # "7",
@@ -45,7 +46,7 @@ class MaxPoolSweep(HyperSweepConfig):
     ])
     max_pool: List[Any] = field(default_factory=lambda: [
         True,
-        False,
+        # False,
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
         True,

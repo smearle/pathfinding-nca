@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any, List
 import hydra
 
+from configs.env_gen import EnvGeneration2
 from configs.sweeps.all import HyperSweepConfig
 
 
@@ -15,13 +16,13 @@ class ModelSweep(HyperSweepConfig):
         # "FixedBfsNCA",
     ])
     exp_name: List[Any] = field(default_factory=lambda: [
-        # "0",
-        # "1",
-        # "2",
-        # "3",
-        # "4",
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
         # "5",
-        "6",
+        # "6",
 
         # "8",
         # "9",
@@ -34,19 +35,19 @@ class ModelSweep(HyperSweepConfig):
         "pathfinding",
     ])
     shared_weights: List[bool] = field(default_factory=lambda: [
-        True,
-        # False
+        # True,
+        False
     ])
     traversable_edges_only: List[bool] = field(default_factory=lambda: [
         True,
-        False,
+        # False,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
         # 4,
         # 8,
-        # 16,
+        16,
         # 24,
-        # 32,
+        32,
         64,
         # 96,
     ])
@@ -57,24 +58,16 @@ class ModelSweep(HyperSweepConfig):
         # 32,
         # 48,
         96,
-        # 128,
+        128,
         256,
         # 512,
     ])
-    loss_interval: List[Any] = field(default_factory=lambda: [
-        None,
-        # 4,
-        # 8,
-        # 16,
-        # 32,
-        # 64,
-    ])
     learning_rate: List[Any] = field(default_factory=lambda: [
-        0.0001,
-        # 0.00005,
+        # 0.0001,
+        0.00005,
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
         None,
-        # EnvGeneration(),
+        # EnvGeneration2(),
     ])
 

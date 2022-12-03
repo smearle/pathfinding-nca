@@ -128,8 +128,8 @@ names_to_hyperparams = {
     'gnn': [
         # "task",
         "model",
-        "traversable_edges_only",
-        # "positional_edge_features",
+        # "traversable_edges_only",
+        "positional_edge_features",
         # "env_generation",
         "n_layers",
         # "max_pool",
@@ -230,7 +230,7 @@ col_renaming = {
     'n params': 'n. params',
     'n updates': 'n. updates',
     'pct complete': 'pct. complete',
-    'accs': 'accuracies',
+    'accs': 'accuracy',
     'sol length': 'sol. length',
 }
 
@@ -338,7 +338,8 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str, se
         df.sort_index(inplace=True)
 
         csv_name = os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval.csv')
-        html_name = os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval.html')
+        html_name = os.path.join(EVAL_DIR, f'{task}_{name}_' + ('selective_' if selective_table else '') + 
+            'cross_eval.html')
 
         if not selective_table:
             csv_name_multi = os.path.join(EVAL_DIR, f'{task}_{name}_cross_eval_multi.csv')
@@ -380,8 +381,6 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str, se
             ndf.columns = new_col_indices
             ndf.index.names = df.index.names[:-1]
             ndf = ndf
-            ndf.to_csv(csv_name)
-            ndf.to_html(html_name)
 
             df = ndf
 
@@ -414,6 +413,8 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str, se
                                 col_name=k)
             )
     
+    ndf.to_csv(csv_name)
+    df.to_html(html_name)
     raw_tbl_tex_name = f'{task}_{batch_cfg.sweep_name}_cross_eval{("_selective" if selective_table else "")}.tex'
 
     # df.to_latex(os.path.join(EVAL_DIR, 'cross_eval.tex'), multirow=True)
@@ -478,14 +479,14 @@ def plot_by_n_params(df, task, bool_param):
         xs = list(df_b['model']['---']['n. params'])
         # No variance in n. params
         xs, _ = list(zip(*xs))
-        pct_complete = list(df_b[('test', '32x32', 'accuracies')])
+        pct_complete = list(df_b[('test', '32x32', 'accuracy')])
         y, yerr = list(zip(*pct_complete))
-        # to_omit = np.argwhere(np.array(xs) > 4e4)
-        # if len(to_omit) > 0:
-        #     to_omit = to_omit[0][0]
-        #     xs = xs[:to_omit]
-        #     y = y[:to_omit]
-            # yerr = yerr[:to_omit]
+        to_omit = np.argwhere(np.array(xs) > 6e5)
+        if len(to_omit) > 0:
+            to_omit = to_omit[0][0]
+            xs = xs[:to_omit]
+            y = y[:to_omit]
+            yerr = yerr[:to_omit]
         # plt.errorbar(xs, y, yerr=yerr, label=label)
         plt.errorbar(xs, y, yerr=yerr, fmt='o', color=color,
             ecolor=ecolor, elinewidth=3, capsize=0, label=label)
@@ -505,7 +506,7 @@ def plot_by_n_params(df, task, bool_param):
     plt.legend()
     plt.title(f"{task}, {bool_param}")
     plt.savefig(os.path.join(EVAL_DIR, f'{task}_{bool_param}_x_n_params.jpg'), dpi=2000)
-    plt.show()
+    # plt.show()
     plt.clf()
 
 

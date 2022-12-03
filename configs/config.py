@@ -68,7 +68,7 @@ class Config():
     log_interval: int = 1000
 
     # How often to save the model and optimizer to disk.
-    save_interval: int = 2000
+    save_interval: int = 1000
 
     eval_interval: int = 100
 
@@ -122,6 +122,7 @@ class Config():
     render: bool = False
     overwrite: bool = False
     wandb: bool = False
+    loss_fn: str = "ce"
 
     # Update our own image of loss curves and model outputs in the training directory (in addition to writing them to 
     # tensorboard and/or wandb).
@@ -159,6 +160,7 @@ class BatchConfig(Config):
     load_pickle: bool = False
     n_updates: int = 50000
     overwrite_evals: bool = False
+    headless: bool = False
 
 
 cs = ConfigStore.instance()

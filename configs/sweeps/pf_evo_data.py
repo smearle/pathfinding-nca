@@ -90,3 +90,7 @@ class PFEvoDataSweep(HyperSweepConfig):
         # 0.0001,
         0.00005,
     ])
+    loss_fn: List[Any] = field(default_factory=lambda: [
+        "ce",
+        # "mse", 
+    ])

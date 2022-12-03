@@ -35,9 +35,9 @@ class GNN(PathfindingNN):
                 in_channels=n_hid_chan + n_in_chan, 
                 out_channels=self.n_out_chan, 
                 # FIXME: This doesn't work?
-                add_self_loops=False, 
+                add_self_loops=False,
             )
-            weight = list(gconv0.modules())[1].weight
+            weight = list(gconv0.modules())[2].weight
             bias = gconv0.bias
 
             th.nn.init.normal_(weight, 0, 0.01)
@@ -122,7 +122,10 @@ class GNN(PathfindingNN):
             layer_kwargs = {}
 
 
-        x = self.layers[i](x, self.edges, **layer_kwargs).relu()
+        x = self.layers[i](x, self.edges, **layer_kwargs)
+        
+        if i < len(self.layers) - 1:
+            x = th.relu(x)
 
 #         x = self.layers[i*2](x, self.grid_edges).relu()
 #         x = self.layers[i*2+1](x, self.self_edges).relu()

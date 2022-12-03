@@ -10,9 +10,6 @@ from configs.sweeps.all import HyperSweepConfig
 class ScratchSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
     exp_name: str = 'scratch'
-    log_interval = 2
-    save_interval = 2
-    manual_log = True
     exp_name: List[Any] = field(default_factory=lambda: [
         # "0",
         # "1",
@@ -25,15 +22,15 @@ class ScratchSweep(HyperSweepConfig):
         "scratch",
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
-        None,
-        # EnvGeneration2(),
+        # None,
+        EnvGeneration2(),
     ])
     task: List[Any] = field(default_factory=lambda: [
         # "pathfinding",
         # "pathfinding_solnfree",
-        # "diameter",
+        "diameter",
         # "traveling",
-        "maze_gen",
+        # "maze_gen",
     ])
     max_pooling: List[Any] = field(default_factory=lambda: [
         # True,
@@ -95,7 +92,7 @@ class ScratchSweep(HyperSweepConfig):
     # # ])
     learning_rate: List[Any] = field(default_factory=lambda: [
         # 0.0001,
-        # 0.00005,
-        0.00001,
+        0.00005,
+        # 0.00001,
     ])
     

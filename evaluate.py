@@ -1,4 +1,5 @@
 import json
+import os
 import numpy as np
 from pdb import set_trace as TT
 import torch as th
@@ -24,6 +25,11 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
         is_eval (bool): Whether we are evaluating after training, in which case we collect more stats. (Otherwise, we 
             are validating during training, and compute less expensive metrics.)
     """
+    if os.path.isdir(cfg.iter_log_dir):
+        # Then we are evaluating a key checkpoint.
+        log_dir = cfg.iter_log_dir
+    else:
+        log_dir = cfg.log_dir
     loss_fn = cfg.loss_fn
     mazes_onehot, mazes_discrete, edges, edge_feats, target_paths = maze_data.mazes_onehot, maze_data.mazes_discrete, \
         maze_data.edges, maze_data.edge_feats, maze_data.target_paths
@@ -122,6 +128,7 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
     std_accs = np.std(accs)
     mean_discrete_accs = np.mean(discrete_accs)
     std_discrete_accs = np.std(discrete_accs)
+    sol_len = target_paths.sum((-1, -2)).float()
 
     stats = {
         'accs': (mean_accs, std_accs),
@@ -129,13 +136,14 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
         'losses': (np.mean(losses), np.std(losses)),
         'disc_losses': (np.mean(discrete_losses), np.std(discrete_losses)),
         'pct_complete': (np.mean(eval_pcts_complete), np.std(eval_pcts_complete)),
+        'sol_len': (th.mean(sol_len).item(), th.std(sol_len).item()),
     }
     if is_eval:
         stats.update({
             'completion_time': (np.nanmean(eval_completion_times), np.nanstd(eval_completion_times)),
         })
         # Dump stats to a json file
-        with open(f'{cfg.log_dir}/{name}_stats.json', 'w') as f:
+        with open(f'{log_dir}/{name}_stats.json', 'w') as f:
             json.dump(stats, f, indent=4)
         print(f'{name} stats:')
         print(json.dumps(stats, indent=4))

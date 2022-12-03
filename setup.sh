@@ -6,17 +6,20 @@
 
 # For most GPUs:
 #conda install pytorch torchvision torchaudio cudatoolkit=10.2 -c pytorch
-conda install pytorch torchvision torchaudio cudatoolkit=11.6 -c pytorch -c conda-forge
+# conda install pytorch torchvision torchaudio cudatoolkit=11.6 -c pytorch -c nvidia
+python -m pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
 
 # For 3090:
 # conda install pytorch torchvision torchaudio cudatoolkit=11.3 -c pytorch
 
 # No distinction between CUDA/CPU
-conda install pyg -c pyg
+# pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-1.12.0+cu116.html
+python -m pip install pyg-lib torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-1.13.0+cu116.html
+# conda install pyg -c pyg
 
 
 # Recommended speedup. Probably not important for us.
-# conda install scikit-learn-intelex
+conda install scikit-learn-intelex
 
 
 

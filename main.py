@@ -114,7 +114,13 @@ def main_experiment(cfg: Config = None, cfg_path: str = None):
             model, opt, logger = load(model, opt, cfg)
             if cfg.env_generation:
                 print("Loading environment generation data.")
-                maze_data_train = pickle.load(open(f"{cfg.log_dir}/evo_mazes.pkl", "rb"))
+                if os.path.isdir(cfg.iter_log_dir):
+                    # This will only be true if we are evaluating a key checkpoint (or experiment has already passed 
+                    # n_updates during prior training).
+                    evo_log_dir = cfg.iter_log_dir
+                else:
+                    evo_log_dir = cfg.log_dir
+                maze_data_train = pickle.load(open(f"{evo_log_dir}/evo_mazes.pkl", "rb"))
             loaded = True
         except FileNotFoundError as e:
             print("Failed to load, with error:\n", e)
@@ -134,9 +140,9 @@ def main_experiment(cfg: Config = None, cfg_path: str = None):
 
     if not loaded:
         if cfg.overwrite and os.path.exists(cfg.log_dir):
-            shutil.rmtree(cfg.log_dir)
+            shutil.rmtree(cfg.log_dir, ignore_errors=True)
         try:
-            os.mkdir(cfg.log_dir)
+            os.makedirs(cfg.log_dir)
             logger = Logger()
         except FileExistsError as e:
             raise FileExistsError(f"Experiment log folder {cfg.log_dir} already exists. Use `load=True` or "

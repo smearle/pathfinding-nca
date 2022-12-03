@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from typing import Any, List
-import hydra
 
 from configs.env_gen import EnvGeneration
 from configs.sweeps.all import HyperSweepConfig
@@ -11,19 +10,16 @@ class GNNSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
     name: str = 'gnn'
     exp_name: List[Any] = field(default_factory=lambda: [
-        # "0",
-        # "1",
-        # "2",
-        # "3",
-        # "4",
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
         # "5",
-        "6",
+        # "6",
         # "7",
         # "8",
         # "10",
-        # "11",
-        # "12",
-        # "scratch",
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
         # EnvGeneration(),
@@ -32,10 +28,6 @@ class GNNSweep(HyperSweepConfig):
     task: List[Any] = field(default_factory=lambda: [
         "pathfinding",
         # "diameter",
-    ])
-    max_pooling: List[Any] = field(default_factory=lambda: [
-        # True,
-        False,
     ])
     model: List[Any] = field(default_factory=lambda: [
         # "NCA",
@@ -51,13 +43,9 @@ class GNNSweep(HyperSweepConfig):
     ])
     positional_edge_features: List[Any] = field(default_factory=lambda: [
         False,
-        # True,
+        True,
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
-        True,
-        # False,
-    ])
-    cut_conv_corners: List[Any] = field(default_factory=lambda: [
         # True,
         False,
     ])
@@ -69,12 +57,13 @@ class GNNSweep(HyperSweepConfig):
     # #     # 32,
         # 48,
         96,
-        # 128,
+        128,
         256,
-        # 512,
+        # 320,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
-        # 16,
+        16,
+        32,
         # 48,
         64,
     #     # 96,
@@ -87,12 +76,9 @@ class GNNSweep(HyperSweepConfig):
         # 32,
         # 64,
     # ])
-    # # symmetric_conv: List[Any] = field(default_factory=lambda: [
-    #     # True,
-    #     # False,
-    # # ])
     learning_rate: List[Any] = field(default_factory=lambda: [
-        0.0001,
-        # 0.00005,
+        # 0.0001,
+        0.00005,
+        # 0.00001,
     ])
     

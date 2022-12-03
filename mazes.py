@@ -178,8 +178,9 @@ class Mazes():
             target_path = th.zeros_like(rand_maze_discrete)
             sol = np.array(sol)
             target_path[0, sol[:, 0], sol[:, 1]] = 1
-            if not th.all(th.conv2d(weight=th.Tensor([[[[1,1],[1,1]]]]).float(), input=target_path.float(), bias=th.Tensor([-4])) < 0):
-                TT()
+            # if not th.all(th.conv2d(weight=th.Tensor([[[[1,1],[1,1]]]]).float(), input=target_path.float(), bias=th.Tensor([-4])) < 0):
+            #     TT()
+            assert th.all(th.conv2d(weight=th.Tensor([[[[1,1],[1,1]]]]).float(), input=target_path.float(), bias=th.Tensor([-4])) < 0)
             target_paths.append(target_path)
             # For convenience, we use the same maze in the dataset for the diameter problem.
             diam_xy, connected, traveling_xy, dests_xy = diameter(width, graph, traveling=True)
@@ -394,10 +395,11 @@ def get_graph(onehot):
         ux, uy = u // width, u % width
         if onehot[Tiles.WALL, ux, uy] == 1:
             continue
-        if onehot[Tiles.SRC, ux, uy] == 1:
+        # Checking if we care about src/trg based on number of channels (eek)
+        if Tiles.SRC < onehot.shape[0] and onehot[Tiles.SRC, ux, uy] == 1:
             assert src is None
             src = u
-        if onehot[Tiles.TRG, ux, uy] == 1:
+        if Tiles.TRG < onehot.shape[0] and onehot[Tiles.TRG, ux, uy] == 1:
             assert trg is None
             trg = u
         neighbs_xy = [(ux - 1, uy), (ux, uy-1), (ux+1, uy), (ux, uy+1)]
@@ -411,7 +413,7 @@ def get_graph(onehot):
             edge_feats.append(edge_feat)
         edges.append((u, u))
         edge_feats.append((0, 0))
-    assert not (src is None and src == trg)
+    # assert not (src is None and src == trg)
     # if src is None and src == trg:
         # TT()
     edges = th.Tensor(edges).long()
@@ -471,7 +473,7 @@ def diameter(width, graph, traveling=True):
     max_path_xy = [(u // width, u % width) for u in max_path]
 
     # Place destinations in largest connected component.
-    target_traveling, dests_xy = None, None
+    traveling_xy, dests_xy = None, None
     if traveling:
         dests = [max_connected.popitem()[0] for i in range(min(len(max_connected), 10))]
         target_traveling = nx.algorithms.approximation.traveling_salesman_problem(graph, nodes=dests, cycle=True)
@@ -483,6 +485,7 @@ def diameter(width, graph, traveling=True):
 def get_shortest_path(onehot):
     width, height = onehot.shape[1:]
     graph, edges, edge_feats, src, trg = get_graph(onehot)
+    assert (src is not None) and (trg is not None) and (trg != src)
     # srcs = th.argwhere(arr==Tiles.EMPTY)
     # src = srcs[np.random.randint(len(srcs))]
     # src = src[0] * width + src[1]
@@ -506,11 +509,12 @@ def get_target_path(maze_onehot, cfg):
         return sol, edges, edge_feats
 
 
-def get_target_diam(maze_discrete, cfg):
-    diam, connected, traveling, dests_xy = diameter(maze_discrete.cpu().numpy(), cfg.n_in_chan, traveling=cfg.problem=='traveling')
+def get_target_diam(maze_onehot, cfg):
+    graph, edges, edge_feats, src, trg = get_graph(maze_onehot.cpu().numpy())
+    diam, connected, traveling, dests_xy = diameter(maze_onehot.shape[-2], graph, traveling=cfg.task=='traveling')
     # for (x, y) in diam:
         # offspring_target_paths[mi, x, y] = 1
-    return diam, traveling
+    return diam, traveling, edges, edge_feats
 
 
 if __name__ == "__main__":

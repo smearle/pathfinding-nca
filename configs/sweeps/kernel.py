@@ -1,4 +1,3 @@
-
 from dataclasses import dataclass, field
 from typing import Any, List
 import hydra
@@ -45,24 +44,24 @@ class KernelSweep(HyperSweepConfig):
         # "GCN",
     ])
     kernel_size: List[Any] = field(default_factory=lambda: [
-        # 3,
+        3,
         5,
     ])
     max_pool: List[Any] = field(default_factory=lambda: [
-        # True,
+        True,
         False,
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
         True,
-        # False,
+        False,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
         # 4,
         # 8,
         # 32,
 
-        # 48,
-        # 96,
+        48,
+        96,
         128,
 
         # 256,

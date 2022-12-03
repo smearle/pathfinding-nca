@@ -6,7 +6,7 @@ import torch as th
 from configs.config import Config
 from mazes import Tilesets
 import models
-from utils import get_mse_loss, maze_gen_loss, solnfree_pathfinding_loss
+from utils import get_ce_loss, get_mse_loss, maze_gen_loss, solnfree_pathfinding_loss
 
 
 def set_exp_name(cfg: Config):
@@ -19,22 +19,22 @@ def set_exp_name(cfg: Config):
             Tilesets, cfg.task.upper(),
         )()
 
-    # assert '-' not in self.exp_name, "Cannot have hyphens in `exp_name` (to allow for a backward compatibility hack)"
     validate(cfg)
-    # TODO: create distinct `full_exp_name` attribute where we'll write this thing, so we don't overwrite the user-
-    # supplied `exp_name`.
-    # In the meantime, using the presence of a hyphen to mean we have set the full `exp_name`:
+
+    sep = os.path.sep
+
     cfg.full_exp_name = ''.join([
-        f"{cfg.model}",
-        (f"_{cfg.task}" if cfg.task != "pathfinding" else ""),
-        ("_evoData" if cfg.env_generation is not None else ""),
-        ("_noShared" if not cfg.shared_weights else ""),
+        f"{cfg.task}", sep,
+        f"{cfg.model}", sep,
+        (f"genEnv" if cfg.env_generation is not None else ""), sep,
+        ("noShared" if not cfg.shared_weights else ""),
         ("_noSkip" if not cfg.skip_connections else ""),
         ("_maxPool" if cfg.max_pool else ""),
         (f"_{cfg.kernel_size}-kern" if cfg.kernel_size != 3 else ""),
         f"_{cfg.n_hid_chan}-hid",
         f"_{cfg.n_layers}-layer",
         f"_lr-{'{:.0e}'.format(cfg.learning_rate)}",
+        (f"_{cfg.loss_fn}-loss"),
         f"_{cfg.n_data}-data",
         (f"_{cfg.loss_interval}-loss" if cfg.loss_interval != cfg.n_layers else ''),
         ("_cutCorners" if cfg.cut_conv_corners and cfg.model == "NCA" else ""),
@@ -46,6 +46,17 @@ def set_exp_name(cfg: Config):
     ])
     cfg.log_dir = os.path.join(Path(__file__).parent.parent, "runs", cfg.full_exp_name)
 
+    # Has to happen after setting the log_dir (should store name as different attribute).
+    if cfg.task == "pathfinding_solnfree":
+        cfg.loss_fn = solnfree_pathfinding_loss
+    elif cfg.task == "maze_gen":
+        cfg.loss_fn = maze_gen_loss
+    elif cfg.loss_fn == "mse":
+        cfg.loss_fn = get_mse_loss
+    elif cfg.loss_fn == "ce":
+        cfg.loss_fn = get_ce_loss
+    else:
+        raise ValueError(f"Unknown loss function {cfg.loss_fn}.")
 
 def validate(cfg: Config):
     cfg.device = "cuda" if th.cuda.is_available() else "cpu"
@@ -97,10 +108,3 @@ def validate(cfg: Config):
     if cfg.render:
         cfg.wandb = False
         # self.render_minibatch_size = 1
-
-    if cfg.task == "pathfinding_solnfree":
-        cfg.loss_fn = solnfree_pathfinding_loss
-    elif cfg.task == "maze_gen":
-        cfg.loss_fn = maze_gen_loss
-    else:
-        cfg.loss_fn = get_mse_loss

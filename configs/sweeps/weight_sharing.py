@@ -17,14 +17,11 @@ class WeightSharingSweep(HyperSweepConfig):
         "2",
         "3",
         "4",
-        # "5",
-        # "6",
-        # "7",
-        # "8",
-        # "9",
-        # "10",
-        # "11",
-        # "12",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
         None,
@@ -40,34 +37,54 @@ class WeightSharingSweep(HyperSweepConfig):
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
         True,
-        # False,
+        False,
+    ])
+    cut_corners: List[Any] = field(default_factory=lambda: [
+        True,
+        False,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
-    #     # 4,
-    #     # 8,
-        # 32,
+        ### No shared weights only
+        4,
+        6,
 
+        8,
+
+        ### No shared weights only
+        10,
+        12,
+        14,
+
+        16,
+
+        ### No shared weights only
+        20,
+
+        24,
+
+        ### No shared weights only
+        28,
+
+        32,
+
+        ### Shared weights only
         48,
         96,
         128,
-
-    #     # 256,
+        160,
+        192,
+        224,
+        256,
+        # 512,
+        # 1024,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
-    #     # 48,
+        # 48,
         64,
         # 96,
-    #     # 128,
+        # 128,
     ])
-    loss_interval: List[Any] = field(default_factory=lambda: [
-    #     # 4,
-    #     # 8,
-    #     # 16,
-        32,
-        # 64,
+    learning_rate: List[Any] = field(default_factory=lambda: [
+        0.0001,
+        # 0.00005,
     ])
-    symmetric_conv: List[Any] = field(default_factory=lambda: [
-        # True,
-        False,
-    ])
-    

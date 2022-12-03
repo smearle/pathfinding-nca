@@ -11,42 +11,25 @@ from configs.sweeps.all import HyperSweepConfig
 class CutCornerSweep(HyperSweepConfig):
     """A config defining hyperparameter sweeps, whose cartesian product defines a set of `Config` instances."""
     name: str = 'cut_corners'
-    # save_interval: List[Any] = field(default_factory=lambda: [
-    #     10000,
-    # ])
-    # log_interval: List[Any] = field(default_factory=lambda: [
-    #     10000,
-    # ])
-    # n_updates: List[Any] = field(default_factory=lambda: [
-    #     50000,
-    # ])
-
     exp_name: List[Any] = field(default_factory=lambda: [
         "0",
         "1",
         "2",
         "3",
         "4",
-        # "5", 
-        # "debug",
-
-        # "8",
-        # "9",
-        # "10",
-        # "11",
-        # "12",
-    ])
-    cut_conv_corners: List[Any] = field(default_factory=lambda: [
-        True,
-        # False,
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
-        # EnvGeneration(),
         None,
+        # EnvGeneration2(),
     ])
     task: List[Any] = field(default_factory=lambda: [
         "pathfinding",
-        "diameter",
+        # "diameter",
     ])
     model: List[Any] = field(default_factory=lambda: [
         "NCA",
@@ -54,16 +37,46 @@ class CutCornerSweep(HyperSweepConfig):
     ])
     shared_weights: List[Any] = field(default_factory=lambda: [
         True,
+        False,
+    ])
+    cut_corners: List[Any] = field(default_factory=lambda: [
+        True,
         # False,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
-        # 4,
-        # 8,
-        # 32,
+        # ### No shared weights only
+        4,
+        6,
+
+        8,
+
+        # ### No shared weights only
+        10,
+        12,
+        14,
+
+        16,
+
+        # ### No shared weights only
+        20,
+
+        24,
+
+        # ### No shared weights only
+        28,
+
+        32,
+
+        # ### Shared weights only
         48,
         96,
         128,
-        # 256,
+        160,
+        192,
+        224,
+        256,
+        # 512,
+        # 1024,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
         # 48,
@@ -71,21 +84,7 @@ class CutCornerSweep(HyperSweepConfig):
         # 96,
         # 128,
     ])
-    loss_interval: List[Any] = field(default_factory=lambda: [
-        # 4,
-        # 8,
-        # 16,
-
-        # 32,
-        64,
-
-    ])
-    # symmetric_conv: List[Any] = field(default_factory=lambda: [
-    #     # True,
-    #     False,
-    # ])
     learning_rate: List[Any] = field(default_factory=lambda: [
-        # 0.0001,
-        0.00005,
+        0.0001,
+        # 0.00005,
     ])
-    
