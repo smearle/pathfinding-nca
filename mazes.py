@@ -71,7 +71,7 @@ def main_mazes(cfg: Config=None):
     train_fname = f"{maze_fname}_train.pk"
     val_fname = f"{maze_fname}_val.pk"
     test_fname = f"{maze_fname}_test.pk"
-    if np.any([os.path.exists(fname) for fname in [train_fname, val_fname, test_fname]]):
+    if cfg.overwrite_maze_data and np.any([os.path.exists(fname) for fname in [train_fname, val_fname, test_fname]]):
     #     user_input = input("File already exists. Overwrite? (y/n) ")
     #     while user_input not in ['y', 'n']:
     #         print(f"Invalid input '{user_input}'. Please enter 'y' or 'n'.")
@@ -81,17 +81,20 @@ def main_mazes(cfg: Config=None):
         
         print('Overwriting existing dataset...')
 
-    maze_data = Mazes(cfg)
-    with open(train_fname, 'wb') as f:
-        pickle.dump(maze_data, f)
+    if cfg.overwrite_maze_data or not os.path.isfile(train_fname):
+        maze_data = Mazes(cfg)
+        with open(train_fname, 'wb') as f:
+            pickle.dump(maze_data, f)
 
-    maze_data = Mazes(cfg)
-    with open(val_fname, 'wb') as f:
-        pickle.dump(maze_data, f)
+    if cfg.overwrite_maze_data or not os.path.isfile(val_fname):
+        maze_data = Mazes(cfg)
+        with open(val_fname, 'wb') as f:
+            pickle.dump(maze_data, f)
 
-    maze_data = Mazes(cfg)
-    with open(test_fname, 'wb') as f:
-        pickle.dump(maze_data, f)
+    if cfg.overwrite_maze_data or not os.path.isfile(test_fname):
+        maze_data = Mazes(cfg)
+        with open(test_fname, 'wb') as f:
+            pickle.dump(maze_data, f)
 
     # TODO: Render a big grid of all the data.
 

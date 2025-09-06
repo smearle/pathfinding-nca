@@ -121,6 +121,7 @@ class Config():
     load: bool = False
     render: bool = False
     overwrite: bool = False
+    overwrite_maze_data: bool = False
     wandb: bool = False
     loss_fn: str = "ce"
 
