@@ -9,7 +9,11 @@ pandas
 Pillow
 pyyaml
 scienceplots
+scipy
 submitit
 tensorboard
 torchinfo
+torch[cuda]
+torchvision
+torch_geometric
 wandb

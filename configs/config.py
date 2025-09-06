@@ -149,8 +149,7 @@ class Config():
 @dataclass
 class BatchConfig(Config):
     """A class for batch configurations. This is used for parallel SLURM jobs, or a sequence of local jobs."""
-    sweep: HyperSweepConfig = HyperSweepConfig()
-    # batch_hyperparams: HyperSweepConfig = HyperSweepConfig()
+    sweep: HyperSweepConfig = field(default_factory=HyperSweepConfig)
     slurm: bool = False
     vis_cross_eval: bool = False
     gen_new_data: bool = False

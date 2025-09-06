@@ -8,17 +8,21 @@ We also hand-code Breadth- and Depth-First Search implementations using pathfind
 
 ## Installation
 
-This code was developed with python 3.9. First, modify `setup.sh` so that the command for torch installation matches your system, i.e., whether you have a GPU, 
-and which version of CUDA it requires. You can also find the latest installation instructions for pytorch [here](https://pytorch.org/get-started/locally/). Then, run:
+Using python 3.13, 
 ```
-bash setup.sh
+pip install -r requirements.txt
 ```
 
 ## Use
 
+To generate new data, run
+```
+python sweep.py gen_new_data=True
+```
+
 To run experiments involving multiple (repeated) runs over various hyper-parameters, we use the `BatchConfig` classes defined in `configs/sweeps`. These will define, for various hyper-parameters, lists of values for these hyperparemeters, with which experiments will be run in sequence (or in parallel, by submitting a series of independent jobs, using SLURM). For example, running
 ```
-python run_batch.py +sweep=kernel slurm=True
+python sweep.py +sweep=kernel slurm=True
 ```
  will submit a series of jobs on a SLURM cluster, involving experiments with NCAs with differently-sized convolutional kernels, by loading the `KernelSweep` config defined in `configs/sweeps/kernel.py`.
  
