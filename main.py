@@ -45,7 +45,7 @@ def main_experiment_load_cfg(cfg_path: str = None):
     main_experiment(cfg=cfg)
 
 
-# @hydra.main(config_path=None, config_name="config")
+@hydra.main(config_path='configs', config_name="config")
 def main_experiment(cfg: Config = None, cfg_path: str = None):
     # TODO: Re-enable running this script/function directly? (i.e. main hydra.main.) Currently always going through 
     #   `run_batch.py`.
@@ -154,7 +154,7 @@ def main_experiment(cfg: Config = None, cfg_path: str = None):
         wandb.init(
             project='pathfinding-nca', 
             name=cfg.full_exp_name, 
-            id=cfg.full_exp_name,
+            id=cfg.full_exp_name.replace('/', '_'),
             config=hyperparam_cfg,
             # resume="allow" if cfg.load else None,
         )
@@ -172,7 +172,7 @@ def main_experiment(cfg: Config = None, cfg_path: str = None):
     if cfg.render:
         with th.no_grad():
             render_trained(model, maze_data_train, cfg)
-            render_trained(model, maze_data_test_32, cfg_32, name="_32")
+            render_trained(model, maze_data_test_32, cfg_32, render_name="_32")
 
     else:
         print("Beginning to train.")

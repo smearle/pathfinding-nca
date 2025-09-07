@@ -18,7 +18,7 @@ import torch.nn.functional as F
 from configs.config import Config
 from mazes import Tiles
 from models.gnn import GCN
-from render import N_RENDER_CHANS, render_ep_cv2
+from render import render_trained
 
 from models.nn import PathfindingNN
 
@@ -157,7 +157,7 @@ def to_path(x):
 
 
 def get_ce_loss(paths, target_paths, cfg=None):
-    loss = F.binary_cross_entropy(F.sigmoid(paths), target_paths.float())
+    loss = F.binary_cross_entropy(F.sigmoid(paths.double()), target_paths.double())
     return loss
 
 

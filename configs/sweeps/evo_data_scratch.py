@@ -22,8 +22,8 @@ class EvoDataScratchSweep(HyperSweepConfig):
         # None,
     ])
     task: List[Any] = field(default_factory=lambda: [
-        "diameter",
-        # "pathfinding",
+        # "diameter",
+        "pathfinding",
     ])
     model: List[Any] = field(default_factory=lambda: [
         "NCA",
@@ -38,15 +38,15 @@ class EvoDataScratchSweep(HyperSweepConfig):
     #     # 8,
         # 32,
         # 48,
-        96,
-        # 128,
+        # 96,
+        128,
     #     # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
     #     # 48,
-        64,
+        # 64,
         # 96,
-    #     # 128,
+        128,
     ])
     loss_interval: List[Any] = field(default_factory=lambda: [
     #     # 4,

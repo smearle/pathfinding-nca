@@ -423,7 +423,7 @@ def log(logger, lr_sched, cfg):
     fps = cfg.n_layers * cfg.minibatch_size * cfg.log_interval / (timer() - logger.last_time)
     print('step_n:', len(logger.loss_log),
         ' loss: {:.6e}'.format(logger.loss_log[-1]),
-        ' fps: {:.2f}'.format(fps), 
+        ' fps: {:,.2f}'.format(fps), 
         ' lr:', lr_sched.get_last_lr(), # end=''
         )
 

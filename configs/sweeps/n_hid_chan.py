@@ -23,14 +23,14 @@ class HidChanSweep(HyperSweepConfig):
         # 16,
         # 32,
         # 48,
-        96,
-        # 128,
+        # 96,
+        128,
         # 256,
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
-        64,
+        # 64,
         # 96,
-        # 128,
+        128,
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
         None,

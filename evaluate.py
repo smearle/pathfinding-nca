@@ -85,7 +85,7 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
 
                 if j == cfg.n_layers - 1:
                     if is_eval:
-                        baseline_loss = loss_fn(th.zeros_like(target_paths_minibatch, dtype=float), target_paths_minibatch).mean().item()
+                        baseline_loss = loss_fn(th.zeros_like(target_paths_minibatch, dtype=th.double), target_paths_minibatch).mean().item()
                         baseline_losses.append(baseline_loss)
                     out_paths = to_path(x_clipped)
                     eval_loss = loss_fn(out_paths, target_paths_minibatch).mean().item()
