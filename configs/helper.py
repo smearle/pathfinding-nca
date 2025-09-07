@@ -22,28 +22,31 @@ def set_exp_name(cfg: Config):
     validate(cfg)
 
     sep = os.path.sep
-
-    cfg.full_exp_name = ''.join([
-        f"{cfg.task}", sep,
-        f"{cfg.model}", sep,
-        (f"genEnv" if cfg.env_generation is not None else ""), sep,
-        ("noShared" if not cfg.shared_weights else ""),
-        ("_noSkip" if not cfg.skip_connections else ""),
-        ("_maxPool" if cfg.max_pool else ""),
-        (f"_{cfg.kernel_size}-kern" if cfg.kernel_size != 3 else ""),
-        f"_{cfg.n_hid_chan}-hid",
-        f"_{cfg.n_layers}-layer",
-        f"_lr-{'{:.0e}'.format(cfg.learning_rate)}",
-        (f"_{cfg.loss_fn}-loss"),
-        f"_{cfg.n_data}-data",
-        (f"_{cfg.loss_interval}-loss" if cfg.loss_interval != cfg.n_layers else ''),
-        ("_cutCorners" if cfg.cut_conv_corners and cfg.model == "NCA" else ""),
-        ("_symmConv" if cfg.symmetric_conv and cfg.model == "NCA" else ""),
-        ('_sparseUpdate' if cfg.sparse_update else ''),
-        ('_edgeFeats' if cfg.positional_edge_features else ''),
-        ('_travEdges' if cfg.traversable_edges_only else ''),
-        f"_{cfg.exp_name}",
-    ])
+    components = [
+        f"{cfg.task}",
+        f"{cfg.model}",
+        f"genEnv" if cfg.env_generation is not None else "",
+        "noShared" if not cfg.shared_weights else "",
+        "noSkip" if not cfg.skip_connections else "",
+        "maxPool" if cfg.max_pool else "",
+        (
+            (f"{cfg.kernel_size}-kern_" if cfg.kernel_size != 3 else "") + \
+            f"{cfg.n_hid_chan}-hid"
+            f"_{cfg.n_layers}-layer"
+            f"_lr-{'{:.0e}'.format(cfg.learning_rate)}"
+            f"_{cfg.loss_fn}-loss"
+            f"_{cfg.n_data}-data" + \
+            (f"_{cfg.loss_interval}-loss" if cfg.loss_interval != cfg.n_layers else '') + \
+            ("_cutCorners" if cfg.cut_conv_corners and cfg.model == "NCA" else "") + \
+            ("_symmConv" if cfg.symmetric_conv and cfg.model == "NCA" else "") + \
+            ('_sparseUpdate' if cfg.sparse_update else '') + \
+            ('_edgeFeats' if cfg.positional_edge_features else '') + \
+            ('_travEdges' if cfg.traversable_edges_only else '') + \
+            f"_{cfg.exp_name}"
+        )
+    ]
+    # Remove empty components and join with separator
+    cfg.full_exp_name = sep.join([c for c in components if c])
     cfg.log_dir = os.path.join(Path(__file__).parent.parent, "runs", cfg.full_exp_name)
 
     # Has to happen after setting the log_dir (should store name as different attribute).

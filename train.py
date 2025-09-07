@@ -201,7 +201,7 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
 
             if i % cfg.eval_interval == 0:
                 val_stats = evaluate(model, maze_data_val, cfg.val_batch_size, "validate", cfg)
-                logger.log_val(val_stats)
+                # logger.log_val(val_stats)
                 for k, v in val_stats.items():
                     tb_writer.add_scalar(f"validation/mean_{k}", v[0], i)
                     if cfg.wandb:
@@ -215,7 +215,9 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                             wandb.log({f"validation/32x32/mean_{k}": v[0]}, step=i)
 
             if i % cfg.log_interval == 0 or last_step:
-                log(logger, lr_sched, cfg)
+                fps = log(logger, i, loss, lr_sched, cfg)
+                if cfg.wandb:
+                    wandb.log({'fps': fps}, step=i)
             
             if i % cfg.log_interval == 0 or last_step:
                 render_paths = np.hstack(to_path(x[:cfg.render_minibatch_size]).cpu())
@@ -234,9 +236,9 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                     images = wandb.Image(images, caption="Top: Input, Middle: Output, Bottom: Target")
                     wandb.log({"examples": images}, step=i)
 
-            evo_loss_thresh = 1e-2
+            evo_loss_thresh = 5e-1
             # evo_loss_thresh = 1
-            if env_gen_cfg is not None and loss < evo_loss_thresh and last_evo >= env_gen_cfg.gen_interval:
+            if (env_gen_cfg is not None) and (loss < evo_loss_thresh) and (last_evo >= env_gen_cfg.gen_interval):
             # if True:
                 last_evo = 0
                 # and i % env_gen_cfg.gen_interval == 0 \
@@ -419,13 +421,14 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 last_evo += 1
                 
 
-def log(logger, lr_sched, cfg):
-    fps = cfg.n_layers * cfg.minibatch_size * cfg.log_interval / (timer() - logger.last_time)
-    print('step_n:', len(logger.loss_log),
-        ' loss: {:.6e}'.format(logger.loss_log[-1]),
+def log(logger, step_i, loss, lr_sched, cfg):
+    fps = (step_i + 1) * cfg.n_layers * cfg.minibatch_size * cfg.log_interval / (timer() - logger.last_time)
+    print('step_n:', step_i,
+        ' loss: {:.6e}'.format(loss),
         ' fps: {:,.2f}'.format(fps), 
         ' lr:', lr_sched.get_last_lr(), # end=''
         )
+    return fps
 
 def vis_train(logger, render_maze_ims, render_path_ims, target_path_ims, render_batch_idx, log_dir):
     fig, ax = plt.subplots(2, 4, figsize=(20, 10))

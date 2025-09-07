@@ -10,5 +10,5 @@ class EnvGeneration:
 
 @dataclass
 class EnvGeneration2:
-    gen_interval: int = 10
+    gen_interval: int = 50
     evo_batch_size: int = 64

@@ -57,8 +57,8 @@ class Logger():
 
     def log(self, loss, discrete_loss):
         """Log training loss (once per update step)."""
-        self.loss_log.append(loss)
-        self.discrete_loss_log.append(discrete_loss)
+        # self.loss_log.append(loss)
+        # self.discrete_loss_log.append(discrete_loss)
         self.n_step += 1
 
     def log_val(self, val_stats):

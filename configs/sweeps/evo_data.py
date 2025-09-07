@@ -35,7 +35,7 @@ class EvoDataSweep(HyperSweepConfig):
     ])
     task: List[Any] = field(default_factory=lambda: [
         "pathfinding",
-        "diameter",
+        # "diameter",
     ])
     model: List[Any] = field(default_factory=lambda: [
         "NCA",
@@ -47,14 +47,14 @@ class EvoDataSweep(HyperSweepConfig):
     ])
     kernel_size: List[Any] = field(default_factory=lambda: [
         3,
-        5,
+        # 5,
     ])
     cut_conv_corners: List[Any] = field(default_factory=lambda: [
-        True,
+        # True,
         False,
     ])
     max_pool: List[Any] = field(default_factory=lambda: [
-        True,
+        # True,
         False,
     ])
     n_hid_chan: List[Any] = field(default_factory=lambda: [
@@ -69,7 +69,7 @@ class EvoDataSweep(HyperSweepConfig):
     ])
     n_layers: List[Any] = field(default_factory=lambda: [
         # 48,
-        64,
+        # 64,
         # 96,
         128,
     ])

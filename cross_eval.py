@@ -374,7 +374,7 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str, se
                 mean_exp = [(i, e) for i, e in zip(mean_exp, std_exp)]
                 new_rows.append(mean_exp)
             ndf = pd.DataFrame()
-            ndf = ndf.append(new_rows)
+            ndf = ndf._append(new_rows)
             new_col_indices = pd.MultiIndex.from_tuples(df.columns)
             new_row_indices = pd.MultiIndex.from_tuples(new_row_names)
             ndf.index = new_row_indices
@@ -423,9 +423,8 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str, se
         os.path.join(EVAL_DIR, raw_tbl_tex_name), 
         multirow=True, 
         index=True, 
-        header=True,
         vertical_bars=True,
-        columns=col_indices, 
+        header=col_indices, 
         multicolumn=True, 
         multicolumn_format='c|',
         right_align_first_column=False,
@@ -551,7 +550,7 @@ def bold_extreme_values(data, data_max=-1, col_name=None):
     return data
 
 
-def pandas_to_latex(df_table, latex_file, vertical_bars=False, right_align_first_column=True, header=True, index=False,
+def pandas_to_latex(df_table, latex_file, vertical_bars=False, right_align_first_column=True, index=False,
                     escape=False, multicolumn=False, **kwargs) -> None:
     """
     Function that augments pandas DataFrame.to_latex() capability.
@@ -579,7 +578,7 @@ def pandas_to_latex(df_table, latex_file, vertical_bars=False, right_align_first
         # Add the vertical lines
         cols = '|' + '|'.join(cols) + '|'
 
-    latex = df_table.to_latex(escape=escape, index=index, column_format=cols, header=header, multicolumn=multicolumn,
+    latex = df_table.to_latex(escape=escape, index=index, column_format=cols, multicolumn=multicolumn,
                               **kwargs)
     latex = latex.replace('\\begin{table}', '\\begin{table*}')
     latex = latex.replace('\end{table}', '\end{table*}')
@@ -600,7 +599,7 @@ def pandas_to_latex(df_table, latex_file, vertical_bars=False, right_align_first
         # Find horizontal start and end indices of multicols
         # Here's a hack for the evo cross eval table.
         hstart = 1 + offset
-        hend = offset + len(kwargs['columns'])
+        hend = offset + len(kwargs['header'])
         midrule_str += rf'\cline{{{hstart}-{hend}}}'
 
         # Ensure that headers don't get colored by row highlighting

@@ -33,40 +33,6 @@ RUNS_DIR = os.path.join(PAR_DIR, 'runs')
 # RUNS_DIR = "/checkpoint/samearle/pathfinding-nca/runs"
 
 
-def submit_slurm_job(sbatch_file, experiment_name, exp_cfg_path, job_time, job_cpus, job_gpus, job_mem):
-    # Need to `import *` here to prevent missing classes when loading mazes using pickle.
-    cmd = f'python -c "from main import *; main_experiment_load_cfg(\'{exp_cfg_path}\')"'
-
-    with open(sbatch_file) as f:
-        content = f.read()
-        # job_name = 'nca_'
-        # if args.evaluate:
-            # job_name += 'eval_'
-        # job_name += str(experiment_name)
-        output_path = os.path.join(RUNS_DIR, f'{experiment_name}.out')
-        job_name = experiment_name
-        content = re.sub(r'--job-name=.*', f'--job-name={job_name}', content)
-        content = re.sub(r'--output=.*', f'--output={output_path}', content)
-        ##SBATCH --gres=gpu:1
-        gpu_str = f"#SBATCH --gres=gpu:{job_gpus}" if job_gpus > 0 else f"##SBATCH --gres=gpu:1"
-        content = re.sub(r'#+SBATCH --gres=gpu:\d+', gpu_str, content)
-        content = re.sub(r'#SBATCH --time=\d+:', '#SBATCH --time={}:'.format(job_time), content)
-        content = re.sub(r'#SBATCH --cpus-per-task=\d+', '#SBATCH --cpus-per-task={}'.format(job_cpus), content)
-        content = re.sub(r'#SBATCH --mem=\d+GB', '#SBATCH --mem={}GB'.format(job_mem), content)
-        cmd = '\n' + cmd
-        new_content = re.sub('\n.*python -c "from main import.*', cmd, content)
-
-    with open(sbatch_file, 'w') as f:
-        f.write(new_content)
-
-    os.system('sbatch {}'.format(sbatch_file))
-
-
-def dump_config(exp_name, exp_cfg):
-    with open(os.path.join('configs', 'auto', f'{exp_name}.json'), 'w') as f:
-        json.dump(exp_cfg, f, indent=4)
-
-
 @hydra.main(config_path=None, config_name="batch_config", version_base="1.2")
 def main_batch(batch_dict_cfg: BatchConfig):
     batch_cfg: BatchConfig = BatchConfig()
@@ -233,7 +199,7 @@ def main_batch(batch_dict_cfg: BatchConfig):
         else:
             slurm_time='5:00:00'
         executor.update_parameters(slurm_job_name=job_name, gpus_per_node=1, slurm_mem="16GB", cpus_per_task=1, 
-            slurm_time=slurm_time, slurm_array_parallelism=200)
+            slurm_time=slurm_time, slurm_array_parallelism=200, slurm_account='pr_174_tandon_advanced')
         with executor.batch():
             for exp_cfg in exp_configs:
                 exp_cfg_path = os.path.abspath(os.path.join(Path(__file__).parent, 'slurm', 'auto_configs', f'{exp_cfg.full_exp_name}'))

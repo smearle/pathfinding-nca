@@ -76,7 +76,7 @@ class Config():
     n_updates: int = 50000        
 
     # How many mazes on which to train at once
-    minibatch_size: int= 32 
+    minibatch_size: int= 256
 
     # Size of minibatch for rendering images and animations.
     render_minibatch_size: int = 1
@@ -122,7 +122,7 @@ class Config():
     render: bool = False
     overwrite: bool = False
     overwrite_maze_data: bool = False
-    wandb: bool = False
+    wandb: bool = True
     loss_fn: str = "ce"
 
     # Update our own image of loss curves and model outputs in the training directory (in addition to writing them to 
