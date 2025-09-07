@@ -20,7 +20,7 @@ class HyperSweepConfig():
     # n_updates: List[Any] = field(default_factory=lambda: [
         # 50000,
     # ])
-    n_updates: int = 50000
+    n_updates: int = 100_000
 
     # exp_name: List[Any] = field(default_factory=lambda: [
         # "2",

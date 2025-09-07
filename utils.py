@@ -156,14 +156,18 @@ def to_path(x):
     return x[:, -1, :, :]
 
 
-def get_ce_loss(paths, target_paths, cfg=None):
-    loss = F.binary_cross_entropy(F.sigmoid(paths.double()), target_paths.double())
+def get_ce_loss(paths, target_paths, cfg=None, reduction='mean'):
+    loss = F.binary_cross_entropy(F.sigmoid(paths.double()), target_paths.double(), reduction=reduction)
+    if reduction == 'none':
+        loss = loss.mean(dim=(1, 2))
     return loss
 
 
-def get_mse_loss(paths, target_paths, cfg=None):
+def get_mse_loss(paths, target_paths, cfg=None, reduction='mean'):
     # Assuming dimension 0 is batch dimension.
     err = (F.relu(paths) - target_paths).square().mean(dim=(1, 2))
+    if reduction == 'mean':
+        err = err.mean()
     return err
 
 

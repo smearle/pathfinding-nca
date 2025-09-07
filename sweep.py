@@ -6,27 +6,27 @@ directory.
 import argparse
 from collections import namedtuple
 import copy
+import json
+import os
 from pathlib import Path
 from typing import Iterable, List
-import hydra
-from omegaconf import DictConfig, OmegaConf
-from itertools import product
-import json
-import omegaconf
-import os
-from pdb import set_trace as TT
-import re
-import submitit
 import traceback
 import yaml
 
+import hydra
+import omegaconf
+from omegaconf import OmegaConf
+import dotenv
+import submitit
+
 from configs.config import BatchConfig
 from configs import helper as config_helper
-from cross_eval import vis_cross_eval
+from cross_eval import vis_cross_eval, EVAL_DIR
 from main import main_experiment
 from mazes import Mazes, main_mazes  # Weirdly need this to be able to load dataset of mazes.
 # from cross_eval import vis_cross_eval
 
+dotenv.load_dotenv()
 
 PAR_DIR = Path(__file__).parent
 RUNS_DIR = os.path.join(PAR_DIR, 'runs')
@@ -154,6 +154,7 @@ def main_batch(batch_dict_cfg: BatchConfig):
                 tasks[ec.task].append(ec)
 
         for task, exp_configs in tasks.items():
+
             vis_cross_eval(exp_configs, batch_cfg, task, selective_table=False)
             vis_cross_eval(exp_configs, batch_cfg, task, selective_table=True)
 
@@ -198,8 +199,18 @@ def main_batch(batch_dict_cfg: BatchConfig):
             job_name += '_eval'
         else:
             slurm_time='5:00:00'
-        executor.update_parameters(slurm_job_name=job_name, gpus_per_node=1, slurm_mem="16GB", cpus_per_task=1, 
-            slurm_time=slurm_time, slurm_array_parallelism=200, slurm_account='pr_174_tandon_advanced')
+        executor.update_parameters(
+            slurm_job_name=job_name,
+            slurm_gres='gpu:1',
+            slurm_mem="30GB",
+            cpus_per_task=1,
+            slurm_time=slurm_time,
+            slurm_array_parallelism=200,
+            slurm_account=os.environ["SLURM_USER"],
+            slurm_mail_type="ALL",
+            slurm_mail_user=os.environ["SLURM_MAIL_USER"],
+            slurm_constraint="rtx8000|v100",
+        )
         with executor.batch():
             for exp_cfg in exp_configs:
                 exp_cfg_path = os.path.abspath(os.path.join(Path(__file__).parent, 'slurm', 'auto_configs', f'{exp_cfg.full_exp_name}'))

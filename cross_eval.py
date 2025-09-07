@@ -102,7 +102,7 @@ names_to_hyperparams = {
         'env_generation',
         # 'kernel_size',
         # 'max_pool',
-        'shared_weights',
+        # 'shared_weights',
         # 'cut_conv_corners',
         # 'n_hid_chan',
         # 'learning_rate',
@@ -190,7 +190,7 @@ names_to_cols = {
         'TEST_pct_complete',
         # 'TEST_completion_time',
         'TEST_32_accs',
-        # 'TEST_32_pct_complete',
+        'TEST_32_pct_complete',
     ],
     'loss_interval': [
         'TRAIN_pct_complete',
@@ -304,7 +304,10 @@ def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str, se
             row_tpl = []
             for h in hyperparams:
                 if h == 'env_generation':
-                    row_tpl.append(getattr(exp_cfg, h) is not None)
+                    if getattr(exp_cfg, h) is None:
+                        row_tpl.append('fixed')
+                    else:
+                        row_tpl.append(getattr(exp_cfg, h).gen_interval)
                 # elif h == 'exp_name':
                     # FIXME: hack
                     # row_tpl.append(getattr(exp_cfg, h).split('_')[-1])

@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any, List
 import hydra
 
-from configs.env_gen import EnvGeneration2, EnvGeneration3
+from configs.env_gen import EnvGeneration50, EnvGeneration10
 from configs.sweeps.all import HyperSweepConfig
 
 
@@ -18,9 +18,9 @@ class EvoDataScratchSweep(HyperSweepConfig):
         "scratch",
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
-        EnvGeneration3(),
-        EnvGeneration2(),
-        None,
+        EnvGeneration10(),
+        # EnvGeneration50(),
+        # None,
     ])
     task: List[Any] = field(default_factory=lambda: [
         # "diameter",
@@ -49,13 +49,13 @@ class EvoDataScratchSweep(HyperSweepConfig):
         # 96,
         128,
     ])
-    loss_interval: List[Any] = field(default_factory=lambda: [
-    #     # 4,
-    #     # 8,
-    #     # 16,
-        # 32,
-        64,
-    ])
+    # loss_interval: List[Any] = field(default_factory=lambda: [
+    # #     # 4,
+    # #     # 8,
+    # #     # 16,
+    #     # 32,
+    #     # 64,
+    # ])
     symmetric_conv: List[Any] = field(default_factory=lambda: [
         # True,
         False,

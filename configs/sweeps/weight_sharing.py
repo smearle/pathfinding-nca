@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, List
 import hydra
-from configs.env_gen import EnvGeneration2
+from configs.env_gen import EnvGeneration50
 
 from configs.sweeps.all import HyperSweepConfig
 

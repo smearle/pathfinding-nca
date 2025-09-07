@@ -53,7 +53,7 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 print("Env losses array not found. Initializing from scratch.")
         if not loaded_env_losses:
             env_losses = th.empty((cfg.n_data))
-            env_losses.fill_(-np.inf)
+            env_losses.fill_(np.inf)
 
     for i in tqdm(range(logger.n_step, cfg.n_updates)):
         if tb_writer is None:
@@ -93,6 +93,7 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
         # the forward pass twice!
         # x = th.utils.checkpoint.checkpoint_sequential([model]*cfg.n_layers, 32, x)
 
+        # FIXME: This assumes that `cfg.n_layers` is divisible by `cfg.loss_interval`... Not super clean!
         n_subepisodes = cfg.n_layers // cfg.loss_interval
         loss = 0
         if cfg.env_generation:
@@ -361,7 +362,8 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                         x = model(x)
 
                     out_paths = to_path(x)
-                    batch_errs = loss_fn(out_paths, offspring_target_paths)
+                    batch_errs = loss_fn(out_paths, offspring_target_paths, reduction='none')
+                    # Print number of unique losses
                     # err = (out_paths - offspring_target_paths).square()
                     offspring_env_losses += batch_errs
 
