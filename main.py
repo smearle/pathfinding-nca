@@ -109,6 +109,7 @@ def main_experiment(cfg: Config = None, cfg_path: str = None):
     print("Done loading 32x32 mazes.")
 
     loaded = False
+    wandb_run_id = None
     if cfg.load:
         try:
             model, opt, logger = load(model, opt, cfg)
@@ -122,6 +123,9 @@ def main_experiment(cfg: Config = None, cfg_path: str = None):
                     evo_log_dir = cfg.log_dir
                 maze_data_train = pickle.load(open(f"{evo_log_dir}/evo_mazes.pkl", "rb"))
             loaded = True
+            with open(os.path.join(cfg.log_dir, "wandb_run_id.txt"), "r") as f:
+                wandb_run_id = f.read().strip()
+            print(f"Loaded wandb run id {wandb_run_id}.")
         except FileNotFoundError as e:
             print("Failed to load, with error:\n", e)
             if cfg.evaluate:
@@ -151,13 +155,17 @@ def main_experiment(cfg: Config = None, cfg_path: str = None):
     if cfg.wandb:
         hyperparam_cfg = {k: v for k, v in vars(cfg).items() if k not in set({'log_dir', 'exp_name'})}
         wandb.login()
-        wandb.init(
+        run = wandb.init(
             project='pathfinding-nca', 
-            name=cfg.full_exp_name, 
-            id=cfg.full_exp_name.replace('/', '_'),
+            # name=cfg.full_exp_name, 
+            # id=cfg.full_exp_name.replace('/', '_'),
+            id=wandb_run_id,
             config=hyperparam_cfg,
             # resume="allow" if cfg.load else None,
         )
+    wandb_run_id = run.id
+    with open(os.path.join(cfg.log_dir, "wandb_run_id.txt"), "w") as f:
+        f.write(wandb_run_id)
 
     # Save a dictionary of the config to a json for future reference.
     # json.dump(cfg.__dict__, open(f'{cfg.log_dir}/config.json', 'w'))

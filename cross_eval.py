@@ -98,13 +98,13 @@ names_to_hyperparams = {
         'cut_conv_corners',
     ],
     'evo_data': [
-        'model',
+        # 'model',
         'env_generation',
-        'kernel_size',
-        'max_pool',
+        # 'kernel_size',
+        # 'max_pool',
         'shared_weights',
-        'cut_conv_corners',
-        'n_hid_chan',
+        # 'cut_conv_corners',
+        # 'n_hid_chan',
         # 'learning_rate',
     ],
     'diam_evo_data': [

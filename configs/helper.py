@@ -25,7 +25,7 @@ def set_exp_name(cfg: Config):
     components = [
         f"{cfg.task}",
         f"{cfg.model}",
-        f"genEnv" if cfg.env_generation is not None else "",
+        f"genEnv-{cfg.env_generation.gen_interval}" if cfg.env_generation is not None else "fixEnv",
         "noShared" if not cfg.shared_weights else "",
         "noSkip" if not cfg.skip_connections else "",
         "maxPool" if cfg.max_pool else "",

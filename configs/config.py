@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from pdb import set_trace as TT
 from typing import Any, List, Optional
+from configs.env_gen import EnvGeneration
 from configs.sweeps.diam_evo_data import DiamEvoDataSweep
 
 import hydra
@@ -130,7 +131,7 @@ class Config():
     manual_log: bool = False
 
     # A regime for generating environments in parallel with training with the aim of increasing the model's generality.
-    env_generation: Any = None
+    env_generation: Optional[EnvGeneration] = None
 
     # Load a config from a file at this path. Will override all other config options.
     load_config_path: Any = None
