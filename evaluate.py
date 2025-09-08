@@ -87,7 +87,8 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
                     if is_eval:
                         baseline_loss = loss_fn(th.zeros_like(target_paths_minibatch, dtype=th.double), target_paths_minibatch).mean().item()
                         baseline_losses.append(baseline_loss)
-                    out_paths = to_path(x_clipped)
+                    # out_paths = to_path(x_clipped)
+                    out_paths = to_path(x)
                     eval_loss = loss_fn(out_paths, target_paths_minibatch).mean().item()
                     # print(baseline_loss, eval_loss)
                     eval_discrete_loss = get_discrete_loss(x_clipped, target_paths_minibatch).cpu().numpy()
@@ -131,10 +132,10 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
     sol_len = target_paths.sum((-1, -2)).float()
 
     stats = {
-        'accs': (mean_accs, std_accs),
-        'discrete_accs': (mean_discrete_accs, std_discrete_accs),
         'losses': (np.mean(losses), np.std(losses)),
         'disc_losses': (np.mean(discrete_losses), np.std(discrete_losses)),
+        'accs': (mean_accs, std_accs),
+        'discrete_accs': (mean_discrete_accs, std_discrete_accs),
         'pct_complete': (np.mean(eval_pcts_complete), np.std(eval_pcts_complete)),
         'sol_len': (th.mean(sol_len).item(), th.std(sol_len).item()),
     }
