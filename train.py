@@ -8,6 +8,7 @@ import numpy as np
 # from ray.util.multiprocessing import Pool
 from timeit import default_timer as timer
 import torch as th
+from torch.nn import functional as F
 from torch.utils.tensorboard import SummaryWriter
 import torchvision.models as models
 from tqdm import tqdm
@@ -22,6 +23,143 @@ from models.nn import PathfindingNN
 from utils import (backup_file, corner_idxs_3x3, corner_idxs_5x5, count_parameters, delete_backup, get_discrete_loss, 
     get_mse_loss, Logger, to_path, save)
 
+
+def flood_from_sources(free_mask: th.Tensor, src_onehot: th.Tensor, four_conn: bool = True, max_iters: int | None = None):
+    """
+    free_mask: (B, H, W) bool/byte tensor where True means traversable (i.e., not a wall)
+    src_onehot: (B, H, W) bool/byte tensor with exactly one True per batch (the source cell)
+    four_conn: 4- or 8-neighborhood connectivity
+    returns reachable: (B, H, W) bool tensor of cells reachable from the source staying in free space
+    """
+    B, H, W = free_mask.shape
+    device = free_mask.device
+    # Convolution kernel for dilation
+    k = th.tensor([[0,1,0],
+                    [1,1,1],
+                    [0,1,0]], dtype=th.float32, device=device)
+    k = k.view(1,1,3,3)
+
+    # State as (B,1,H,W) float/bool
+    reach = src_onehot.clone().bool().view(B,1,H,W)
+    free = free_mask.view(B,1,H,W)
+
+    # Reasonable upper bound on steps: diameter <= H*W/2
+    T = max_iters if max_iters is not None else ((H * W) // 2)
+
+    for _ in range(T):
+        # Dilate current frontier
+        nbr = F.conv2d(reach.float(), k, padding=1) > 0
+        # Constrain to free space and add previous
+        new_reach = (nbr & free) | reach
+        if th.equal(new_reach, reach):
+            break
+        reach = new_reach
+
+    return reach.view(B,H,W)
+
+def pick_reachable_targets(reachable: th.Tensor, src_idxs_tuple: tuple[th.Tensor,th.Tensor,th.Tensor]):
+    """
+    reachable: (B,H,W) bool, includes the source cell; chooses a RANDOM reachable cell != source.
+    src_idxs_tuple: (b_idx, y_idx, x_idx) each shape (B,) indicating the current source per batch.
+    returns (trg_b, trg_y, trg_x) each shape (B,), and a valid_mask (B,) in case some batch has no target.
+    """
+    B, H, W = reachable.shape
+    # Exclude source from candidate set
+    r = reachable.clone()
+    r[src_idxs_tuple] = False
+
+    # If a batch has no reachable target (fully enclosed source), we’ll mark invalid.
+    # Sample with Gumbel-max trick over masked logits.
+    logits = th.where(r, th.rand(B,H,W, device=reachable.device), th.full((B,H,W), -1e9, device=reachable.device))
+    flat = logits.view(B, -1)
+    flat_idx = flat.argmax(dim=1)  # (B,)
+
+    # valid if we didn’t pick a masked -1e9
+    valid = (flat.max(dim=1).values > -1e6)
+
+    y = flat_idx // W
+    x = flat_idx % W
+    b = th.arange(B, device=reachable.device)
+    return (b, y, x), valid
+
+def select_adjacent_cells(src_idxs, H, W, device, prefer_non_border=True):
+    """
+    Build 4-neighbor candidate coordinates per batch and a validity mask
+    (optionally forbidding border cells). Returns ny (B,4), nx (B,4), valid (B,4).
+    """
+    b, sy, sx = src_idxs  # each shape (B,)
+    B = b.shape[0]
+
+    # 4-neighborhood offsets: up, down, left, right
+    offs = th.tensor([[-1,0],[1,0],[0,-1],[0,1]], device=device)
+    ny = sy[:,None] + offs[:,0]   # (B,4)
+    nx = sx[:,None] + offs[:,1]   # (B,4)
+
+    # In-bounds mask
+    inb = (ny >= 0) & (ny < H) & (nx >= 0) & (nx < W)
+
+    if prefer_non_border:
+        non_border = (ny > 0) & (ny < H-1) & (nx > 0) & (nx < W-1)
+        valid = inb & non_border
+    else:
+        valid = inb
+
+    return ny, nx, valid
+
+def fallback_open_adjacent_and_place_target(
+    invalid_mask: th.Tensor,
+    src_idxs: tuple[th.Tensor, th.Tensor, th.Tensor],
+    offspring_maze_walls: th.Tensor,
+    free_mask: th.Tensor,
+):
+    """
+    For batches where invalid_mask==True (no reachable target), open a valid adjacent cell
+    by flipping a wall -> empty and set that as the target location.
+
+    Mutates offspring_maze_walls and free_mask in-place. Returns trg tuple (b,y,x) for ALL batches,
+    where valid batches will have dummy values (ignored by caller when merging).
+    """
+    device = offspring_maze_walls.device
+    B, H, W = offspring_maze_walls.shape
+    b, sy, sx = src_idxs
+
+    ny, nx, valid = select_adjacent_cells(src_idxs, H, W, device, prefer_non_border=True)  # (B,4)
+
+    # If a row has no valid interior neighbor (rare), allow any in-bounds neighbor as backup
+    none_valid = ~valid.any(dim=1)
+    if none_valid.any():
+        ny2, nx2, valid2 = select_adjacent_cells(src_idxs, H, W, device, prefer_non_border=False)
+        valid = th.where(none_valid[:,None], valid2, valid)
+        ny = th.where(none_valid[:,None], ny2, ny)
+        nx = th.where(none_valid[:,None], nx2, nx)
+
+    # Build logits that prefer walls (so we actually "open" one); break ties randomly.
+    # Score = 1.0 if it's currently a wall, else 0.0; add small random noise for randomness.
+    # Mask out invalid with -inf.
+    candidate_is_wall = th.zeros((B,4), device=device, dtype=th.float32)
+    # Gather wall status at neighbors
+    # (B,4) by advanced indexing per candidate
+    candidate_is_wall = offspring_maze_walls[b[:,None], ny.clamp(0,H-1), nx.clamp(0,W-1)].float()
+    logits = th.where(valid, candidate_is_wall + th.rand_like(candidate_is_wall)*1e-2,
+                      th.full_like(candidate_is_wall, -1e9))
+    # Only choose for invalid batches
+    idx4 = logits.argmax(dim=1)  # (B,)
+    sel_b = th.arange(B, device=device)
+    sel_y = ny[sel_b, idx4]
+    sel_x = nx[sel_b, idx4]
+
+    # Keep only invalid batches; others will be ignored by caller.
+    sel_b = sel_b[invalid_mask]
+    sel_y = sel_y[invalid_mask]
+    sel_x = sel_x[invalid_mask]
+
+    if sel_b.numel() > 0:
+        # Flip chosen neighbors to empty (0) and update free_mask
+        offspring_maze_walls[sel_b, sel_y, sel_x] = 0
+        free_mask[sel_b, sel_y, sel_x] = True
+
+    # Return full-size trg tuple (all batches); caller will merge selectively.
+    return (b, ny[th.arange(B, device=device), idx4], nx[th.arange(B, device=device), idx4])
 
 def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_data_val: Mazes, 
         maze_data_test_32: Mazes, target_paths: th.Tensor, logger: Logger, cfg: Config, cfg_32):
@@ -259,9 +397,10 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 offspring_maze_walls = mazes_onehot[mut_idxs, Tiles.WALL]
 
                 # Mutate the maze walls (except at the border).
-                disc_noise = th.randint(1, 2, offspring_maze_walls.shape)
+                # disc_noise = th.randint(1, 2, offspring_maze_walls.shape)
                 wall_mut_mask = th.rand(offspring_maze_walls.shape) < .1
-                disc_noise *= wall_mut_mask
+                # disc_noise *= wall_mut_mask
+                disc_noise = wall_mut_mask
                 disc_noise[:, 0, :] = disc_noise[:, -1] = 0
                 disc_noise[:, :, 0] = disc_noise[:, :, -1] = 0
                 offspring_maze_walls = (offspring_maze_walls + disc_noise) % 2
@@ -274,9 +413,9 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                     src_idxs = th.argwhere(offspring_mazes_onehot[:, Tiles.SRC] == 1)
                     trg_idxs = th.argwhere(offspring_mazes_onehot[:, Tiles.TRG] == 1)
                     assert not th.any(th.sum(src_idxs == trg_idxs, 1) == 3)
-                    # Evolve 5% of sources, 5% of targets.
+                    # Evolve 5% of sources (we'll always place a new target in case new walls have broken the old path)
                     src_mut_mask = th.rand(evo_batch_size) < 0.05
-                    trg_mut_mask = th.rand(evo_batch_size) < 0.05
+                    # trg_mut_mask = th.rand(evo_batch_size) < 0.05
                     # Uniform randomly select new source/target locations.
                     # We'll use this heatmap, prefering max values to be our new location.
                     src_trg_loc_heat = th.rand((2, *offspring_mazes.shape))
@@ -292,32 +431,49 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                     src_idxs_o = th.stack((th.arange(evo_batch_size), 
                         th.div(flat_src_idxs_o, src_loc_heat.shape[-2], rounding_mode='trunc'),
                         flat_src_idxs_o % src_loc_heat.shape[-2]), dim=1)
-                    # src_idxs_o = (src_loc_heat == 
-                    #     th.max(src_loc_heat, dim=-2, keepdim=True)[0].max(dim=-1, keepdim=True)[0]).nonzero()
+                    src_idxs_o = (src_loc_heat == 
+                        th.max(src_loc_heat, dim=-2, keepdim=True)[0].max(dim=-1, keepdim=True)[0]).nonzero()
                     src_idxs[src_mut_mask] = src_idxs_o[src_mut_mask]
                     # Going from `argwhere` type indices to `where` type ones (tuples)
                     src_idxs = tuple(src_idxs[:, i] for i in range(src_idxs.shape[1]))
-                    # We mask out the new sources to ensure new targets don't overlap.
-                    trg_loc_heat[src_idxs] = -1
-                    # trg_idxs_o = (trg_loc_heat == 
-                    #     th.max(trg_loc_heat, dim=-2, keepdim=True)[0].max(dim=-1, keepdim=True)[0]).nonzero()
-                    flat_trg_idxs_o = th.argmax(trg_loc_heat.view(trg_loc_heat.shape[0], -1), 1)
-                    trg_idxs_o = th.stack((th.arange(evo_batch_size), 
-                        th.div(flat_trg_idxs_o, trg_loc_heat.shape[-2], rounding_mode='trunc'),
-                        flat_trg_idxs_o % trg_loc_heat.shape[-2]), dim=1)
-                    trg_idxs[trg_mut_mask] = trg_idxs_o[trg_mut_mask]
-                    trg_idxs = tuple(trg_idxs[:, i] for i in range(trg_idxs.shape[1]))
+                    # Ensure we are working with free-space mask (True=free)
+                    free_mask = (offspring_maze_walls == 0)
 
-                    # src_mut = th.randint(0, max(cfg.width, cfg.height), (2, evo_batch_size)) * src_mut_mask
-                    # src_idxs_o = (src_idxs[0], (src_idxs[1] + src_mut[0]) % cfg.width, (src_idxs[2] + src_mut[1]) % cfg.height)
-                    # trg_mut = th.randint(0, max(cfg.width, cfg.height), (2, evo_batch_size)) * trg_mut_mask
-                    # trg_idxs_o = (trg_idxs[0], (trg_idxs[1] + trg_mut[0]) % cfg.width, (trg_idxs[2] + trg_mut[1]) % cfg.height)
+                    # Build one-hot sources from src_idxs (currently a tuple of 3 index arrays or a stacked tensor)
+                    # If you still have src_idxs as a stacked (B,3) tensor, convert to tuple:
+                    # src_idxs = (src_idxs[:,0], src_idxs[:,1], src_idxs[:,2])
 
-                    # Place source and target inside borders.
+                    B, H, W = offspring_maze_walls.shape
+
+                    src_onehot = th.zeros((B, H, W), dtype=th.bool, device=free_mask.device)
+                    src_onehot[src_idxs] = True
+                    reachable = flood_from_sources(free_mask, src_onehot, four_conn=True)
+                    # Sample a random reachable cell per batch as target (excluding the source)
+                    (trg_b, trg_y, trg_x), valid_mask = pick_reachable_targets(reachable, src_idxs)
+                    # If some batches are invalid (no reachable cell), open an adjacent wall and place TRG there
+                    if (~valid_mask).any():
+                        # offspring_maze_walls: 1=wall, 0=empty; free_mask = (offspring_maze_walls==0)
+                        fallback_trg = fallback_open_adjacent_and_place_target(
+                            invalid_mask=(~valid_mask),
+                            src_idxs=src_idxs,  # (b,y,x)
+                            offspring_maze_walls=offspring_maze_walls,
+                            free_mask=free_mask,
+                        )
+                        fb_b, fb_y, fb_x = fallback_trg
+
+                        # Use fallback only for invalid batches
+                        trg_b = th.where(valid_mask, trg_b, fb_b)
+                        trg_y = th.where(valid_mask, trg_y, fb_y)
+                        trg_x = th.where(valid_mask, trg_x, fb_x)
+
+                    trg_idxs = (trg_b, trg_y, trg_x)
+
+                    # Clear and place SRC/TRG (as before)
                     offspring_mazes[src_idxs] = Tiles.SRC
                     offspring_mazes[trg_idxs] = Tiles.TRG
+
                     n_src = th.sum(offspring_mazes == Tiles.SRC)
-                    assert not (n_src != th.sum(offspring_mazes == Tiles.TRG) or n_src != evo_batch_size)
+                    assert not ((n_src != th.sum(offspring_mazes == Tiles.TRG)) or (n_src != evo_batch_size))
                     # assert th.sum(offspring_mazes == Tiles.SRC) == th.sum(offspring_mazes == Tiles.TRG) == evo_batch_size
 
                 offspring_mazes = offspring_mazes.type(th.int64)
@@ -342,8 +498,7 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
 
                 # Encode the solutions as 2D binary path arrays in either case.
                 for si, sol in enumerate(sols):
-                    if len(sol) == 0:
-                        continue
+                    assert len(sol) > 0, "Evolved maze has no solution. This shouldn't happen."
                     sol = th.Tensor(sol).long()
                     offspring_target_paths[si, sol[:, 0], sol[:, 1]] = 1
 
