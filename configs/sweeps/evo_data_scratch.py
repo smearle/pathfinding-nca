@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any, List
 import hydra
 
-from configs.env_gen import EnvGeneration50, EnvGeneration10
+from configs.env_gen import EnvGeneration50, EnvGeneration10, EnvGeneration1
 from configs.sweeps.all import HyperSweepConfig
 
 
@@ -18,7 +18,8 @@ class EvoDataScratchSweep(HyperSweepConfig):
         "scratch",
     ])
     env_generation: List[Any] = field(default_factory=lambda: [
-        EnvGeneration10(),
+        EnvGeneration1(),
+        # EnvGeneration10(),
         # EnvGeneration50(),
         # None,
     ])

@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any, List
 import hydra
 
-from configs.env_gen import EnvGeneration, EnvGeneration100, EnvGeneration50, EnvGeneration10
+from configs.env_gen import EnvGeneration, EnvGeneration100, EnvGeneration50, EnvGeneration10, EnvGeneration1
 from configs.sweeps.all import HyperSweepConfig
 
 
@@ -34,6 +34,7 @@ class EvoDataSweep(HyperSweepConfig):
         EnvGeneration100(),
         EnvGeneration50(),
         EnvGeneration10(),
+        EnvGeneration1(),
     ])
     task: List[Any] = field(default_factory=lambda: [
         "pathfinding",

@@ -154,6 +154,8 @@ class BatchConfig(Config):
     sweep: HyperSweepConfig = field(default_factory=HyperSweepConfig)
     slurm: bool = False
     vis_cross_eval: bool = False
+    plot_cross_eval: bool = False
+    plot_individual_runs: bool = False
     gen_new_data: bool = False
     load_all: bool = False
     filter_by_config: bool = False
@@ -162,6 +164,8 @@ class BatchConfig(Config):
     n_updates: int = 50000
     overwrite_evals: bool = False
     headless: bool = False
+    smooth_window: int = 1
+    smooth_std: bool = True
 
 
 cs = ConfigStore.instance()

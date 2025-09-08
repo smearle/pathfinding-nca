@@ -248,7 +248,7 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
 
             # loss += get_mse_loss(x, target_paths_mini_batch)
             out_paths = to_path(x)
-            batch_errs = loss_fn(out_paths, target_paths_mini_batch)
+            batch_errs = loss_fn(out_paths, target_paths_mini_batch, reduction='none')
             # err = (out_paths - target_paths_mini_batch).square()
             loss = loss + batch_errs.mean()
 
@@ -436,8 +436,6 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                     src_idxs_o = th.stack((th.arange(evo_batch_size), 
                         th.div(flat_src_idxs_o, src_loc_heat.shape[-2], rounding_mode='trunc'),
                         flat_src_idxs_o % src_loc_heat.shape[-2]), dim=1)
-                    src_idxs_o = (src_loc_heat == 
-                        th.max(src_loc_heat, dim=-2, keepdim=True)[0].max(dim=-1, keepdim=True)[0]).nonzero()
                     src_idxs[src_mut_mask] = src_idxs_o[src_mut_mask]
                     # Going from `argwhere` type indices to `where` type ones (tuples)
                     src_idxs = tuple(src_idxs[:, i] for i in range(src_idxs.shape[1]))

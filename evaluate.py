@@ -51,7 +51,7 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
         if is_eval:
             eval_completion_times = []
             # What would the loss be if the model output all zeros (sometimes this happens!). Treat this as 0 accuracy, so we 
-            # can better analyzer performance of good models.
+            # can better analyze performance of good models.
             baseline_losses = []
         i = 0
 
@@ -80,7 +80,7 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
             for j in range(cfg.n_layers):
                 x = model(x)
 
-                if j == cfg.n_layers - 1 or is_eval:
+                if j == cfg.n_layers - 1:
                     x_clipped = th.clip(x, 0, 1)
 
                 if j == cfg.n_layers - 1:
@@ -96,12 +96,12 @@ def evaluate(model: PathfindingNN, maze_data: Mazes, batch_size: int, name: str,
                     discrete_losses.append(eval_discrete_loss.mean().item())
                     eval_pcts_complete.append(eval_pct_complete)
 
-                if is_eval:
-                    eval_discrete_loss = get_discrete_loss(x_clipped, target_paths_minibatch).cpu()
-                    completion_times = np.where(eval_discrete_loss.reshape(batch_size, -1).sum(dim=1) == 0, j, completion_times)
-                    # Clamp to avoid dividing by 0.
-                    completion_times /= np.clip(path_lengths, a_min=1, a_max=None)
-                    eval_completion_times.append(np.nanmean(completion_times))
+                # if is_eval:
+                #     eval_discrete_loss = get_discrete_loss(x_clipped, target_paths_minibatch).cpu()
+                #     completion_times = np.where(eval_discrete_loss.reshape(batch_size, -1).sum(dim=1) == 0, j, completion_times)
+                #     # Clamp to avoid dividing by 0.
+                #     completion_times /= np.clip(path_lengths, a_min=1, a_max=None)
+                #     eval_completion_times.append(np.nanmean(completion_times))
 
                     # fig, ax = plt.subplots(figsize=(10, 10))
                     # solved_maze_ims = np.hstack(render_discrete(x0_discrete[:cfg.render_minibatch_size], cfg))

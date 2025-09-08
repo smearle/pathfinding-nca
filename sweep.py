@@ -21,7 +21,7 @@ import submitit
 
 from configs.config import BatchConfig
 from configs import helper as config_helper
-from cross_eval import vis_cross_eval, EVAL_DIR
+from cross_eval import plot_cross_eval, vis_cross_eval, EVAL_DIR
 from main import main_experiment
 from mazes import Mazes, main_mazes  # Weirdly need this to be able to load dataset of mazes.
 # from cross_eval import vis_cross_eval
@@ -144,7 +144,7 @@ def main_batch(batch_dict_cfg: BatchConfig):
             print("Skipping experiment.")
     exp_configs = filtered_exp_configs
 
-    if batch_cfg.vis_cross_eval:
+    if batch_cfg.vis_cross_eval or batch_cfg.plot_cross_eval:
         # Visualize one table per task.
         tasks = {}
         for ec in exp_configs:
@@ -155,8 +155,11 @@ def main_batch(batch_dict_cfg: BatchConfig):
 
         for task, exp_configs in tasks.items():
 
-            vis_cross_eval(exp_configs, batch_cfg, task, selective_table=False)
-            vis_cross_eval(exp_configs, batch_cfg, task, selective_table=True)
+            if batch_cfg.plot_cross_eval:
+                plot_cross_eval(exp_configs, batch_cfg, task)
+            if batch_cfg.vis_cross_eval:
+                vis_cross_eval(exp_configs, batch_cfg, task, selective_table=False)
+                vis_cross_eval(exp_configs, batch_cfg, task, selective_table=True)
 
 
         return
@@ -196,9 +199,9 @@ def main_batch(batch_dict_cfg: BatchConfig):
         job_name = batch_cfg.sweep_name
         if batch_cfg.evaluate:
             slurm_time='5:00'
-            job_name += '_eval'
+            job_name = 'eval_' + job_name
         else:
-            slurm_time='5:00:00'
+            slurm_time='12:00:00'
         executor.update_parameters(
             slurm_job_name=job_name,
             slurm_gres='gpu:1',

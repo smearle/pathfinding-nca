@@ -8,10 +8,10 @@ from typing import List
 
 import matplotlib.pyplot as plt
 import numpy as np
-from configs.config import BatchConfig, Config
-
 import pandas as pd
+from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
+from configs.config import BatchConfig, Config
 from mazes import load_dataset
 
 
@@ -182,14 +182,24 @@ names_to_cols = {
         # 'TEST_32_pct_complete',
     ],
     'evo_data': [
-        'n_params',
+        # 'n_params',
         'TRAIN_sol_len',
+        'TRAIN_losses',
         'TRAIN_accs',
+        'TRAIN_disc_losses',
+        'TRAIN_discrete_accs',
+        'TRAIN_pct_complete',
         # 'TRAIN_completion_time',
+        'TEST_losses',
+        'TEST_disc_losses',
         'TEST_accs',
+        'TEST_discrete_accs',
         'TEST_pct_complete',
         # 'TEST_completion_time',
+        'TEST_32_losses',
         'TEST_32_accs',
+        'TEST_32_disc_losses',
+        'TEST_32_discrete_accs',
         'TEST_32_pct_complete',
     ],
     'loss_interval': [
@@ -233,6 +243,156 @@ col_renaming = {
     'accs': 'accuracy',
     'sol length': 'sol. length',
 }
+
+
+def _moving_avg_nan(y: np.ndarray, window: int) -> np.ndarray:
+    """NaN-safe centered moving average with 'same' length."""
+    if window <= 1:
+        return y
+    y = np.asarray(y, dtype=float)
+    kernel = np.ones(window, dtype=float)
+    num = np.convolve(np.nan_to_num(y, nan=0.0), kernel, mode='same')
+    den = np.convolve(~np.isnan(y), kernel, mode='same')
+    out = np.empty_like(y)
+    with np.errstate(invalid='ignore', divide='ignore'):
+        out = num / np.maximum(den, 1.0)
+    out[den == 0] = np.nan
+    # If kernel is larger than input, we need to trim the output to match the input
+    if window > y.shape[0]:
+        trim = (window - y.shape[0]) // 2
+        out = out[trim: -trim or None]
+    return out
+
+
+def get_grp_name(cfg: Config, hyperparams: List[str]) -> str:
+    "Get group name from config and list of hyperparameters."
+    grp_name = ""
+    for h in hyperparams:
+        if h == 'env_generation':
+            if getattr(cfg, h) is None:
+                grp_name += 'fixed_'
+            else:
+                grp_name += f'genEnv-{getattr(cfg, h).gen_interval}_'
+        else:
+            grp_name += f'{h}-{getattr(cfg, h)}_'
+    return grp_name[:-1]
+
+
+def plot_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str):
+
+    mean_plots_dir = os.path.join(EVAL_DIR, 'plots')
+    os.makedirs(mean_plots_dir, exist_ok=True)
+
+    hyperparams = names_to_hyperparams[batch_cfg.sweep_name]
+
+    tags_to_grps_to_vals = {}
+
+    for exp_cfg in exp_cfgs:
+        # Load results from relevant checkpoint if possible.
+        if os.path.isdir(exp_cfg.iter_log_dir):
+            log_dir = exp_cfg.iter_log_dir
+        else:
+            log_dir = exp_cfg.log_dir
+        event_acc = EventAccumulator(log_dir)
+        event_acc.Reload()
+        scalar_tags = event_acc.Tags()['scalars']
+        for tag in scalar_tags:
+
+            if tag == 'n_parms':
+                continue
+
+            tag_str = tag.replace(" ", "_").replace("/", "_")
+            if tag_str not in tags_to_grps_to_vals:
+                tags_to_grps_to_vals[tag_str] = {}
+
+            grp_name = get_grp_name(exp_cfg, hyperparams)
+            if grp_name not in tags_to_grps_to_vals[tag_str]:
+                tags_to_grps_to_vals[tag_str][grp_name] = []
+
+            events = event_acc.Scalars(tag)
+            steps, vals = zip(*[(e.step, e.value) for e in events])
+
+            tags_to_grps_to_vals[tag_str][grp_name].append((steps, vals))
+
+            if batch_cfg.plot_individual_runs:
+                plt.plot(steps, vals, label=tag)
+                plt.xlabel("n. updates")
+                plt.ylabel("vals")
+                plt.title(f"{task}, {exp_cfg.full_exp_name.replace('/', '_')}")
+                fig_path = os.path.join(log_dir, f'{tag_str}_curve.png')
+                plt.savefig(fig_path)
+                print(f"Saved plot to {fig_path}.")
+                plt.close()
+
+    for tag_str, grps_to_vals in tags_to_grps_to_vals.items():
+        plt.figure()
+
+        # Optional smoothing window (set batch_cfg.smooth_window = 1 to disable)
+        smooth_w = batch_cfg.smooth_window
+        smooth_std = batch_cfg.smooth_std  # also smooth the band by default
+
+        all_bands = []  # collect for tight ylim
+
+        for grp_name, runs in grps_to_vals.items():
+            # Convert runs to dicts for O(1) lookups
+            run_dicts = [dict(zip(steps, vals)) for steps, vals in runs]
+
+            # Collect all unique steps across runs
+            all_steps = sorted({s for steps, _ in runs for s in steps})
+
+            mean_vals = []
+            std_vals = []
+            for step in all_steps:
+                step_vals = [rd[step] for rd in run_dicts if step in rd]
+                if step_vals:
+                    mean_vals.append(np.mean(step_vals))
+                    std_vals.append(np.std(step_vals))
+                else:
+                    mean_vals.append(np.nan)
+                    std_vals.append(np.nan)
+
+            mean_vals = np.array(mean_vals, dtype=float)
+            std_vals  = np.array(std_vals, dtype=float)
+
+            # Smooth (NaN-safe, centered)
+            if smooth_w and smooth_w > 1:
+                mean_vals_s = _moving_avg_nan(mean_vals, smooth_w)
+                std_vals_s  = _moving_avg_nan(std_vals,  smooth_w) if smooth_std else std_vals
+            else:
+                mean_vals_s = mean_vals
+                std_vals_s  = std_vals
+
+            upper = mean_vals_s + std_vals_s
+            lower = mean_vals_s - std_vals_s
+            all_bands.append((lower, upper))
+
+            plt.plot(all_steps, mean_vals_s, label=grp_name)
+            plt.fill_between(all_steps, lower, upper, alpha=0.3)
+
+        # Axes cosmetics
+        plt.xlabel("n. updates")
+        # plt.ylabel(tag_str)
+        # plt.title(f"{task}, {batch_cfg.sweep_name} sweep")
+        plt.ylabel('vals')
+        plt.title(tag_str)
+
+        # Tight y-limits to band (with tiny epsilon to avoid clipping)
+        if all_bands:
+            lows  = np.nanmin(np.concatenate([lb for lb, _ in all_bands]), axis=None)
+            highs = np.nanmax(np.concatenate([ub for _, ub in all_bands]), axis=None)
+            if np.isfinite(lows) and np.isfinite(highs):
+                yr = highs - lows
+                eps = 1e-9 if yr == 0 else 1e-3 * yr
+                plt.ylim(lows - eps, highs + eps)
+
+        # Legend INSIDE the axes
+        plt.legend(loc='best', frameon=True, framealpha=0.85, fancybox=True)
+
+        plt.tight_layout()
+        fig_path = os.path.join(mean_plots_dir, f'{task}_{batch_cfg.sweep_name}_{tag_str}_mean_curve.png')
+        plt.savefig(fig_path)
+        print(f"Saved plot to {fig_path}.")
+        plt.close()
 
 
 def vis_cross_eval(exp_cfgs: List[Config], batch_cfg: BatchConfig, task: str, selective_table: bool = False):
