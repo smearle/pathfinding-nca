@@ -362,8 +362,8 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 render_paths = np.hstack(to_path(x[:cfg.render_minibatch_size]).cpu())
                 render_maze_ims = np.hstack(maze_ims[render_batch_idx])
                 target_path_ims = np.hstack(target_paths[render_batch_idx].cpu())
-                if cfg.manual_log or last_step or key_ckp_step:
-                    vis_train(logger, render_maze_ims, render_paths, target_path_ims, render_batch_idx, cfg.log_dir)
+                # if cfg.manual_log or last_step or key_ckp_step:
+                #     vis_train(logger, render_maze_ims, render_paths, target_path_ims, render_batch_idx, cfg.log_dir)
                 images = np.vstack((
                     render_maze_ims*255, 
                     np.tile(render_paths[...,None], (1, 1, 3))*255, 
@@ -392,7 +392,10 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
 
                 # Select random k for mutation.
                 evo_batch_size = env_gen_cfg.evo_batch_size
-                mut_idxs = th.randint(min(cfg.n_data, mazes_onehot.shape[0]), (evo_batch_size,))
+                # mut_idxs = th.randint(min(cfg.n_data, mazes_onehot.shape[0]), (evo_batch_size,))
+                # Select top k env_losses for mutation
+                env_losses_masked = th.where(th.isfinite(env_losses), env_losses, th.full_like(env_losses, -1e9))
+                mut_idxs = th.topk(env_losses_masked, evo_batch_size, largest=True).indices
                 offspring_mazes_onehot = mazes_onehot[mut_idxs]
                 offspring_maze_walls = mazes_onehot[mut_idxs, Tiles.WALL]
 
@@ -401,8 +404,10 @@ def train(model: PathfindingNN, opt: th.optim.Optimizer, maze_data: Mazes, maze_
                 wall_mut_mask = th.rand(offspring_maze_walls.shape) < .1
                 # disc_noise *= wall_mut_mask
                 disc_noise = wall_mut_mask
-                disc_noise[:, 0, :] = disc_noise[:, -1] = 0
-                disc_noise[:, :, 0] = disc_noise[:, :, -1] = 0
+                disc_noise[:, 0, :] = 0
+                disc_noise[:, -1] = 0
+                disc_noise[:, :, 0] = 0
+                disc_noise[:, :, -1] = 0
                 offspring_maze_walls = (offspring_maze_walls + disc_noise) % 2
                 offspring_mazes = offspring_maze_walls
 

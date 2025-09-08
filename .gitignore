@@ -5,3 +5,7 @@ runs
 submitit
 wandb
 .env
+runs_eval
+!runs_eval/tables.tex
+!runs_eval/table_template.tex
+.vscode
